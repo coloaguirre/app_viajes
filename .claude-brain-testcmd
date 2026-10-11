@@ -1,0 +1,3 @@
+# Test command the git guard hook (H3) runs before push/merge to dev/main.
+# First non-comment line is the command.
+./tools/run-tests.sh

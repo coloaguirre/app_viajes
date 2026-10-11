@@ -1,0 +1,43 @@
+# Android / Gradle
+.gradle/
+build/
+*/build/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Python (desktop-renderer, tools) — gestionado con uv
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+desktop-renderer/work/
+
+# Modelos y salidas pesadas (whisper, renders)
+*.ggml
+*.bin
+tools/sample-trips/**/out/
+logs/
+
+# Secretos — nunca al repo (claves de API van en local.properties o .env)
+.env
+
+# Configs locales de agentes de IA: pueden contener tokens y rutas
+.claude/settings.local.json
+.mcp.json
+
+# Sistema
+.DS_Store
