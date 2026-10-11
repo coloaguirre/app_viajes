@@ -169,3 +169,60 @@ nuevos. Impacto por cambio:
   "resumen rápido 1 min" desde la pantalla de fin de etapa; el motor
   completo queda en Fase 5. Reordena trabajo, no lo agrega. Riesgo R5
   (APIs de Media3 cambiantes) se adelanta una fase.
+
+## Pasada c — hallazgos del researcher (integrados)
+
+Informe completo: `docs/notes/estado-del-arte.md` (16 afirmaciones de la
+spec verificadas contra fuente oficial, hallazgos con evidencia,
+oportunidades, fuentes). Resumen de lo que entra a la tanda de preguntas:
+
+- [RIESGO] R1 alineación de páginas de 16 KB para librerías nativas
+  (whisper.cpp, MapLibre): exigida por Play desde 11/2025; en sideload
+  Android 16 muestra diálogo de compatibilidad. → criterio de aceptación
+  en Fase 0 y Fase 3.
+- [RIESGO] R2 tareas largas: Worker común tope ~10 min; `dataSync` y
+  `mediaProcessing` comparten presupuesto de 6 h/24 h; Android 16 pone
+  cuota a jobs concurrentes con un servicio en primer plano. → gestor
+  único de trabajos largos con `onTimeout` y reanudación.
+- [RIESGO] R3 Auto Backup de Android: tope 25 MB por app; la base de un
+  viaje de 30 días lo supera y entonces no se respalda nada. → excluir la
+  base del Auto Backup; respaldo oficial = `trip.json` automático (§16.3).
+- [RIESGO] R4 Whisper alucina en silencio o ruido exterior; la spec no
+  menciona detección de voz (VAD). whisper.cpp trae Silero VAD. → VAD
+  obligatorio y confianza por segmento.
+- [RIESGO] R5 términos de MapTiler prohíben guardar el mapa como imagen
+  estática fuera de la API: componer teselas en cuadros de video desde
+  Python es zona gris. → decisión del usuario (aceptar para uso personal
+  o cartografía propia con PMTiles, oportunidad O2).
+- [RIESGO] R6 endpoint de resumen de Wikipedia en transición 2026-27. →
+  mantener abstracción del cliente.
+- [RIESGO] R7 `creation_time` de MP4/MOV es el FIN de la grabación. →
+  restar la duración al vincular videos.
+- [GAP-IND] G1 transcripción local real ya en Fase 2 con el reconocedor
+  del sistema desde archivo (`EXTRA_AUDIO_SOURCE`, API 33); G2 semántica
+  de huecos GPS en la detección de paradas; G3 barómetro para desnivel;
+  G4 `GPSDateStamp/TimeStamp` del EXIF son UTC (ancla exacta y desfase de
+  cámara automático); G5 barrido incremental de MediaStore con
+  `GENERATION_ADDED` y exclusión de `IS_PENDING`; G6 KML particionado por
+  capa para My Maps (10 capas, 2.000 elementos/capa, 5 MB); G7 política
+  de resiliencia para APIs comunitarias (User-Agent, backoff, instancia
+  cambiable); G8 HEIC en el renderizador Python (`pillow-heif`); G9 el
+  Picker de Google Fotos no entrega ubicación y obliga a copiar.
+- [DIVERGENCIA] D-R1 ventana de interpolación 5/10 min vs 30 min de
+  exiftool; D-R2 namespace GPX propio vs Garmin TrackPointExtension;
+  D-R3 modelo whisper `base` vs `small` para español (medir antes de
+  fijar); D-R4 CI en GitHub Actions vs convención GitLab (proyecto
+  personal en GitHub: no es divergencia real).
+- [OPORTUNIDAD] O1 reescritura con ML Kit GenAI en el dispositivo; O2
+  cartografía propia PMTiles/Protomaps; O3 vista previa con
+  `CompositionPlayer`; O4 corrección de altitud con DEM offline; O5
+  detector de paradas robusto a huecos; O6 nombre de localidad offline
+  (GeoNames); O7 selección estética y recorte 9:16 con caras; O8 segundo
+  motor de transcripción (`sherpa-onnx`); O9 sobrevuelo 3D (no viable en
+  MapLibre Native hoy).
+
+Vigencia verificada: límites de servicios en primer plano (`location` sin
+límite), política de fotos de Play en vigor desde 2025-05-28, Google Fotos
+Library API solo contenido propio, Media3 1.10 estable, My Maps límites
+confirmados, target 36 coherente con el patrón anual (no confirmado en
+página oficial).
