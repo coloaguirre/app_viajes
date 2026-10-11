@@ -101,6 +101,7 @@ adb logcat -s Bitacora:* AndroidRuntime:E
 adb exec-out screencap -p > /tmp/screen.png   # luego leer la imagen para verificar la UI
 uv run --project tools/gpx-replay python tools/gpx-replay/replay.py tools/sample-trips/trekking/track.gpx --speed 20
 cd desktop-renderer && uv run pytest
+uv run --with openpyxl python tools/gantt.py   # regenera reports/gantt.xlsx desde PLAN.md + git
 ```
 
 ## Reglas que no se negocian

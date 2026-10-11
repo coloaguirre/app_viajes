@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 import subprocess
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 from openpyxl import Workbook
