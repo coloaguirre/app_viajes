@@ -3,8 +3,8 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **0 — no iniciada**
-- Última actualización: —
+- Fase: **0 — Esqueleto y entorno, por iniciar** (PLAN.md aprobado 2026-10-11)
+- Última actualización: 2026-10-11
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |

@@ -1,5 +1,5 @@
 # PLAN — app-viajes (Bitácora de Viaje)
-Estado: BORRADOR · Tipo: otro (app móvil Android personal + renderizador Python de escritorio)
+Estado: APROBADO (2026-10-11) · Tipo: otro (app móvil Android personal + renderizador Python de escritorio)
 Fuentes: docs/incoming/DISENO.md · docs/incoming/pedido-original.md · docs/incoming/pedido-original-adenda-1.md · docs/incoming/README-paquete-arranque.md
 Inicio: 2026-10-11 · Fin: 2027-03-12 (propuesto; ver §4 Calendario)
 Kickoff: 19 preguntas en 2 rondas · researcher: sí
