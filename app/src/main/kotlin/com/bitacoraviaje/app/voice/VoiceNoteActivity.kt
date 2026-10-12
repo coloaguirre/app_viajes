@@ -47,8 +47,11 @@ import com.bitacoraviaje.app.ui.theme.BitacoraTheme
 import com.bitacoraviaje.data.repository.TrackingRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Translucent recording bubble (DISENO §8.2). Opened from the notification action, the
@@ -118,7 +121,7 @@ class VoiceNoteActivity : ComponentActivity() {
                                         Button(onClick = { finishRecording() }, modifier = Modifier.weight(1f).height(56.dp).testTag("voice_done")) { Text(stringResource(R.string.voice_done)) }
                                     }
                                 }
-                                else -> Text(stringResource(R.string.voice_saving), style = MaterialTheme.typography.bodyLarge)
+                                else -> Text(stringResource(if (startedUtcMs == 0L) R.string.voice_preparing else R.string.voice_saving), style = MaterialTheme.typography.bodyLarge)
                             }
                         }
                     }
@@ -154,32 +157,39 @@ class VoiceNoteActivity : ComponentActivity() {
             state = State.DONE
             return
         }
-        try {
-            recorder.start(file)
-        } catch (e: Exception) {
-            Log.w(TAG, "recorder start failed: ${e.javaClass.simpleName} ${e.message}")
-            errorRes = R.string.voice_mic_failed
-            state = State.DONE
-            return
+        state = State.SAVING // "preparing" while the recorder starts off the main thread
+        lifecycleScope.launch {
+            // MediaRecorder.start() can block for seconds when the audio HAL is missing or busy
+            // (measured: ANR on the emulator without audio). Never on the main thread, and bounded.
+            val started = withTimeoutOrNull(START_TIMEOUT_MS) {
+                withContext(Dispatchers.IO) { runCatching { recorder.start(file) }.onFailure { Log.w(TAG, "recorder start failed: ${it.javaClass.simpleName} ${it.message}") }.isSuccess }
+            } ?: false
+            if (!started) {
+                withContext(Dispatchers.IO) { recorder.cancel() }
+                file.delete()
+                errorRes = R.string.voice_mic_failed
+                state = State.DONE
+                return@launch
+            }
+            startedUtcMs = System.currentTimeMillis()
+            vibrate(longArrayOf(0, 40))
+            state = State.RECORDING
         }
-        startedUtcMs = System.currentTimeMillis()
-        vibrate(longArrayOf(0, 40))
-        state = State.RECORDING
     }
 
     private fun finishRecording() {
         val seg = segmentId ?: return
         val trip = tripId ?: return
         state = State.SAVING
-        val ok = recorder.stop()
-        vibrate(longArrayOf(0, 40, 80, 40))
-        if (!ok) {
-            VoiceRecorder.fileFor(this, trip, noteId).delete()
-            finishAndRemoveTask()
-            return
-        }
         val duration = System.currentTimeMillis() - startedUtcMs
         lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) { recorder.stop() }
+            vibrate(longArrayOf(0, 40, 80, 40))
+            if (!ok) {
+                VoiceRecorder.fileFor(this@VoiceNoteActivity, trip, noteId).delete()
+                finishAndRemoveTask()
+                return@launch
+            }
             val pos = controller.position()
             controller.saveVoiceNote(seg, trip, noteId, startedUtcMs, duration, pos)
             Log.i(TAG, "voice note saved id=$noteId duration=${duration}ms pos=${pos.lat != null}")
@@ -188,9 +198,11 @@ class VoiceNoteActivity : ComponentActivity() {
     }
 
     private fun cancelRecording() {
-        recorder.cancel()
-        tripId?.let { VoiceRecorder.fileFor(this, it, noteId).delete() }
-        finishAndRemoveTask()
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) { recorder.cancel() }
+            tripId?.let { VoiceRecorder.fileFor(this@VoiceNoteActivity, it, noteId).delete() }
+            finishAndRemoveTask()
+        }
     }
 
     override fun onDestroy() {
@@ -205,6 +217,7 @@ class VoiceNoteActivity : ComponentActivity() {
 
     companion object {
         const val TAG = "Bitacora"
+        const val START_TIMEOUT_MS = 4_000L
 
         fun intent(context: Context): Intent = Intent(context, VoiceNoteActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
     }

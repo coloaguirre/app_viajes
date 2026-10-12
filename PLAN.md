@@ -261,7 +261,7 @@ su aceptación es la evidencia que él aporta, registrada en
       `Transcriber`.  (est: 2.5)
       Aceptación: nota grabada en el emulador aparece en la línea de
       tiempo con ubicación; tests de la interfaz con stub.
-- [ ] 2.5 Notas de texto, marcadores y destacados.  (est: 0.5)
+- [x] 2.5 Notas de texto, marcadores y destacados.  (est: 0.5)
       Aceptación: tests de DAO; aparecen en la línea de tiempo.
 - [ ] 2.6 `core/timeline`: `buildTimeline` puro con agrupación de
       momentos, resúmenes intermedios y cambio de día.  (est: 1.5)

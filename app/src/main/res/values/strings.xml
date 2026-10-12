@@ -99,6 +99,7 @@
     <string name="voice_recording">Grabando… tocá Listo al terminar</string>
     <string name="voice_done">Listo</string>
     <string name="voice_saving">Guardando la nota…</string>
+    <string name="voice_preparing">Preparando el micrófono…</string>
     <string name="voice_close">Cerrar</string>
     <string name="voice_no_session">No hay un registro en curso: iniciá una etapa para dictar notas.</string>
     <string name="voice_no_space">No hay espacio suficiente en el teléfono para grabar.</string>
