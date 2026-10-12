@@ -102,6 +102,17 @@ data class TrackPointEntity(
     @ColumnInfo(name = "is_simplified_keep") val isSimplifiedKeep: Boolean,
 )
 
+/**
+ * Clock offset the user confirmed for one camera ("Make Model") in a trip (DISENO §7.6 step 4).
+ * Applied on every rescan so the correction survives the next media sweep.
+ */
+@Entity(tableName = "camera_clock_offset", primaryKeys = ["trip_id", "camera"])
+data class CameraClockOffsetEntity(
+    @ColumnInfo(name = "trip_id") val tripId: String,
+    val camera: String,
+    @ColumnInfo(name = "offset_ms") val offsetMs: Long,
+)
+
 @Entity(
     tableName = "media_item",
     foreignKeys = [

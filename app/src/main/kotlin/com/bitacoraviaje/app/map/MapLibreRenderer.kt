@@ -55,7 +55,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
     private val styleUrl = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
 
     @Composable
-    override fun TrackMap(state: TrackMapState, modifier: Modifier) {
+    override fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)?) {
         if (!isConfigured) {
             Box(modifier, contentAlignment = Alignment.Center) {
                 Text(
@@ -96,15 +96,16 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
                     getMapAsync { map ->
                         map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
                             holder.attach(map, style)
-                            holder.render(state)
+                            holder.latest?.let(holder::render)
                         }
                         map.addOnCameraMoveStartedListener { reason ->
                             if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) holder.userMoved = true
                         }
+                        map.addOnMapClickListener { ll -> holder.onClick?.invoke(MapPoint(ll.latitude, ll.longitude)); holder.onClick != null }
                     }
                 }
             },
-            update = { holder.render(state) },
+            update = { holder.onClick = onMapClick; holder.latest = state; holder.render(state) },
             modifier = modifier.fillMaxSize(),
         )
     }
@@ -115,7 +116,12 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         private var trackSource: GeoJsonSource? = null
         private var pointSource: GeoJsonSource? = null
         private var framedOnce = false
-        private var lastTrack: List<MapPoint>? = null
+        /** Last state handed by Compose; replayed when the style finishes loading after the last recomposition. */
+        var latest: TrackMapState? = null
+        private var lastTracks: List<List<MapPoint>>? = null
+        private var lastMarkers: List<MapMarker>? = null
+        private var lastFocus: MapPoint? = null
+        var onClick: ((MapPoint) -> Unit)? = null
         private var lastCurrent: MapPoint? = null
         private var lastStops: List<MapPoint>? = null
         var userMoved = false
@@ -141,6 +147,25 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
                 ).withFilter(org.maplibre.android.style.expressions.Expression.eq(org.maplibre.android.style.expressions.Expression.get("kind"), "stop")),
             )
             style.addLayer(
+                CircleLayer(LAYER_MARKERS, SRC_POINTS).withProperties(
+                    PropertyFactory.circleColor(
+                        org.maplibre.android.style.expressions.Expression.match(
+                            org.maplibre.android.style.expressions.Expression.get("kind"),
+                            org.maplibre.android.style.expressions.Expression.rgb(31, 56, 100),
+                            org.maplibre.android.style.expressions.Expression.stop("PHOTO", org.maplibre.android.style.expressions.Expression.rgb(0, 150, 136)),
+                            org.maplibre.android.style.expressions.Expression.stop("VIDEO", org.maplibre.android.style.expressions.Expression.rgb(0, 121, 107)),
+                            org.maplibre.android.style.expressions.Expression.stop("VOICE", org.maplibre.android.style.expressions.Expression.rgb(156, 39, 176)),
+                            org.maplibre.android.style.expressions.Expression.stop("TEXT", org.maplibre.android.style.expressions.Expression.rgb(96, 125, 139)),
+                            org.maplibre.android.style.expressions.Expression.stop("HIGHLIGHT", org.maplibre.android.style.expressions.Expression.rgb(255, 152, 0)),
+                            org.maplibre.android.style.expressions.Expression.stop("PLACED", org.maplibre.android.style.expressions.Expression.rgb(211, 47, 47)),
+                        ),
+                    ),
+                    PropertyFactory.circleRadius(8f),
+                    PropertyFactory.circleStrokeColor("#FFFFFF"),
+                    PropertyFactory.circleStrokeWidth(2f),
+                ).withFilter(org.maplibre.android.style.expressions.Expression.eq(org.maplibre.android.style.expressions.Expression.get("layer"), "marker")),
+            )
+            style.addLayer(
                 CircleLayer(LAYER_CURRENT, SRC_POINTS).withProperties(
                     PropertyFactory.circleColor("#1F3864"),
                     PropertyFactory.circleRadius(9f),
@@ -153,22 +178,31 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         fun render(state: TrackMapState) {
             val m = map ?: return
             // The screen recomposes every second (elapsed time); only touch the GPU sources when the data changed (I11).
-            if (state.track !== lastTrack) {
-                lastTrack = state.track
-                val line = if (state.track.size >= 2) LineString.fromLngLats(state.track.map { Point.fromLngLat(it.lon, it.lat) }) else null
-                trackSource?.setGeoJson(if (line != null) FeatureCollection.fromFeature(Feature.fromGeometry(line)) else FeatureCollection.fromFeatures(emptyList()))
+            if (state.tracks !== lastTracks) {
+                lastTracks = state.tracks
+                val lines = state.tracks.filter { it.size >= 2 }.map { t -> Feature.fromGeometry(LineString.fromLngLats(t.map { Point.fromLngLat(it.lon, it.lat) })) }
+                trackSource?.setGeoJson(FeatureCollection.fromFeatures(lines))
             }
-            if (state.current != lastCurrent || state.stops !== lastStops) {
+            if (state.current != lastCurrent || state.stops !== lastStops || state.markers !== lastMarkers) {
                 lastCurrent = state.current
                 lastStops = state.stops
+                lastMarkers = state.markers
                 val features = ArrayList<Feature>()
                 state.stops.forEach { s -> features += Feature.fromGeometry(Point.fromLngLat(s.lon, s.lat)).also { it.addStringProperty("kind", "stop") } }
+                state.markers.forEach { m -> features += Feature.fromGeometry(Point.fromLngLat(m.point.lon, m.point.lat)).also { it.addStringProperty("layer", "marker"); it.addStringProperty("kind", m.kind.name); it.addStringProperty("id", m.id) } }
                 state.current?.let { c -> features += Feature.fromGeometry(Point.fromLngLat(c.lon, c.lat)).also { it.addStringProperty("kind", "current") } }
                 pointSource?.setGeoJson(FeatureCollection.fromFeatures(features))
             }
+            if (state.focus != null && state.focus != lastFocus) {
+                lastFocus = state.focus
+                framedOnce = true
+                m.easeCamera(CameraUpdateFactory.newLatLngZoom(LatLng(state.focus.lat, state.focus.lon), maxOf(m.cameraPosition.zoom, 15.0)), 600)
+                return
+            }
 
-            if (!framedOnce && state.track.size >= 2) {
-                val b = LatLngBounds.Builder().also { bb -> state.track.forEach { bb.include(LatLng(it.lat, it.lon)) } }.build()
+            val all = state.tracks.flatten()
+            if (!framedOnce && all.size >= 2) {
+                val b = LatLngBounds.Builder().also { bb -> all.forEach { bb.include(LatLng(it.lat, it.lon)) } }.build()
                 m.moveCamera(CameraUpdateFactory.newLatLngBounds(b, 80))
                 framedOnce = true
             } else if (state.follow && !userMoved && state.current != null) {
@@ -187,6 +221,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
             const val SRC_POINTS = "points"
             const val LAYER_TRACK = "track-line"
             const val LAYER_STOPS = "stops"
+            const val LAYER_MARKERS = "markers"
             const val LAYER_CURRENT = "current"
         }
     }

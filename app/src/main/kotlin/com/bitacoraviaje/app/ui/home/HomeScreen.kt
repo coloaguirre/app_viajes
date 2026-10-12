@@ -1,5 +1,6 @@
 package com.bitacoraviaje.app.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,7 +43,7 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.model.Trip
 
 @Composable
-fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActiveSession: (String) -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActiveSession: (String) -> Unit, onOpenTrip: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val denied = stringResource(R.string.home_permission_denied)
@@ -62,6 +63,7 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
         onResumeActive = { id -> onOpenActiveSession(id) },
         onRecoverResume = viewModel::resumeOpenSegment,
         onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
+        onOpenTrip = onOpenTrip,
     )
 }
 
@@ -75,6 +77,7 @@ fun HomeScreen(
     onResumeActive: (String) -> Unit,
     onRecoverResume: () -> Unit = {},
     onRecoverClose: () -> Unit = {},
+    onOpenTrip: (String) -> Unit = {},
 ) {
     if (state.needsRecovery) {
         AlertDialog(
@@ -123,7 +126,7 @@ fun HomeScreen(
             if (state.trips.isEmpty()) {
                 EmptyTrips()
             } else {
-                TripList(state.trips)
+                TripList(state.trips, onOpenTrip)
             }
         }
     }
@@ -147,12 +150,13 @@ private fun EmptyTrips() {
 }
 
 @Composable
-private fun TripList(trips: List<Trip>) {
+private fun TripList(trips: List<Trip>, onOpenTrip: (String) -> Unit) {
     LazyColumn(Modifier.fillMaxSize()) {
         items(trips, key = { it.id }) { trip ->
             ListItem(
                 headlineContent = { Text(trip.title) },
-                supportingContent = { Text(trip.status.name) },
+                supportingContent = { Text(stringResource(if (trip.status == com.bitacoraviaje.core.model.TripStatus.ACTIVE) R.string.trip_status_active else R.string.trip_status_finished)) },
+                modifier = Modifier.clickable { onOpenTrip(trip.id) }.testTag("home_trip_${trip.id}"),
             )
         }
     }

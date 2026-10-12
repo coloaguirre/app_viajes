@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
 import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.TextNoteEntity
 import com.bitacoraviaje.data.db.entity.VoiceNoteEntity
@@ -163,6 +164,9 @@ interface VoiceNoteDao {
     @Query("SELECT * FROM voice_note WHERE id = :id")
     suspend fun getById(id: String): VoiceNoteEntity?
 
+    @Query("SELECT * FROM voice_note WHERE id = :id")
+    fun observeById(id: String): Flow<VoiceNoteEntity?>
+
     @Query("SELECT * FROM voice_note WHERE segment_id = :segmentId ORDER BY started_utc_ms")
     fun observeBySegment(segmentId: String): Flow<List<VoiceNoteEntity>>
 
@@ -214,4 +218,13 @@ interface StopDao {
         deleteBySegment(segmentId)
         insertAll(stops)
     }
+}
+
+@Dao
+interface CameraClockOffsetDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: CameraClockOffsetEntity)
+
+    @Query("SELECT * FROM camera_clock_offset WHERE trip_id = :tripId")
+    suspend fun getByTrip(tripId: String): List<CameraClockOffsetEntity>
 }

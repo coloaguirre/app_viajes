@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.bitacoraviaje.data.db.dao.CameraClockOffsetDao
 import com.bitacoraviaje.data.db.dao.MediaDao
 import com.bitacoraviaje.data.db.dao.SegmentDao
 import com.bitacoraviaje.data.db.dao.StopDao
@@ -11,6 +12,7 @@ import com.bitacoraviaje.data.db.dao.TextNoteDao
 import com.bitacoraviaje.data.db.dao.VoiceNoteDao
 import com.bitacoraviaje.data.db.dao.TrackPointDao
 import com.bitacoraviaje.data.db.dao.TripDao
+import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
 import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
@@ -27,9 +29,10 @@ import com.bitacoraviaje.data.db.entity.TripEntity
  *  2 — item 1.5: track_point.monotonic_ms (clock-change resilience).
  *  3 — item 2.2: media_item (photos and videos linked to the trip).
  *  4 — items 2.4/2.5: voice_note and text_note.
+ *  5 — item 2.7: camera_clock_offset (per-camera clock fix that survives rescans).
  */
 @Database(
-    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class],
+    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class],
     version = BitacoraDatabase.VERSION,
     exportSchema = true,
 )
@@ -41,9 +44,10 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun voiceNoteDao(): VoiceNoteDao
     abstract fun textNoteDao(): TextNoteDao
+    abstract fun cameraClockOffsetDao(): CameraClockOffsetDao
 
     companion object {
-        const val VERSION = 4
+        const val VERSION = 5
         const val NAME = "bitacora.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -130,6 +134,19 @@ abstract class BitacoraDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS camera_clock_offset (
+                        trip_id TEXT NOT NULL,
+                        camera TEXT NOT NULL,
+                        offset_ms INTEGER NOT NULL,
+                        PRIMARY KEY(trip_id, camera)
+                    )""",
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
     }
 }

@@ -49,19 +49,45 @@ class MediaLinker @Inject constructor(
         return link(open.tripId, candidates, segments, nowUtcMs)
     }
 
+    /**
+     * DISENO §7.6 step 4: shift the capture time of every automatically linked item of
+     * [camera] ("Make Model") by [offsetMs] and re-link them from the track. Manual
+     * placements and exclusions are kept.
+     */
+    suspend fun applyCameraOffset(tripId: String, camera: String, offsetMs: Long, nowUtcMs: Long = System.currentTimeMillis()) {
+        val segments = tracking.segmentsOf(tripId)
+        val pointsCache = HashMap<String, List<TrackPoint>>()
+        // Items already carry the previously confirmed offset: store the accumulated total for future scans.
+        media.setCameraOffset(tripId, camera, (media.cameraOffsets(tripId)[camera] ?: 0L) + offsetMs)
+        val updated = media.allOfTrip(tripId).filter { m ->
+            listOfNotNull(m.cameraMake, m.cameraModel).joinToString(" ") == camera && m.linkMethod != com.bitacoraviaje.core.model.LinkMethod.MANUAL && !m.isExcluded
+        }.map { m ->
+            val taken = m.takenUtcMs + offsetMs
+            val segment = segmentFor(taken, segments, nowUtcMs)
+            val points = segment?.let { s -> pointsCache.getOrPut(s.id) { tracking.validPoints(s.id) } } ?: emptyList()
+            // EXIF GPS stays authoritative when present; only the time moved.
+            val link = linkMedia(taken, m.exifLat, m.exifLon, segment, points)
+            m.copy(takenUtcMs = taken, segmentId = link.segmentId, linkedLat = link.lat, linkedLon = link.lon, linkMethod = link.method, linkConfidence = link.confidence, linkTimeGapMs = link.timeGapMs, needsReview = link.needsReview)
+        }
+        media.upsertAll(updated)
+        Log.i(TAG, "camera offset applied camera=$camera offsetMs=$offsetMs items=${updated.size}")
+    }
+
     private suspend fun link(tripId: String, candidates: List<MediaCandidate>, segments: List<Segment>, nowUtcMs: Long): Result {
         var linked = 0
         var review = 0
         var skipped = 0
         val pointsCache = HashMap<String, List<TrackPoint>>()
         val items = ArrayList<MediaItem>()
+        val offsets = media.cameraOffsets(tripId)
         for (c in candidates) {
             val existing = media.getByMediaStoreId(c.mediaStoreId)
             if (existing != null && (existing.linkMethod == com.bitacoraviaje.core.model.LinkMethod.MANUAL || existing.isExcluded)) {
                 skipped++
                 continue
             }
-            val (taken, source) = resolveTakenTime(c, segments, nowUtcMs)
+            val (resolved, source) = resolveTakenTime(c, segments, nowUtcMs)
+            val taken = resolved + (offsets[listOfNotNull(c.exif?.make, c.exif?.model).joinToString(" ")] ?: 0L)
             val segment = segmentFor(taken, segments, nowUtcMs)
             if (segment == null) {
                 skipped++

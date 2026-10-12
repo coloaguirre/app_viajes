@@ -261,12 +261,15 @@ su aceptación es la evidencia que él aporta, registrada en
       `Transcriber`.  (est: 2.5)
       Aceptación: nota grabada en el emulador aparece en la línea de
       tiempo con ubicación; tests de la interfaz con stub.
+      Estado 2026-10-12: aceptación cumplida en el emulador (nota en la línea
+      de tiempo con ubicación, detalle editable, reintento); queda la prueba
+      con micrófono real y transcripción en el Pixel, que se hace junto con 2.8.
 - [x] 2.5 Notas de texto, marcadores y destacados.  (est: 0.5)
       Aceptación: tests de DAO; aparecen en la línea de tiempo.
-- [ ] 2.6 `core/timeline`: `buildTimeline` puro con agrupación de
+- [x] 2.6 `core/timeline`: `buildTimeline` puro con agrupación de
       momentos, resúmenes intermedios y cambio de día.  (est: 1.5)
       Aceptación: tests unitarios con fixture de etapa completa.
-- [ ] 2.7 UI: detalle de viaje con pestañas línea de tiempo / mapa /
+- [x] 2.7 UI: detalle de viaje con pestañas línea de tiempo / mapa /
       fotos sincronizadas; revisión de medios sin ubicación con
       ubicación manual; detalle de nota de voz editable.  (est: 2.5)
       Aceptación: prueba de Compose del flujo de revisión; capturas.

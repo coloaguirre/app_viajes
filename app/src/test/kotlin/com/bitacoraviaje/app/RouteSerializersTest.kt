@@ -18,5 +18,8 @@ class RouteSerializersTest {
         assertEquals("com.bitacoraviaje.app.ui.navigation.Route.ActiveSession", serializer<Route.ActiveSession>().descriptor.serialName)
         assertEquals("com.bitacoraviaje.app.ui.navigation.Route.NewSession", serializer<Route.NewSession>().descriptor.serialName)
         assertEquals("com.bitacoraviaje.app.ui.navigation.Route.FinishSegment", serializer<Route.FinishSegment>().descriptor.serialName)
+        assertEquals("com.bitacoraviaje.app.ui.navigation.Route.TripDetail", serializer<Route.TripDetail>().descriptor.serialName)
+        assertEquals("com.bitacoraviaje.app.ui.navigation.Route.MediaReview", serializer<Route.MediaReview>().descriptor.serialName)
+        assertEquals("com.bitacoraviaje.app.ui.navigation.Route.VoiceNoteDetail", serializer<Route.VoiceNoteDetail>().descriptor.serialName)
     }
 }

@@ -75,8 +75,20 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 4 to 5 adds camera_clock_offset keyed by trip and camera`() {
+        helper.createDatabase(DB_NAME, 4).use { v4 ->
+            v4.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+        }
+        val v5 = helper.runMigrationsAndValidate(DB_NAME, 5, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v5.execSQL("INSERT INTO camera_clock_offset (trip_id,camera,offset_ms) VALUES ('t','Canon EOS',3720000)")
+        v5.execSQL("INSERT OR REPLACE INTO camera_clock_offset (trip_id,camera,offset_ms) VALUES ('t','Canon EOS',60000)")
+        v5.query("SELECT offset_ms FROM camera_clock_offset WHERE trip_id='t' AND camera='Canon EOS'").use { c -> c.moveToFirst(); assertEquals(60000L, c.getLong(0)) }
+        v5.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(4, BitacoraDatabase.VERSION)
+        assertEquals(5, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

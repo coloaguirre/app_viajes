@@ -17,6 +17,7 @@ kotlin {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:geo"))
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
 }

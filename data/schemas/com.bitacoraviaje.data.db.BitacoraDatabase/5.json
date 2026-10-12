@@ -1,0 +1,1018 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "51330bbf4b1add56ff14ef5a4d791400",
+    "entities": [
+      {
+        "tableName": "trip",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `created_utc_ms` INTEGER NOT NULL, `started_utc_ms` INTEGER, `ended_utc_ms` INTEGER, `cover_media_id` TEXT, `status` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdUtcMs",
+            "columnName": "created_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedUtcMs",
+            "columnName": "started_utc_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "endedUtcMs",
+            "columnName": "ended_utc_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "coverMediaId",
+            "columnName": "cover_media_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "segment",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `trip_id` TEXT NOT NULL, `parent_segment_id` TEXT, `type` TEXT NOT NULL, `transport` TEXT, `title` TEXT, `intent_text` TEXT, `started_utc_ms` INTEGER NOT NULL, `ended_utc_ms` INTEGER, `tz_id` TEXT NOT NULL, `sampling_profile` TEXT NOT NULL, `recording_mode` TEXT NOT NULL, `auto_created` INTEGER NOT NULL, `status` TEXT NOT NULL, `distance_m` REAL, `moving_time_ms` INTEGER, `total_time_ms` INTEGER, `max_speed_mps` REAL, `avg_moving_speed_mps` REAL, `elevation_gain_m` REAL, `elevation_loss_m` REAL, `min_alt_m` REAL, `max_alt_m` REAL, `bbox_min_lat` REAL, `bbox_min_lon` REAL, `bbox_max_lat` REAL, `bbox_max_lon` REAL, PRIMARY KEY(`id`), FOREIGN KEY(`trip_id`) REFERENCES `trip`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`parent_segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tripId",
+            "columnName": "trip_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentSegmentId",
+            "columnName": "parent_segment_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transport",
+            "columnName": "transport",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "intentText",
+            "columnName": "intent_text",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "startedUtcMs",
+            "columnName": "started_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedUtcMs",
+            "columnName": "ended_utc_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "tzId",
+            "columnName": "tz_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "samplingProfile",
+            "columnName": "sampling_profile",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordingMode",
+            "columnName": "recording_mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoCreated",
+            "columnName": "auto_created",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceM",
+            "columnName": "distance_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "movingTimeMs",
+            "columnName": "moving_time_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "totalTimeMs",
+            "columnName": "total_time_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "maxSpeedMps",
+            "columnName": "max_speed_mps",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "avgMovingSpeedMps",
+            "columnName": "avg_moving_speed_mps",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "elevationGainM",
+            "columnName": "elevation_gain_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "elevationLossM",
+            "columnName": "elevation_loss_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "minAltM",
+            "columnName": "min_alt_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "maxAltM",
+            "columnName": "max_alt_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bboxMinLat",
+            "columnName": "bbox_min_lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bboxMinLon",
+            "columnName": "bbox_min_lon",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bboxMaxLat",
+            "columnName": "bbox_max_lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bboxMaxLon",
+            "columnName": "bbox_max_lon",
+            "affinity": "REAL"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_segment_trip",
+            "unique": false,
+            "columnNames": [
+              "trip_id",
+              "started_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_segment_trip` ON `${TABLE_NAME}` (`trip_id`, `started_utc_ms`)"
+          },
+          {
+            "name": "index_segment_parent_segment_id",
+            "unique": false,
+            "columnNames": [
+              "parent_segment_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_segment_parent_segment_id` ON `${TABLE_NAME}` (`parent_segment_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "trip",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "trip_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "segment",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "parent_segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "segment_pause",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `segment_id` TEXT NOT NULL, `kind` TEXT NOT NULL, `paused_utc_ms` INTEGER NOT NULL, `resumed_utc_ms` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pausedUtcMs",
+            "columnName": "paused_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resumedUtcMs",
+            "columnName": "resumed_utc_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_pause_segment",
+            "unique": false,
+            "columnNames": [
+              "segment_id",
+              "paused_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_pause_segment` ON `${TABLE_NAME}` (`segment_id`, `paused_utc_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "segment",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "track_point",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `segment_id` TEXT NOT NULL, `time_utc_ms` INTEGER NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `alt_m` REAL, `alt_msl_m` REAL, `h_accuracy_m` REAL, `v_accuracy_m` REAL, `speed_mps` REAL, `speed_accuracy_mps` REAL, `bearing_deg` REAL, `provider` TEXT, `activity` TEXT, `is_mock` INTEGER NOT NULL, `monotonic_ms` INTEGER, `is_filtered_out` INTEGER NOT NULL, `is_simplified_keep` INTEGER NOT NULL, FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeUtcMs",
+            "columnName": "time_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "altM",
+            "columnName": "alt_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "altMslM",
+            "columnName": "alt_msl_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "hAccuracyM",
+            "columnName": "h_accuracy_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "vAccuracyM",
+            "columnName": "v_accuracy_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "speedMps",
+            "columnName": "speed_mps",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "speedAccuracyMps",
+            "columnName": "speed_accuracy_mps",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bearingDeg",
+            "columnName": "bearing_deg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "activity",
+            "columnName": "activity",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isMock",
+            "columnName": "is_mock",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "monotonicMs",
+            "columnName": "monotonic_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isFilteredOut",
+            "columnName": "is_filtered_out",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSimplifiedKeep",
+            "columnName": "is_simplified_keep",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_tp_segment_time",
+            "unique": false,
+            "columnNames": [
+              "segment_id",
+              "time_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_tp_segment_time` ON `${TABLE_NAME}` (`segment_id`, `time_utc_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "segment",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "stop",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `segment_id` TEXT NOT NULL, `start_utc_ms` INTEGER NOT NULL, `end_utc_ms` INTEGER NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `radius_m` REAL NOT NULL, `place_id` TEXT, `user_label` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startUtcMs",
+            "columnName": "start_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endUtcMs",
+            "columnName": "end_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "radiusM",
+            "columnName": "radius_m",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placeId",
+            "columnName": "place_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userLabel",
+            "columnName": "user_label",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_stop_segment",
+            "unique": false,
+            "columnNames": [
+              "segment_id",
+              "start_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_stop_segment` ON `${TABLE_NAME}` (`segment_id`, `start_utc_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "segment",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `trip_id` TEXT NOT NULL, `segment_id` TEXT, `kind` TEXT NOT NULL, `source` TEXT NOT NULL, `content_uri` TEXT, `mediastore_id` INTEGER, `display_name` TEXT, `mime_type` TEXT, `size_bytes` INTEGER, `width` INTEGER, `height` INTEGER, `duration_ms` INTEGER, `orientation_deg` INTEGER, `taken_utc_ms` INTEGER NOT NULL, `taken_time_source` TEXT NOT NULL, `exif_lat` REAL, `exif_lon` REAL, `camera_make` TEXT, `camera_model` TEXT, `linked_lat` REAL, `linked_lon` REAL, `link_method` TEXT NOT NULL, `link_confidence` REAL NOT NULL, `link_time_gap_ms` INTEGER, `needs_review` INTEGER NOT NULL, `sha256` TEXT, `user_caption` TEXT, `is_favorite` INTEGER NOT NULL, `is_excluded` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`trip_id`) REFERENCES `trip`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tripId",
+            "columnName": "trip_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentUri",
+            "columnName": "content_uri",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "mediastore_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "size_bytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "orientationDeg",
+            "columnName": "orientation_deg",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "takenUtcMs",
+            "columnName": "taken_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "takenTimeSource",
+            "columnName": "taken_time_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exifLat",
+            "columnName": "exif_lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "exifLon",
+            "columnName": "exif_lon",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "cameraMake",
+            "columnName": "camera_make",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cameraModel",
+            "columnName": "camera_model",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "linkedLat",
+            "columnName": "linked_lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "linkedLon",
+            "columnName": "linked_lon",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "linkMethod",
+            "columnName": "link_method",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "linkConfidence",
+            "columnName": "link_confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "linkTimeGapMs",
+            "columnName": "link_time_gap_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "needsReview",
+            "columnName": "needs_review",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userCaption",
+            "columnName": "user_caption",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "is_favorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isExcluded",
+            "columnName": "is_excluded",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_media_trip_time",
+            "unique": false,
+            "columnNames": [
+              "trip_id",
+              "taken_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_media_trip_time` ON `${TABLE_NAME}` (`trip_id`, `taken_utc_ms`)"
+          },
+          {
+            "name": "idx_media_ms",
+            "unique": true,
+            "columnNames": [
+              "mediastore_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `idx_media_ms` ON `${TABLE_NAME}` (`mediastore_id`)"
+          },
+          {
+            "name": "index_media_item_segment_id",
+            "unique": false,
+            "columnNames": [
+              "segment_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_item_segment_id` ON `${TABLE_NAME}` (`segment_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "trip",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "trip_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "segment",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "voice_note",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `segment_id` TEXT NOT NULL, `started_utc_ms` INTEGER NOT NULL, `duration_ms` INTEGER NOT NULL, `lat` REAL, `lon` REAL, `h_accuracy_m` REAL, `audio_path` TEXT NOT NULL, `audio_format` TEXT NOT NULL, `transcript` TEXT, `transcript_edited` TEXT, `transcript_lang` TEXT, `transcript_engine` TEXT, `transcript_status` TEXT NOT NULL, `transcript_segments_json` TEXT, `media_item_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedUtcMs",
+            "columnName": "started_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "hAccuracyM",
+            "columnName": "h_accuracy_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "audioPath",
+            "columnName": "audio_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioFormat",
+            "columnName": "audio_format",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transcript",
+            "columnName": "transcript",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "transcriptEdited",
+            "columnName": "transcript_edited",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "transcriptLang",
+            "columnName": "transcript_lang",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "transcriptEngine",
+            "columnName": "transcript_engine",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "transcriptStatus",
+            "columnName": "transcript_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transcriptSegmentsJson",
+            "columnName": "transcript_segments_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mediaItemId",
+            "columnName": "media_item_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_voice_segment_time",
+            "unique": false,
+            "columnNames": [
+              "segment_id",
+              "started_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_voice_segment_time` ON `${TABLE_NAME}` (`segment_id`, `started_utc_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "segment",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "text_note",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `segment_id` TEXT NOT NULL, `time_utc_ms` INTEGER NOT NULL, `lat` REAL, `lon` REAL, `kind` TEXT NOT NULL, `text` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeUtcMs",
+            "columnName": "time_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_text_segment_time",
+            "unique": false,
+            "columnNames": [
+              "segment_id",
+              "time_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_text_segment_time` ON `${TABLE_NAME}` (`segment_id`, `time_utc_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "segment",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "camera_clock_offset",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`trip_id` TEXT NOT NULL, `camera` TEXT NOT NULL, `offset_ms` INTEGER NOT NULL, PRIMARY KEY(`trip_id`, `camera`))",
+        "fields": [
+          {
+            "fieldPath": "tripId",
+            "columnName": "trip_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "camera",
+            "columnName": "camera",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "offsetMs",
+            "columnName": "offset_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "trip_id",
+            "camera"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '51330bbf4b1add56ff14ef5a4d791400')"
+    ]
+  }
+}

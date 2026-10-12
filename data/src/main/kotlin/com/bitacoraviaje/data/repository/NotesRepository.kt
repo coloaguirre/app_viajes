@@ -23,6 +23,8 @@ class NotesRepository @Inject constructor(private val db: BitacoraDatabase) {
 
     suspend fun getVoiceNote(id: String): VoiceNote? = voice.getById(id)?.toDomain()
 
+    fun observeVoiceNote(id: String): Flow<VoiceNote?> = voice.observeById(id).map { it?.toDomain() }
+
     fun observeVoiceNotes(segmentId: String): Flow<List<VoiceNote>> = voice.observeBySegment(segmentId).map { l -> l.map { it.toDomain() } }
 
     fun observeVoiceNotesOfTrip(tripId: String): Flow<List<VoiceNote>> = voice.observeByTrip(tripId).map { l -> l.map { it.toDomain() } }

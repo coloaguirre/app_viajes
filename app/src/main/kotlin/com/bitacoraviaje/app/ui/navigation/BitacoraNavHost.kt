@@ -9,6 +9,9 @@ import com.bitacoraviaje.app.ui.active.ActiveSessionRoute
 import com.bitacoraviaje.app.ui.finish.FinishSegmentRoute
 import com.bitacoraviaje.app.ui.home.HomeRoute
 import com.bitacoraviaje.app.ui.newsession.NewSessionRoute
+import com.bitacoraviaje.app.ui.review.MediaReviewRoute
+import com.bitacoraviaje.app.ui.tripdetail.TripDetailRoute
+import com.bitacoraviaje.app.ui.voicenote.VoiceNoteDetailRoute
 import com.bitacoraviaje.app.ui.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
@@ -28,6 +31,15 @@ sealed interface Route {
 
     @Serializable
     data class FinishSegment(val segmentId: String) : Route
+
+    @Serializable
+    data class TripDetail(val tripId: String) : Route
+
+    @Serializable
+    data class MediaReview(val tripId: String) : Route
+
+    @Serializable
+    data class VoiceNoteDetail(val noteId: String) : Route
 }
 
 @Composable
@@ -39,7 +51,22 @@ fun BitacoraNavHost(mapRenderer: MapRenderer) {
                 onOpenSettings = { navController.navigate(Route.Settings) },
                 onNewSession = { navController.navigate(Route.NewSession) },
                 onOpenActiveSession = { id -> navController.navigate(Route.ActiveSession(id)) },
+                onOpenTrip = { id -> navController.navigate(Route.TripDetail(id)) },
             )
+        }
+        composable<Route.TripDetail> {
+            TripDetailRoute(
+                mapRenderer = mapRenderer,
+                onBack = { navController.popBackStack() },
+                onReview = { id -> navController.navigate(Route.MediaReview(id)) },
+                onVoiceNote = { id -> navController.navigate(Route.VoiceNoteDetail(id)) },
+            )
+        }
+        composable<Route.MediaReview> {
+            MediaReviewRoute(mapRenderer = mapRenderer, onBack = { navController.popBackStack() })
+        }
+        composable<Route.VoiceNoteDetail> {
+            VoiceNoteDetailRoute(mapRenderer = mapRenderer, onBack = { navController.popBackStack() })
         }
         composable<Route.Settings> {
             SettingsScreen(onBack = { navController.popBackStack() })

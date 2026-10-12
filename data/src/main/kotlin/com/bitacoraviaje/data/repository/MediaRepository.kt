@@ -3,6 +3,7 @@ package com.bitacoraviaje.data.repository
 import com.bitacoraviaje.core.model.LinkMethod
 import com.bitacoraviaje.core.model.MediaItem
 import com.bitacoraviaje.data.db.BitacoraDatabase
+import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
 import com.bitacoraviaje.data.mapper.toDomain
 import com.bitacoraviaje.data.mapper.toEntity
 import javax.inject.Inject
@@ -29,6 +30,13 @@ class MediaRepository @Inject constructor(private val db: BitacoraDatabase) {
     fun observeReviewQueue(tripId: String): Flow<List<MediaItem>> = dao.observeReviewQueue(tripId).map { l -> l.map { it.toDomain() } }
 
     suspend fun countByTrip(tripId: String): Int = dao.countByTrip(tripId)
+
+    suspend fun allOfTrip(tripId: String): List<MediaItem> = dao.getByTrip(tripId).map { it.toDomain() }
+
+    /** Confirmed clock offsets per camera ("Make Model") for the trip, applied by the linker on every scan. */
+    suspend fun cameraOffsets(tripId: String): Map<String, Long> = db.cameraClockOffsetDao().getByTrip(tripId).associate { it.camera to it.offsetMs }
+
+    suspend fun setCameraOffset(tripId: String, camera: String, offsetMs: Long) = db.cameraClockOffsetDao().upsert(CameraClockOffsetEntity(tripId, camera, offsetMs))
 
     /** Manual placement from the review screen: wins over any future rescan. */
     suspend fun placeManually(id: String, lat: Double, lon: Double) {

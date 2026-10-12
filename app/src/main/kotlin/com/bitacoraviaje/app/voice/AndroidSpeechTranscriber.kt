@@ -38,7 +38,10 @@ class AndroidSpeechTranscriber @Inject constructor(@ApplicationContext private v
         val pcm = withContext(Dispatchers.Default) { AudioDecoder.decodeToPcm16Mono16k(audio) }
         val (readFd, writeFd) = ParcelFileDescriptor.createPipe()
         val writer = Thread {
-            ParcelFileDescriptor.AutoCloseOutputStream(writeFd).use { it.write(pcm) }
+            // The recognizer may close its end early (error 12 on devices without the
+            // audio-source extra): the resulting EPIPE must not take the process down.
+            runCatching { ParcelFileDescriptor.AutoCloseOutputStream(writeFd).use { it.write(pcm) } }
+                .onFailure { Log.w(TAG, "pcm feed ended early: ${it.message}") }
         }.apply { start() }
         return try {
             withTimeout(RESULT_TIMEOUT_MS) { recognize(readFd, languageTag) }
