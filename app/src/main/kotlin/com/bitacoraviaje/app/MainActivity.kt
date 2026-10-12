@@ -4,6 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.foundation.layout.Box
 import com.bitacoraviaje.app.ui.navigation.BitacoraNavHost
 import com.bitacoraviaje.app.ui.theme.BitacoraTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -15,7 +20,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BitacoraTheme {
-                BitacoraNavHost()
+                // Exposes Modifier.testTag as resource-id to uiautomator (E2E via adb).
+                @OptIn(ExperimentalComposeUiApi::class)
+                Box(Modifier.semantics { testTagsAsResourceId = true }) {
+                    BitacoraNavHost()
+                }
             }
         }
     }

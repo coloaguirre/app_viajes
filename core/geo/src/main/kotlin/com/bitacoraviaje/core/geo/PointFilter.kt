@@ -1,5 +1,6 @@
 package com.bitacoraviaje.core.geo
 
+import com.bitacoraviaje.core.model.SamplingProfile
 import com.bitacoraviaje.core.model.TrackPoint
 import com.bitacoraviaje.core.model.Transport
 
@@ -17,6 +18,15 @@ data class FilterConfig(
         val BIKE = FilterConfig(maxAccuracyM = 25.0, maxSpeedMps = 20.0)
         val VEHICLE = FilterConfig(maxAccuracyM = 50.0, maxSpeedMps = 70.0)
         val PLANE = FilterConfig(maxAccuracyM = 200.0, maxSpeedMps = 300.0)
+
+        fun forProfile(profile: SamplingProfile): FilterConfig = when (profile) {
+            SamplingProfile.TREKKING_HIGH, SamplingProfile.WALK -> WALK
+            SamplingProfile.BIKE -> BIKE
+            SamplingProfile.VEHICLE -> VEHICLE
+            SamplingProfile.PLANE -> PLANE
+            // Battery modes relax accuracy (balanced power yields 20-50 m fixes) but keep a vehicle speed cap.
+            SamplingProfile.SAVER, SamplingProfile.ECONOMY, SamplingProfile.REST -> FilterConfig(maxAccuracyM = 100.0, maxSpeedMps = 70.0)
+        }
 
         fun forTransport(transport: Transport?): FilterConfig = when (transport) {
             Transport.WALK, null -> WALK

@@ -3,14 +3,14 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **1 — Recorrido continuo, en curso** (1.1 y 1.2 cerrados 2026-10-12; siguiente 1.3 `TrackingService`).
+- Fase: **1 — Recorrido continuo, en curso** (1.1, 1.2 y 1.3 cerrados 2026-10-12; siguiente 1.4 viaje continuo).
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
-| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
+| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
@@ -30,6 +30,7 @@
 | 2026-10-11 | Minivideo de 1 min en el teléfono adelantado a Fase 4 | Adenda 1 del usuario |
 | 2026-10-11 | Teselas MapTiler en el video aceptadas para uso personal | Zona gris de términos; PMTiles si se publica |
 | 2026-10-12 | Esquema v1 agrega sobre DISENO §5.2: `segment.recording_mode`, `segment.auto_created`, `segment_pause.kind` (USER/AUTO_REST/NESTED), `track_point.is_mock`; `stop.place_id` sin FK hasta que exista `place` (Fase 4) | Adenda 1 (viaje continuo, modo económico) y §16.2 (mock) |
+| 2026-10-12 | Perfil ECONOMY con prioridad de alta precisión (GPS) e intervalo 30 s / 40 m / lote 60 s, no prioridad balanceada | Sin Wi-Fi ni celdas en montaña la prioridad balanceada no tiene de dónde ubicar; el ahorro viene del intervalo largo |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -50,6 +51,7 @@
 | Navigation Compose / Activity Compose / Lifecycle | 2.10.2 / 1.13.0 / 2.11.0 | 2026-10-11 |
 | WorkManager / DataStore / core-ktx | 2.12.0 / 1.2.1 / 1.19.1 | 2026-10-11 |
 | Coroutines / kotlinx-serialization | 1.11.0 / 1.11.0 | 2026-10-12 |
+| Play Services Location / lifecycle-service | 21.4.0 / 2.11.0 | 2026-10-12 |
 | hilt-navigation-compose | 1.4.0 | 2026-10-11 |
 | JUnit / androidx.test.ext junit / Espresso / Robolectric | 4.13.2 / 1.3.0 / 3.7.0 / 4.17 | 2026-10-11 |
 | ffmpeg (build estático, user space) | 7.0.2 | 2026-10-11 |
@@ -71,6 +73,12 @@ Observaciones de la verificación (ítem 0.1):
   un comando con sudo del usuario.
 
 ## Problemas conocidos
+- El emulador no reproduce fielmente la altitud de `geo fix` (la mantiene
+  durante descensos). El desnivel se valida con el test JVM sobre el GPX y
+  en el Pixel 8 Pro; no confiar en el emulador para esa métrica.
+- Reproducción de GPX en el emulador: máximo 3x para perfiles a pie (el
+  filtro rechaza velocidades implícitas mayores a 4 m/s); comparaciones
+  de cantidad de puntos entre modos solo a 1x.
 - El emulador requiere el grupo `kvm` (resuelto 2026-10-12 con
   `usermod -aG kvm`). La sesión de Claude Code no hereda el grupo: el
   emulador se lanza con `sg kvm -c "emulator ..."`.

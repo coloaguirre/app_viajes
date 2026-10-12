@@ -35,3 +35,11 @@ object DataModule {
 
     @Provides fun provideStopDao(db: BitacoraDatabase): StopDao = db.stopDao()
 }
+
+@Module
+@InstallIn(SingletonComponent::class)
+object ClockModule {
+    @Provides
+    @Singleton
+    fun provideClock(): com.bitacoraviaje.data.repository.Clock = com.bitacoraviaje.data.repository.Clock { System.currentTimeMillis() }
+}

@@ -37,6 +37,7 @@ room {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:geo"))
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

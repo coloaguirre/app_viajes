@@ -204,7 +204,7 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: tests unitarios con fixtures sintéticas por regla;
       distancia del trekking de ejemplo dentro del ±2 % del valor de
       referencia calculado del GPX.
-- [ ] 1.3 `TrackingService`: servicio en primer plano tipo `location`,
+- [x] 1.3 `TrackingService`: servicio en primer plano tipo `location`,
       perfiles por medio, selector Full/Económico, escritura en lote,
       pausa/reanudar, notificación con acciones.  (est: 3)
       Aceptación: E2E con `tools/gpx-replay` sobre el trekking de ejemplo

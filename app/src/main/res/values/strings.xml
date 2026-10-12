@@ -6,7 +6,33 @@
     <string name="home_empty_title">Todavía no hay viajes</string>
     <string name="home_empty_body">Cuando empieces un viaje, el recorrido, las fotos y tus notas van a aparecer acá.</string>
     <string name="home_new_recording">Nuevo registro</string>
-    <string name="home_new_recording_soon">El registro de recorrido llega en la próxima versión.</string>
+    <string name="home_active_banner">Registro en curso</string>
+    <string name="home_active_banner_action">Volver a la sesión</string>
+    <string name="home_permission_denied">Sin permiso de ubicación no se puede registrar el recorrido.</string>
+
+    <string name="active_title">Sesión activa</string>
+    <string name="active_elapsed">Tiempo</string>
+    <string name="active_distance">Distancia</string>
+    <string name="active_speed">Velocidad</string>
+    <string name="active_points">Puntos</string>
+    <string name="active_gps_ok">GPS activo</string>
+    <string name="active_gps_waiting">Esperando GPS…</string>
+    <string name="active_paused">En pausa</string>
+    <string name="active_profile">Perfil %1$s</string>
+    <string name="active_finish_confirm_title">¿Terminar la etapa?</string>
+    <string name="active_finish_confirm_body">Se cierra el registro de esta etapa y se calculan sus estadísticas. El viaje sigue abierto.</string>
+    <string name="active_finish_trip">Terminar viaje</string>
+    <string name="active_finish_segment">Cerrar etapa</string>
+    <string name="active_cancel">Cancelar</string>
+    <string name="action_pause">Pausar</string>
+    <string name="action_resume">Reanudar</string>
+    <string name="action_finish">Terminar</string>
+
+    <string name="notif_channel_tracking">Registro del recorrido</string>
+    <string name="notif_channel_tracking_desc">Muestra el registro en curso. No suena.</string>
+    <string name="notif_recording">Registrando recorrido</string>
+    <string name="notif_paused">Registro en pausa</string>
+    <string name="notif_summary">%1$s · %2$s</string>
 
     <string name="settings_title">Ajustes</string>
     <string name="settings_units">Unidades</string>
