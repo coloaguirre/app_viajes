@@ -197,7 +197,7 @@ su aceptación es la evidencia que él aporta, registrada en
 - [x] 1.1 `core/model` y `data`: tablas de esta fase (trip, segment,
       segment_pause, track_point, stop) con migraciones probadas.  (est: 2)
       Aceptación: tests de migración y de DAOs (Robolectric) verdes.
-- [ ] 1.2 `core/geo`: haversine, filtros (precisión, saltos imposibles,
+- [x] 1.2 `core/geo`: haversine, filtros (precisión, saltos imposibles,
       ruido en reposo), métricas (distancia, tiempo en movimiento,
       desnivel con histéresis usando barómetro si existe, velocidad p98),
       detección de paradas robusta a huecos GPS, Douglas-Peucker.  (est: 2.5)

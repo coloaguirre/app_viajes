@@ -15,6 +15,11 @@ kotlin {
     }
 }
 
+sourceSets {
+    // Sample trips are shared fixtures: JVM tests, emulator replay and the renderer.
+    test { resources.srcDir(rootProject.file("tools/sample-trips")) }
+}
+
 dependencies {
     implementation(project(":core:model"))
     testImplementation(libs.junit)
