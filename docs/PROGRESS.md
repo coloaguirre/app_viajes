@@ -3,14 +3,14 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **0 — Esqueleto y entorno, CERRADA (2026-10-12)**. Siguiente: Fase 1 — Recorrido continuo (ítem 1.1).
+- Fase: **1 — Recorrido continuo, en curso** (1.1 cerrado 2026-10-12; siguiente 1.2 `core/geo`).
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
-| 1 — Recorrido | ⬜ Pendiente | Requiere clave de MapTiler del usuario antes del ítem 1.6 |
+| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
@@ -29,6 +29,7 @@
 | 2026-10-11 | Modo Full / Económico elegido por el usuario | Adenda 1 del usuario |
 | 2026-10-11 | Minivideo de 1 min en el teléfono adelantado a Fase 4 | Adenda 1 del usuario |
 | 2026-10-11 | Teselas MapTiler en el video aceptadas para uso personal | Zona gris de términos; PMTiles si se publica |
+| 2026-10-12 | Esquema v1 agrega sobre DISENO §5.2: `segment.recording_mode`, `segment.auto_created`, `segment_pause.kind` (USER/AUTO_REST/NESTED), `track_point.is_mock`; `stop.place_id` sin FK hasta que exista `place` (Fase 4) | Adenda 1 (viaje continuo, modo económico) y §16.2 (mock) |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -44,7 +45,8 @@
 | KSP | 2.3.12 | 2026-10-11 |
 | Compose BOM | 2026.09.00 | 2026-10-11 |
 | Hilt | 2.60.1 | 2026-10-11 |
-| Room | 2.8.5 | 2026-10-11 |
+| Room | 2.8.5 (plugin `androidx.room`, esquemas en `data/schemas/`) | 2026-10-11 |
+| androidx.test core-ktx / runner | 1.7.0 / 1.7.0 | 2026-10-12 |
 | Navigation Compose / Activity Compose / Lifecycle | 2.10.2 / 1.13.0 / 2.11.0 | 2026-10-11 |
 | WorkManager / DataStore / core-ktx | 2.12.0 / 1.2.1 / 1.19.1 | 2026-10-11 |
 | Coroutines / kotlinx-serialization | 1.11.0 / 1.11.0 | 2026-10-12 |

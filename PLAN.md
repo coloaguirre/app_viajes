@@ -194,7 +194,7 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: pipeline verde en un push a `dev`.
 
 ### Fase 1 — Recorrido continuo (MVP 1)  (est: 13 días)
-- [ ] 1.1 `core/model` y `data`: tablas de esta fase (trip, segment,
+- [x] 1.1 `core/model` y `data`: tablas de esta fase (trip, segment,
       segment_pause, track_point, stop) con migraciones probadas.  (est: 2)
       Aceptación: tests de migración y de DAOs (Robolectric) verdes.
 - [ ] 1.2 `core/geo`: haversine, filtros (precisión, saltos imposibles,
