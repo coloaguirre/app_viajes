@@ -32,6 +32,9 @@ desktop-renderer/work/
 tools/sample-trips/**/out/
 logs/
 
+# Datos personales del usuario para pruebas locales (fotos, bases volcadas) — nunca al repo
+local-data/
+
 # Secretos — nunca al repo (claves de API van en local.properties o .env)
 .env
 

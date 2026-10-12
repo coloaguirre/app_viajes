@@ -238,7 +238,7 @@ su aceptación es la evidencia que él aporta, registrada en
       estadísticas registrados en `docs/PROGRESS.md`; si Full supera el
       8 %/h se abre un ítem de ajuste de perfiles.
 
-### Fase 2 — Fotos, voz y línea de tiempo (MVP 2)  (est: 12 días)
+### Fase 2 — Fotos, voz y línea de tiempo (MVP 2)  (est: 12.5 días)
 - [ ] 2.1 Permisos de medios en contexto (Android 13/14+, acceso parcial,
       `ACCESS_MEDIA_LOCATION` con original) con pantallas explicativas y
       funcionamiento degradado.  (est: 1)
@@ -273,6 +273,13 @@ su aceptación es la evidencia que él aporta, registrada en
 - [ ] 2.8 **(usuario)** Salida real con fotos y notas de voz.  (est: 0.5)
       Aceptación: porcentaje de fotos vinculadas sin intervención y
       observaciones registrados en `docs/PROGRESS.md`.
+- [ ] 2.9 Cambiar el medio de transporte durante la sesión (agregado
+      2026-10-12 a pedido del usuario): botón en la sesión activa que cambia
+      perfil de GPS y filtro sin cerrar la etapa; el cambio queda como evento
+      `TransportChange` para la línea de tiempo. La detección automática
+      sigue en Fase 3.  (est: 0.5)
+      Aceptación: test de repositorio del evento; E2E: cambiar de a pie a
+      vehículo en el emulador hace que el filtro acepte 20 m/s sin rechazar.
 
 ### Fase 3 — Exportación, transcripción local y tareas largas  (est: 12 días)
 - [ ] 3.1 `core/export`: `trip.json` + JSON Schema, GPX 1.1 con

@@ -3,15 +3,15 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **1 — Recorrido continuo, en curso** (1.1 a 1.6 cerrados 2026-10-12; falta 1.7, la prueba real del usuario con el Pixel 8 Pro).
+- Fase: **2 — Fotos, voz y línea de tiempo, en curso** (iniciada el 2026-10-12 por decisión del usuario con el ítem 1.7 de la Fase 1 todavía abierto: la prueba de campo de 1 h se hace en paralelo y cierra la Fase 1 formalmente; la Fase 1 ya está mergeada en `dev`)..
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
-| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
-| 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
+| 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
+| 2 — Fotos, voz y línea de tiempo | 🟨 En curso | Fotos reales del test del 2026-10-12 en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
@@ -39,6 +39,8 @@
 | 2026-10-12 | Cerrar etapa espera el volcado del búfer del servicio (tope 5 s) | Estadísticas sin los últimos puntos (0 m en una excursión corta) |
 | 2026-10-12 | Revisión de código de Fase 1 aplicada: pipeline del servicio en un solo hilo; volcado del búfer también por tiempo desde el ticker y limpieza solo tras persistir; `finishTrip` cierra todas las etapas abiertas del viaje; simplificación en lotes de 500 ids; corte diario con la zona horaria actual del teléfono; estado vivo rehidratado al retomar una etapa; primer tramo tras pausa/reinicio no suma; ClockGuard sembrado y con detección de reinicio; un solo nivel de anidado; nombre del viaje en el asistente | PR #4, revisión 2026-10-12 |
 | 2026-10-12 | Criterios adaptados en E2E: parada de 4 min (no 20) con umbral de 3 min en 1.4; relación Económico/Completo medida sobre 8 min a 1x en 1.3 | Límite de reproducción a 1x y de 10 min por comando |
+| 2026-10-12 | Fase 2 arranca con 1.7 pendiente (excepción a la regla "no empezar una fase sin cerrar la anterior") | Decisión del usuario; 1.7 depende de una salida de campo y no bloquea el código de Fase 2 |
+| 2026-10-12 | Ítem 2.9 agregado: cambiar medio de transporte durante la sesión | Pregunta del usuario en la prueba: hoy el medio se fija por etapa |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
