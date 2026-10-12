@@ -30,8 +30,8 @@ contradicción o un hueco, preguntá al usuario antes de inventar.
   Coroutines + Flow, WorkManager, FusedLocationProvider, CameraX, Media3.
 - Build: Gradle (Kotlin DSL) con catálogo `gradle/libs.versions.toml`.
   Gradle wrapper en el repo; nunca un Gradle global.
-- `minSdk 26`, `targetSdk 36`, `compileSdk 36`. JDK 17 (verificar si el
-  AGP vigente pide 21).
+- `minSdk 26`, `targetSdk 36`, `compileSdk 37` (las librerías AndroidX
+  vigentes exigen API 37; decisión 2026-10-12). JDK 17.
 - Módulos: `app/`, `core/{model,geo,timeline,export}` (Kotlin JVM puro),
   `data/` (Room; es un módulo Gradle, NO está gitignorado),
   `desktop-renderer/` y `tools/` (Python). Detalle en DISENO.md §4.2.
@@ -122,7 +122,9 @@ uv run --with openpyxl python tools/gantt.py   # regenera reports/gantt.xlsx des
   proveedor de teselas en la bitácora exportada y los créditos del video.
 - **PROHIBIDO mergear a `dev` o `main` con tests fallando**
   (`./tools/run-tests.sh`: corre `./gradlew test` y los `pytest` de los
-  subproyectos Python; el hook de git lo ejecuta antes de cada push).
+  subproyectos Python, igual que CI; el hook de Claude Code lo ejecuta antes
+  de cada push a esas ramas. Un push manual desde otra terminal lo saltea:
+  CI es la segunda red).
 
 ## Identificadores
 - `applicationId` / paquete: `com.bitacoraviaje.app` (provisorio, decisión D1).
