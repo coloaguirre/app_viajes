@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- targetSdk 36 is a deliberate decision (PLAN.md §3): Play requires 36 for 2026;
+         compileSdk is 37 because current AndroidX needs it. Revisit at Phase 6. -->
+    <issue id="OldTargetApi" severity="ignore" />
+    <!-- Kotlin is pinned to the version Hilt validates against (gradle/libs.versions.toml). -->
+    <issue id="NewerVersionAvailable">
+        <ignore regexp="org\.jetbrains\.kotlin" />
+    </issue>
+    <!-- Adaptive icons must live in mipmap-anydpi-v26: AAPT2 rejects them in an unqualified folder
+         even with minSdk 26. -->
+    <issue id="ObsoleteSdkInt" severity="ignore">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+</lint>

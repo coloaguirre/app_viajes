@@ -77,8 +77,8 @@ trekking y propiedad total de los datos.
 - Android nativo, Kotlin + Jetpack Compose + Material 3, Hilt, Room (WAL),
   Coroutines/Flow, WorkManager, FusedLocationProvider. Gradle Kotlin DSL
   con catálogo de versiones; versiones verificadas al crear, nunca de
-  memoria. minSdk 26, compileSdk/targetSdk 36 (verificar en Fase 0 si el
-  SDK 37 de Android 17 ya está publicado y si conviene compilar contra él).
+  memoria. minSdk 26, targetSdk 36, compileSdk 37 (verificado en Fase 0: las
+  librerías AndroidX vigentes exigen API 37; decisión 2026-10-12).
 - Lógica pura en módulos JVM `core/{model,geo,timeline,export,videoplan}`
   con tests que corren sin emulador.
 - **Registro continuo** (adenda 1): el servicio vive desde "Iniciar
@@ -172,24 +172,24 @@ su aceptación es la evidencia que él aporta, registrada en
 `docs/PROGRESS.md`.
 
 ### Fase 0 — Esqueleto y entorno  (est: 2.5 días)
-- [ ] 0.1 Entorno Linux: JDK 17 (o el que pida el AGP vigente), Android
+- [x] 0.1 Entorno Linux: JDK 17 (o el que pida el AGP vigente), Android
       SDK command-line tools, platform 36, build-tools, emulador con AVD
       `bitacora36` (Google APIs x86_64), ffmpeg; script
       `tools/setup-linux.sh` que verifica o instala avisando antes.
       Verificar si existe SDK 37 (Android 17) y registrarlo.  (est: 0.5)
       Aceptación: el script termina en 0; `adb devices` lista el emulador
       arrancado headless; `java -version` y `ffmpeg -version` responden.
-- [ ] 0.2 Proyecto Gradle multi-módulo (`app`, `core/*`, `data`) con
+- [x] 0.2 Proyecto Gradle multi-módulo (`app`, `core/*`, `data`) con
       catálogo de versiones verificado contra Maven, Hilt, Room, Compose,
       navegación; verificación de alineación de 16 KB en el build.  (est: 1)
       Aceptación: `./gradlew assembleDebug test lint` verde; el APK pasa
       la comprobación de alineación de 16 KB; versiones y fecha de
       verificación en `docs/PROGRESS.md`.
-- [ ] 0.3 Tema claro/oscuro, pantalla de Inicio vacía y Ajustes básicos;
+- [x] 0.3 Tema claro/oscuro, pantalla de Inicio vacía y Ajustes básicos;
       `strings.xml` en español.  (est: 0.5)
       Aceptación: la app abre en el emulador; captura guardada en
       `docs/notes/evidencia/fase-0/`.
-- [ ] 0.4 Integración continua en GitHub Actions: lint, tests JVM,
+- [x] 0.4 Integración continua en GitHub Actions: lint, tests JVM,
       assembleDebug y pytest condicional; `tools/run-tests.sh` extendido.  (est: 0.5)
       Aceptación: pipeline verde en un push a `dev`.
 
