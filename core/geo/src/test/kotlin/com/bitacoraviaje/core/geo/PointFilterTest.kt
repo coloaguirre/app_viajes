@@ -1,0 +1,90 @@
+package com.bitacoraviaje.core.geo
+
+import com.bitacoraviaje.core.model.TrackPoint
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class PointFilterTest {
+    private val walk = FilterConfig.WALK
+
+    @Test
+    fun `accepts a clean walk and sums its distance`() {
+        val (pts, dist) = acceptedBy(walk, straightWalk(100))
+        assertEquals(100, pts.size)
+        assertEquals(99 * 5.5, dist, 1.0)
+    }
+
+    @Test
+    fun `rejects low accuracy, duplicate time and backwards time`() {
+        val f = PointFilter(walk)
+        val a = straightWalk(3)
+        assertTrue(f.offer(a[0]).accepted)
+        assertEquals(RejectReason.LOW_ACCURACY, f.offer(a[1].copy(hAccuracyM = 40f)).reason)
+        assertEquals(RejectReason.DUPLICATE_TIME, f.offer(a[0]).reason)
+        assertEquals(RejectReason.DUPLICATE_TIME, f.offer(a[1].copy(timeUtcMs = a[0].timeUtcMs - 1)).reason)
+        assertTrue(f.offer(a[1]).accepted)
+    }
+
+    @Test
+    fun `an isolated impossible jump is dropped`() {
+        val base = straightWalk(10)
+        val spike = base[5].copy(lat = base[5].lat + 0.01) // ~1.1 km in 5 s
+        val raw = base.take(5) + spike + base.drop(6)
+        val (pts, _) = acceptedBy(walk, raw)
+        assertEquals(9, pts.size)
+        assertFalse(pts.any { it.lat == spike.lat })
+    }
+
+    @Test
+    fun `a jump confirmed by the next fixes is a relocation and gets reinstated`() {
+        // 5 fixes here, then a 30 s gap and 6 fixes 2 km away (bus ride with GPS off).
+        val here = straightWalk(5)
+        val thereT0 = here.last().timeUtcMs + 30_000
+        val there = straightWalk(6, lat0 = -34.6 + 0.02, t0 = thereT0)
+        val (pts, dist) = acceptedBy(walk, here + there)
+        assertEquals(11, pts.size, "all fixes of the new area are kept once confirmed")
+        assertTrue(dist < 100.0, "the teleport leg is not counted, got $dist")
+    }
+
+    @Test
+    fun `standing still adds no distance despite GPS wobble`() {
+        val t0 = 1_700_000_000_000L
+        val raw = (0 until 60).map { i ->
+            val wobble = if (i % 2 == 0) 0.0 else 4.0 / 111_320.0
+            TrackPoint(segmentId = "s", timeUtcMs = t0 + i * 5_000L, lat = -34.6 + wobble, lon = -58.4, hAccuracyM = 5f, speedMps = 0.1f)
+        }
+        val (pts, dist) = acceptedBy(walk, raw)
+        assertEquals(60, pts.size, "still points are kept, they just add nothing")
+        assertEquals(0.0, dist, 1e-6)
+    }
+
+    @Test
+    fun `a seeded filter rejects a bogus first fix after a restart`() {
+        val walk = straightWalk(3)
+        val fresh = PointFilter(FilterConfig.WALK)
+        assertTrue(fresh.offer(walk[0].copy(lat = 37.42, lon = -122.08)).accepted, "unseeded: anything goes")
+        val seeded = PointFilter(FilterConfig.WALK).apply { seed(walk[1]) }
+        assertEquals(RejectReason.IMPOSSIBLE_JUMP, seeded.offer(walk[2].copy(lat = 37.42, lon = -122.08)).reason)
+        assertTrue(seeded.offer(walk[2]).accepted)
+    }
+
+    @Test
+    fun `profiles map transports to thresholds and battery profiles keep the transport speed cap`() {
+        assertEquals(70.0, FilterConfig.forTransport(com.bitacoraviaje.core.model.Transport.BUS).maxSpeedMps)
+        assertEquals(4.0, FilterConfig.forTransport(null).maxSpeedMps)
+        val eco = FilterConfig.forProfile(com.bitacoraviaje.core.model.SamplingProfile.ECONOMY, com.bitacoraviaje.core.model.Transport.WALK)
+        assertEquals(4.0, eco.maxSpeedMps)
+        assertEquals(50.0, eco.maxAccuracyM)
+    }
+
+    @Test
+    fun `the first leg after seeding adds no distance`() {
+        val walk = straightWalk(4)
+        val f = PointFilter(FilterConfig.WALK).apply { seed(walk[0]) }
+        val far = walk[1].copy(lat = walk[1].lat + 10.0 / 111_320, timeUtcMs = walk[1].timeUtcMs + 3_600_000) // 1 h later, 15 m away
+        assertEquals(0.0, f.offer(far).addedDistanceM)
+        assertTrue(f.offer(walk[2].copy(timeUtcMs = far.timeUtcMs + 5_000)).addedDistanceM > 0)
+    }
+}

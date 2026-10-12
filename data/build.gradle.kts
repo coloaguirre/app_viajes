@@ -1,10 +1,9 @@
 // Android library: Room database, DAOs and repositories (DISENO §5).
-// Entities and DAOs arrive in Phase 1 (item 1.1); this module only wires the
-// dependencies so the build graph is final from Phase 0.
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -20,10 +19,25 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    sourceSets {
+        // Exported Room schemas are test inputs for MigrationTestHelper.
+        getByName("test").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+room {
+    // Schemas are versioned: every schema change ships with a migration and its test.
+    schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:geo"))
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
@@ -34,6 +48,20 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core.ktx)
+    testImplementation(libs.androidx.test.runner)
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// The exported schema is produced by KSP; make sure the unit-test asset merge
+// sees the freshly exported version (otherwise MigrationTestHelper misses N.json
+// on the first build after a schema bump).
+androidComponents {
+    onVariants { variant ->
+        val cap = variant.name.replaceFirstChar { it.uppercase() }
+        tasks.matching { it.name == "merge${cap}UnitTestAssets" }.configureEach {
+            dependsOn("ksp${cap}Kotlin")
+        }
+    }
 }

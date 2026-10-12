@@ -19,7 +19,8 @@ class UserSettingsTest {
 
     @Test
     fun `valid stored values are parsed`() {
-        val s = UserSettings.from("IMPERIAL", "ECONOMY", "en-US")
+        val s = UserSettings.from("IMPERIAL", "ECONOMY", "en-US", restAfterMin = 10)
+        assertEquals(10, s.restAfterMin)
         assertEquals(Units.IMPERIAL, s.units)
         assertEquals(RecordingMode.ECONOMY, s.recordingMode)
         assertEquals("en-US", s.transcriptionLanguage)
@@ -28,10 +29,11 @@ class UserSettingsTest {
     @Test
     fun `unknown stored values fall back to defaults and are reported`() {
         val invalid = mutableListOf<Pair<String, String>>()
-        val s = UserSettings.from("FURLONGS", "TURBO", "  ") { k, v -> invalid += k to v }
+        val s = UserSettings.from("FURLONGS", "TURBO", "  ", restAfterMin = 999) { k, v -> invalid += k to v }
         assertEquals(Units.METRIC, s.units)
         assertEquals(RecordingMode.FULL, s.recordingMode)
         assertEquals(DEFAULT_TRANSCRIPTION_LANGUAGE, s.transcriptionLanguage)
-        assertEquals(listOf("units" to "FURLONGS", "recording_mode" to "TURBO"), invalid)
+        assertEquals(5, s.restAfterMin)
+        assertEquals(listOf("units" to "FURLONGS", "recording_mode" to "TURBO", "rest_after_min" to "999"), invalid)
     }
 }

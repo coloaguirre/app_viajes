@@ -12,4 +12,7 @@
     <issue id="ObsoleteSdkInt" severity="ignore">
         <ignore path="src/main/res/mipmap-anydpi-v26" />
     </issue>
+    <!-- MapLibre pulls Timber transitively; this app logs through android.util.Log with the
+         'Bitacora' tag by convention (CLAUDE.md). -->
+    <issue id="LogNotTimber" severity="ignore" />
 </lint>

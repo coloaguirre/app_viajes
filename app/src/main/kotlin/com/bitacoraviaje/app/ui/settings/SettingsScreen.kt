@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitacoraviaje.app.BuildConfig
 import com.bitacoraviaje.app.R
+import com.bitacoraviaje.app.settings.REST_AFTER_OPTIONS_MIN
 import com.bitacoraviaje.core.model.Units
 import com.bitacoraviaje.core.model.RecordingMode
 
@@ -63,6 +65,21 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 selected = settings.recordingMode == RecordingMode.ECONOMY,
                 onClick = { viewModel.setRecordingMode(RecordingMode.ECONOMY) },
             )
+            HorizontalDivider()
+            SectionTitle(stringResource(R.string.settings_rest_after))
+            Text(
+                stringResource(R.string.settings_rest_after_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            REST_AFTER_OPTIONS_MIN.forEach { min ->
+                RadioRow(
+                    title = pluralStringResource(R.plurals.settings_rest_after_option, min, min),
+                    selected = settings.restAfterMin == min,
+                    onClick = { viewModel.setRestAfterMin(min) },
+                )
+            }
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_units))
             RadioRow(

@@ -88,10 +88,10 @@ trekking y propiedad total de los datos.
   sub-etapas declaradas por el usuario que pausan y reanudan la principal.
   Sin permiso de ubicación en segundo plano en la versión 1.
 - **Modo Full / Económico** elegido por el usuario (adenda 1). Full =
-  perfiles de la spec §6.2. Económico = prioridad balanceada, intervalo
-  30-60 s, distancia mínima 50 m, agrupación de actualizaciones, reposo
-  agresivo; la UI avisa que pierde detalle en zigzags y subestima
-  distancia (5-10 %).
+  perfiles de la spec §6.2. Económico = GPS de alta precisión con intervalo
+  30 s, distancia mínima 40 m y lote de 60 s (cambiado el 2026-10-12: con
+  prioridad balanceada no hay fijaciones sin Wi-Fi ni celdas); la UI avisa
+  que pierde detalle en zigzags y subestima distancia (5-10 %).
 - **Mapas**: abstracción `MapRenderer`; en v1 solo MapLibre + MapTiler
   (clave en `local.properties`). Google Maps queda como implementación
   futura. Para el video se componen teselas de MapTiler: zona gris de
@@ -194,37 +194,37 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: pipeline verde en un push a `dev`.
 
 ### Fase 1 — Recorrido continuo (MVP 1)  (est: 13 días)
-- [ ] 1.1 `core/model` y `data`: tablas de esta fase (trip, segment,
+- [x] 1.1 `core/model` y `data`: tablas de esta fase (trip, segment,
       segment_pause, track_point, stop) con migraciones probadas.  (est: 2)
       Aceptación: tests de migración y de DAOs (Robolectric) verdes.
-- [ ] 1.2 `core/geo`: haversine, filtros (precisión, saltos imposibles,
+- [x] 1.2 `core/geo`: haversine, filtros (precisión, saltos imposibles,
       ruido en reposo), métricas (distancia, tiempo en movimiento,
       desnivel con histéresis usando barómetro si existe, velocidad p98),
       detección de paradas robusta a huecos GPS, Douglas-Peucker.  (est: 2.5)
       Aceptación: tests unitarios con fixtures sintéticas por regla;
       distancia del trekking de ejemplo dentro del ±2 % del valor de
       referencia calculado del GPX.
-- [ ] 1.3 `TrackingService`: servicio en primer plano tipo `location`,
+- [x] 1.3 `TrackingService`: servicio en primer plano tipo `location`,
       perfiles por medio, selector Full/Económico, escritura en lote,
       pausa/reanudar, notificación con acciones.  (est: 3)
       Aceptación: E2E con `tools/gpx-replay` sobre el trekking de ejemplo
       produce una etapa con distancia ±2 % y las paradas esperadas; el
       mismo GPX en modo Económico produce ≤ 1/5 de los puntos.
-- [ ] 1.4 Viaje continuo: máquina de estados del viaje (ACTIVE hasta
+- [x] 1.4 Viaje continuo: máquina de estados del viaje (ACTIVE hasta
       "Terminar viaje"), corte automático de etapa diaria a medianoche
       local, reposo automático con umbrales configurables, sub-etapas
       excursión/trekking anidadas que pausan y reanudan la principal.  (est: 2.5)
       Aceptación: tests JVM de la máquina de estados; E2E con un GPX que
       incluye una parada de 20 min y un cruce de medianoche simulado
       produce dos etapas y un período de reposo registrado.
-- [ ] 1.5 Recuperación ante fallos: `START_STICKY`, etapa ACTIVE sin
+- [x] 1.5 Recuperación ante fallos: `START_STICKY`, etapa ACTIVE sin
       servicio → reanudar/cerrar, notificación tras reinicio del
       teléfono, referencia monótona de tiempo ante cambios de hora,
       marcado de ubicaciones simuladas.  (est: 1.5)
       Aceptación: tras `adb shell am kill` el registro continúa; tras
       reiniciar el emulador aparece la notificación de reanudar; E2E
       verde.
-- [ ] 1.6 UI de la fase: asistente de nueva sesión (viaje, excursión,
+- [x] 1.6 UI de la fase: asistente de nueva sesión (viaje, excursión,
       trekking; medio; Full/Económico), sesión activa con mapa MapLibre +
       MapTiler y panel de estadísticas, pantalla de fin de etapa y de
       viaje. Requiere la clave de MapTiler del usuario en

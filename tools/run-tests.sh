@@ -26,6 +26,8 @@ if [ -x ./gradlew ]; then
   ran=1
 fi
 
+echo "[run-tests] ruff check tools/ (PEP 723 scripts)"
+uv run --with ruff ruff check tools/
 for proj in desktop-renderer tools/gpx-replay; do
   if [ -f "$proj/pyproject.toml" ]; then
     echo "[run-tests] ruff + pytest ($proj)"
