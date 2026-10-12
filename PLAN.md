@@ -224,7 +224,7 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: tras `adb shell am kill` el registro continúa; tras
       reiniciar el emulador aparece la notificación de reanudar; E2E
       verde.
-- [ ] 1.6 UI de la fase: asistente de nueva sesión (viaje, excursión,
+- [x] 1.6 UI de la fase: asistente de nueva sesión (viaje, excursión,
       trekking; medio; Full/Económico), sesión activa con mapa MapLibre +
       MapTiler y panel de estadísticas, pantalla de fin de etapa y de
       viaje. Requiere la clave de MapTiler del usuario en

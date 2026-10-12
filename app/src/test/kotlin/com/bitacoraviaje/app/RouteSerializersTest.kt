@@ -16,5 +16,7 @@ class RouteSerializersTest {
         assertEquals("com.bitacoraviaje.app.ui.navigation.Route.Home", serializer<Route.Home>().descriptor.serialName)
         assertEquals("com.bitacoraviaje.app.ui.navigation.Route.Settings", serializer<Route.Settings>().descriptor.serialName)
         assertEquals("com.bitacoraviaje.app.ui.navigation.Route.ActiveSession", serializer<Route.ActiveSession>().descriptor.serialName)
+        assertEquals("com.bitacoraviaje.app.ui.navigation.Route.NewSession", serializer<Route.NewSession>().descriptor.serialName)
+        assertEquals("com.bitacoraviaje.app.ui.navigation.Route.FinishSegment", serializer<Route.FinishSegment>().descriptor.serialName)
     }
 }

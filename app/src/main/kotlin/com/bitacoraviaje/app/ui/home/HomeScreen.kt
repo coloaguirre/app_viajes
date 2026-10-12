@@ -1,7 +1,5 @@
 package com.bitacoraviaje.app.ui.home
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,13 +42,10 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.model.Trip
 
 @Composable
-fun HomeRoute(onOpenSettings: () -> Unit, onOpenActiveSession: (String) -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActiveSession: (String) -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val denied = stringResource(R.string.home_permission_denied)
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        viewModel.startQuickSession()
-    }
     LaunchedEffect(Unit) {
         viewModel.events.collect { e ->
             when (e) {
@@ -63,7 +58,7 @@ fun HomeRoute(onOpenSettings: () -> Unit, onOpenActiveSession: (String) -> Unit,
         state = state,
         snackbar = snackbar,
         onOpenSettings = onOpenSettings,
-        onNewRecording = { permissionLauncher.launch(viewModel.requiredPermissions().toTypedArray()) },
+        onNewRecording = onNewSession,
         onResumeActive = { id -> onOpenActiveSession(id) },
         onRecoverResume = viewModel::resumeOpenSegment,
         onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
@@ -102,11 +97,11 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            if (state.openSegment == null) {
+            run {
                 ExtendedFloatingActionButton(
                     onClick = onNewRecording,
                     icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text(stringResource(R.string.home_new_recording)) },
+                    text = { Text(stringResource(if (state.openSegment == null) R.string.home_new_recording else R.string.home_new_excursion)) },
                     modifier = Modifier.testTag("home_new_recording"),
                 )
             }

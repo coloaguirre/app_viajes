@@ -3,14 +3,14 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **1 — Recorrido continuo, en curso** (1.1 a 1.5 cerrados 2026-10-12; siguiente 1.6 UI de la fase con mapa — requiere clave de MapTiler).
+- Fase: **1 — Recorrido continuo, en curso** (1.1 a 1.6 cerrados 2026-10-12; falta 1.7, la prueba real del usuario con el Pixel 8 Pro).
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
-| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
+| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
@@ -35,6 +35,8 @@
 | 2026-10-12 | Perfil REST: alta precisión, 60 s / 40 m, sin agrupación | Con agrupación la salida del reposo se demoraba hasta 3 min |
 | 2026-10-12 | Esquema v2: `track_point.monotonic_ms`; tiempo de cada punto re-derivado del reloj monótono ante saltos del reloj de pared (`ClockGuard`) | DISENO §16.2 cambio manual de hora |
 | 2026-10-12 | El filtro se siembra con el último punto de la etapa al (re)iniciar el servicio | Un primer punto espurio tras un reinicio se aceptaba sin historia |
+| 2026-10-12 | Mapa: MapLibre 13.6.1 + MapTiler estilo `outdoor-v2`, clave en `local.properties` → `BuildConfig.MAPTILER_KEY` (sin clave la app compila y muestra un aviso) | D2 |
+| 2026-10-12 | Cerrar etapa espera el volcado del búfer del servicio (tope 5 s) | Estadísticas sin los últimos puntos (0 m en una excursión corta) |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -56,6 +58,7 @@
 | WorkManager / DataStore / core-ktx | 2.12.0 / 1.2.1 / 1.19.1 | 2026-10-11 |
 | Coroutines / kotlinx-serialization | 1.11.0 / 1.11.0 | 2026-10-12 |
 | Play Services Location / lifecycle-service | 21.4.0 / 2.11.0 | 2026-10-12 |
+| MapLibre Android SDK | 13.6.1 | 2026-10-12 |
 | hilt-navigation-compose | 1.4.0 | 2026-10-11 |
 | JUnit / androidx.test.ext junit / Espresso / Robolectric | 4.13.2 / 1.3.0 / 3.7.0 / 4.17 | 2026-10-11 |
 | ffmpeg (build estático, user space) | 7.0.2 | 2026-10-11 |
@@ -103,4 +106,5 @@ Observaciones de la verificación (ítem 0.1):
 
 ## Pendientes del usuario
 - [x] Definir nombre y `applicationId` (D1) — default confirmado 2026-10-11
-- [ ] Crear clave gratuita de MapTiler y ponerla en `local.properties` (antes del ítem 1.6)
+- [x] Crear clave gratuita de MapTiler y ponerla en `local.properties` — hecho 2026-10-12
+- [ ] Ítem 1.7: prueba real de 1 h caminando con el Pixel 8 Pro (Full y Económico), registrar batería por hora

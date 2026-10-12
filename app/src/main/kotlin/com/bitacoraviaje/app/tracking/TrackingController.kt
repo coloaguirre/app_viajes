@@ -14,6 +14,8 @@ import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.data.repository.TrackingRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.TimeZone
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -73,6 +75,10 @@ class TrackingController @Inject constructor(
 
     fun pause() = send(TrackingService.ACTION_PAUSE)
 
+    private companion object {
+        const val STOP_TIMEOUT_MS = 5_000L
+    }
+
     fun resume() = send(TrackingService.ACTION_RESUME)
 
     /**
@@ -81,7 +87,7 @@ class TrackingController @Inject constructor(
      * the trip keeps going); returns the segment now recording, if any.
      */
     suspend fun finishSegment(segmentId: String): String? {
-        send(TrackingService.ACTION_STOP)
+        stopServiceAndAwaitFlush()
         val done = repository.finishSegment(segmentId, SegmentStatus.FINISHED)
         stateHolder.reset()
         val parentId = done?.parentSegmentId ?: return null
@@ -92,12 +98,24 @@ class TrackingController @Inject constructor(
     }
 
     suspend fun finishTrip(tripId: String) {
-        send(TrackingService.ACTION_STOP)
+        stopServiceAndAwaitFlush()
         repository.finishTrip(tripId)
         stateHolder.reset()
     }
 
     suspend fun pauseInDb(segmentId: String, kind: PauseKind) = repository.pause(segmentId, kind)
+
+    /**
+     * The service flushes its point buffer asynchronously on STOP. Closing the segment
+     * before that flush computed stats without the last buffered points (found in the
+     * item 1.6 E2E: an excursion closed right after its fixes had 0 m). Wait for the
+     * service to report it stopped, bounded so a dead service cannot block the UI.
+     */
+    private suspend fun stopServiceAndAwaitFlush() {
+        if (!stateHolder.state.value.isRunning) return
+        send(TrackingService.ACTION_STOP)
+        withTimeoutOrNull(STOP_TIMEOUT_MS) { stateHolder.state.first { !it.isRunning } }
+    }
 
     private fun send(action: String) {
         context.startService(Intent(context, TrackingService::class.java).setAction(action))

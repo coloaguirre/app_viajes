@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.Box
 import com.bitacoraviaje.app.ui.navigation.BitacoraNavHost
 import com.bitacoraviaje.app.ui.theme.BitacoraTheme
 import dagger.hilt.android.AndroidEntryPoint
+import com.bitacoraviaje.app.map.MapRenderer
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var mapRenderer: MapRenderer
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -23,7 +27,7 @@ class MainActivity : ComponentActivity() {
                 // Exposes Modifier.testTag as resource-id to uiautomator (E2E via adb).
                 @OptIn(ExperimentalComposeUiApi::class)
                 Box(Modifier.semantics { testTagsAsResourceId = true }) {
-                    BitacoraNavHost()
+                    BitacoraNavHost(mapRenderer)
                 }
             }
         }

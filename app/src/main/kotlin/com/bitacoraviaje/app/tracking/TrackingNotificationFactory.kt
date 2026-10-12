@@ -31,7 +31,8 @@ class TrackingNotificationFactory @Inject constructor(@ApplicationContext privat
             state.isResting -> context.getString(R.string.notif_resting)
             else -> context.getString(R.string.notif_recording)
         }
-        val text = context.getString(R.string.notif_summary, formatElapsed(state.elapsedMs(nowUtcMs)), formatKm(state.distanceM))
+        var text = context.getString(R.string.notif_summary, formatElapsed(state.elapsedMs(nowUtcMs)), formatKm(state.distanceM))
+        if (state.profile == com.bitacoraviaje.core.model.SamplingProfile.SAVER) text = text + " · " + context.getString(R.string.notif_saver)
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

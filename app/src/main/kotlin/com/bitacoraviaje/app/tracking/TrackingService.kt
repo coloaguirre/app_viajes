@@ -2,6 +2,8 @@ package com.bitacoraviaje.app.tracking
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Looper
@@ -64,6 +66,9 @@ class TrackingService : LifecycleService() {
     private var lastFlushMs = 0L
     private var lastNotifyMs = 0L
     private var policy: TripContinuityPolicy? = null
+    /** Profile the user asked for; [profile] may be lowered to SAVER on low battery (DISENO §6.2). */
+    private var requestedProfile: SamplingProfile = SamplingProfile.WALK
+    private var batterySaver = false
     private var clockGuard = ClockGuard()
     private var loggedCorrections = 0
     private var tickerJob: Job? = null
@@ -98,7 +103,9 @@ class TrackingService : LifecycleService() {
 
     private fun start(id: String, p: SamplingProfile) {
         segmentId = id
+        requestedProfile = p
         profile = p
+        batterySaver = false
         filter = PointFilter(FilterConfig.forProfile(p))
         clockGuard = ClockGuard()
         notifications.ensureChannel()
@@ -137,6 +144,7 @@ class TrackingService : LifecycleService() {
             while (true) {
                 delay(TICK_INTERVAL_MS)
                 policy?.onTick(System.currentTimeMillis())?.forEach { apply(it) }
+                checkBattery()
             }
         }
     }
@@ -239,6 +247,29 @@ class TrackingService : LifecycleService() {
         }
     }
 
+    /**
+     * Below 15 % and not charging, sample like SAVER until the phone is charged again
+     * (DISENO §6.2). Uses the sticky battery broadcast: no receiver registration needed.
+     */
+    private fun checkBattery() {
+        val b = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return
+        val level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        val status = b.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        if (level < 0) return
+        val pct = level * 100 / maxOf(scale, 1)
+        val wantSaver = pct < LOW_BATTERY_PCT && !charging && requestedProfile != SamplingProfile.ECONOMY && requestedProfile != SamplingProfile.PLANE
+        if (wantSaver == batterySaver) return
+        batterySaver = wantSaver
+        profile = if (wantSaver) SamplingProfile.SAVER else requestedProfile
+        val live = stateHolder.state.value
+        if (!live.isPaused && !live.isResting) requestUpdates(profile)
+        stateHolder.update { it.copy(profile = profile) }
+        notifications.notify(stateHolder.state.value, System.currentTimeMillis())
+        Log.i(TAG, "battery $pct% charging=$charging -> profile=$profile")
+    }
+
     private suspend fun flush() {
         val batch = bufferLock.withLock { if (buffer.isEmpty()) return else buffer.toList().also { buffer.clear() } }
         repository.insertPoints(batch)
@@ -288,6 +319,7 @@ class TrackingService : LifecycleService() {
         fused.removeLocationUpdates(callback)
         // The one accepted runBlocking: never lose buffered points on teardown.
         runBlocking { flush() }
+        stateHolder.update { it.copy(isRunning = false) }
         super.onDestroy()
     }
 
@@ -303,5 +335,6 @@ class TrackingService : LifecycleService() {
         const val FLUSH_INTERVAL_MS = 30_000L
         const val NOTIFY_INTERVAL_MS = 5_000L
         const val TICK_INTERVAL_MS = 60_000L
+        const val LOW_BATTERY_PCT = 15
     }
 }
