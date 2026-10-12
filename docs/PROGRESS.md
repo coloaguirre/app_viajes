@@ -3,13 +3,13 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **0 — Esqueleto y entorno, en curso** (ítem 0.2 cerrado; 0.1 y 0.3 esperan el emulador; 0.4 espera el merge)
+- Fase: **0 — Esqueleto y entorno, en cierre** (0.1, 0.2 y 0.3 cerrados; 0.4 se cierra con el merge del PR #1)
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
-| 0 — Esqueleto | 🟨 En curso | 0.2: `docs/notes/evidencia/fase-0/0.2-build-test-lint.md` · 0.4: `0.4-ci.md` (PR #1 verde) |
+| 0 — Esqueleto | 🟨 En cierre | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
 | 1 — Recorrido | ⬜ Pendiente | |
 | 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
@@ -69,9 +69,13 @@ Observaciones de la verificación (ítem 0.1):
   un comando con sudo del usuario.
 
 ## Problemas conocidos
-- El emulador requiere pertenecer al grupo `kvm` (comando con sudo del
-  usuario, pendiente al 2026-10-12); hasta entonces los ítems 0.1 y 0.3
-  no pueden cerrarse.
+- El emulador requiere el grupo `kvm` (resuelto 2026-10-12 con
+  `usermod -aG kvm`). La sesión de Claude Code no hereda el grupo: el
+  emulador se lanza con `sg kvm -c "emulator ..."`.
+- Memoria: con 7 GB, los demonios de Gradle (3,2 GB) + Kotlin + emulador
+  (2 GB) agotaron la RAM. Mitigado con `-Xmx2g`/`-Xmx1g` y `--no-daemon`
+  en la puerta local; parar demonios (`./gradlew --stop`) antes de
+  arrancar el emulador.
 - Pendientes anotados por la revisión de código de Fase 0 (ver PR #1):
   idioma de transcripción se muestra como etiqueta cruda y no es editable
   (placeholder hasta Fase 3); `allowBackup` sin `dataExtractionRules`

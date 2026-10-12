@@ -19,7 +19,8 @@ export PATH="$JAVA_HOME/bin:$HOME/.local/bin:$PATH"
 ran=0
 if [ -x ./gradlew ]; then
   echo "[run-tests] ./gradlew lint test assembleDebug"
-  ./gradlew lint test assembleDebug --quiet
+  # --no-daemon: the gate runs from a hook; a resident daemon starves the emulator.
+  ./gradlew --no-daemon lint test assembleDebug --quiet
   echo "[run-tests] tools/check-16kb.sh"
   ./tools/check-16kb.sh app/build/outputs/apk/debug/app-debug.apk
   ran=1

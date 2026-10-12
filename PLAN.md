@@ -172,7 +172,7 @@ su aceptación es la evidencia que él aporta, registrada en
 `docs/PROGRESS.md`.
 
 ### Fase 0 — Esqueleto y entorno  (est: 2.5 días)
-- [ ] 0.1 Entorno Linux: JDK 17 (o el que pida el AGP vigente), Android
+- [x] 0.1 Entorno Linux: JDK 17 (o el que pida el AGP vigente), Android
       SDK command-line tools, platform 36, build-tools, emulador con AVD
       `bitacora36` (Google APIs x86_64), ffmpeg; script
       `tools/setup-linux.sh` que verifica o instala avisando antes.
@@ -185,7 +185,7 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: `./gradlew assembleDebug test lint` verde; el APK pasa
       la comprobación de alineación de 16 KB; versiones y fecha de
       verificación en `docs/PROGRESS.md`.
-- [ ] 0.3 Tema claro/oscuro, pantalla de Inicio vacía y Ajustes básicos;
+- [x] 0.3 Tema claro/oscuro, pantalla de Inicio vacía y Ajustes básicos;
       `strings.xml` en español.  (est: 0.5)
       Aceptación: la app abre en el emulador; captura guardada en
       `docs/notes/evidencia/fase-0/`.
