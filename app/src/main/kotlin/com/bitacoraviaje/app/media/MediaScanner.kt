@@ -45,7 +45,23 @@ data class ExifData(
     val lon: Double?,
     val make: String?,
     val model: String?,
-)
+) {
+    companion object {
+        /** Pure mapping from an ExifInterface; (0,0) means the system redacted the location. */
+        fun from(exif: ExifInterface): ExifData {
+            val ll = exif.latLong?.takeUnless { it[0] == 0.0 && it[1] == 0.0 }
+            return ExifData(
+                dateTimeOriginal = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL),
+                offsetTimeOriginal = exif.getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL),
+                subsecOriginal = exif.getAttribute(ExifInterface.TAG_SUBSEC_TIME_ORIGINAL),
+                gpsDateStamp = exif.getAttribute(ExifInterface.TAG_GPS_DATESTAMP),
+                gpsTimeStamp = exif.getAttribute(ExifInterface.TAG_GPS_TIMESTAMP),
+                lat = ll?.get(0), lon = ll?.get(1),
+                make = exif.getAttribute(ExifInterface.TAG_MAKE), model = exif.getAttribute(ExifInterface.TAG_MODEL),
+            )
+        }
+    }
+}
 
 /**
  * MediaStore access (DISENO §7.3). Queries by time window and by generation (API 30+)
@@ -138,25 +154,12 @@ class MediaScanner @Inject constructor(
     private fun readExif(contentUri: Uri): ExifData? {
         val uri = if (Build.VERSION.SDK_INT >= 29 && permissions.hasMediaLocation()) MediaStore.setRequireOriginal(contentUri) else contentUri
         return try {
-            resolver.openInputStream(uri)?.use { ins ->
-                val exif = ExifInterface(ins)
-                val ll = exif.latLong?.takeUnless { it[0] == 0.0 && it[1] == 0.0 }
-                ExifData(
-                    dateTimeOriginal = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL),
-                    offsetTimeOriginal = exif.getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL),
-                    subsecOriginal = exif.getAttribute(ExifInterface.TAG_SUBSEC_TIME_ORIGINAL),
-                    gpsDateStamp = exif.getAttribute(ExifInterface.TAG_GPS_DATESTAMP),
-                    gpsTimeStamp = exif.getAttribute(ExifInterface.TAG_GPS_TIMESTAMP),
-                    lat = ll?.get(0), lon = ll?.get(1),
-                    make = exif.getAttribute(ExifInterface.TAG_MAKE), model = exif.getAttribute(ExifInterface.TAG_MODEL),
-                )
-            }
+            resolver.openInputStream(uri)?.use { ins -> ExifData.from(ExifInterface(ins)) }
         } catch (e: SecurityException) {
             // Without ACCESS_MEDIA_LOCATION the original stream is refused: retry redacted (no GPS).
             if (uri == contentUri) return null
-            runCatching { resolver.openInputStream(contentUri)?.use { ExifInterface(it) } }.getOrNull()?.let { exif ->
-                ExifData(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL), exif.getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL), exif.getAttribute(ExifInterface.TAG_SUBSEC_TIME_ORIGINAL), null, null, null, null, exif.getAttribute(ExifInterface.TAG_MAKE), exif.getAttribute(ExifInterface.TAG_MODEL))
-            }
+            Log.w(TAG, "original stream refused for $contentUri (no ACCESS_MEDIA_LOCATION?): reading redacted EXIF")
+            runCatching { resolver.openInputStream(contentUri)?.use { ExifData.from(ExifInterface(it)).copy(lat = null, lon = null) } }.getOrNull()
         } catch (e: Exception) {
             Log.w(TAG, "exif read failed for $contentUri: ${e.javaClass.simpleName}")
             null

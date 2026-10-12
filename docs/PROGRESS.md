@@ -11,7 +11,7 @@
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
-| 2 — Fotos, voz y línea de tiempo | 🟨 En curso | Fotos reales del test del 2026-10-12 en `local-data/` (gitignorado) |
+| 2 — Fotos, voz y línea de tiempo | 🟨 En curso | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
@@ -41,6 +41,8 @@
 | 2026-10-12 | Criterios adaptados en E2E: parada de 4 min (no 20) con umbral de 3 min en 1.4; relación Económico/Completo medida sobre 8 min a 1x en 1.3 | Límite de reproducción a 1x y de 10 min por comando |
 | 2026-10-12 | Fase 2 arranca con 1.7 pendiente (excepción a la regla "no empezar una fase sin cerrar la anterior") | Decisión del usuario; 1.7 depende de una salida de campo y no bloquea el código de Fase 2 |
 | 2026-10-12 | Ítem 2.9 agregado: cambiar medio de transporte durante la sesión | Pregunta del usuario en la prueba: hoy el medio se fija por etapa |
+| 2026-10-12 | Esquema v3: `media_item` (+`camera_make/model`, `needs_review` sobre §5.2); vinculación como tarea de WorkManager única por viaje, disparada al cerrar etapa y por el observador (2 s) | DISENO §4.4 paso 6, §7.3 |
+| 2026-10-12 | Fotos sintéticas con el escritor EXIF de Pillow (piexif no es legible por ExifInterface) | Hallazgo E2E 2.2 |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -63,6 +65,7 @@
 | Coroutines / kotlinx-serialization | 1.11.0 / 1.11.0 | 2026-10-12 |
 | Play Services Location / lifecycle-service | 21.4.0 / 2.11.0 | 2026-10-12 |
 | MapLibre Android SDK | 13.6.1 | 2026-10-12 |
+| ExifInterface / hilt-work / Coil | 1.4.2 / 1.4.0 / 3.6.3 | 2026-10-12 |
 | hilt-navigation-compose | 1.4.0 | 2026-10-11 |
 | JUnit / androidx.test.ext junit / Espresso / Robolectric | 4.13.2 / 1.3.0 / 3.7.0 / 4.17 | 2026-10-11 |
 | ffmpeg (build estático, user space) | 7.0.2 | 2026-10-11 |

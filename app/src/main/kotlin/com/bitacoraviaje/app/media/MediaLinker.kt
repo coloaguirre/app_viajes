@@ -89,22 +89,26 @@ class MediaLinker @Inject constructor(
         return Result(candidates.size, linked, review, skipped)
     }
 
-    /** DISENO §7.5 priority list; videos: creation time is the end of the clip (review R7). */
-    private fun resolveTakenTime(c: MediaCandidate, segments: List<Segment>, nowUtcMs: Long): Pair<Long, TakenTimeSource> {
-        val exif = c.exif
-        val durationAdjust = if (c.kind == MediaKind.VIDEO) (c.durationMs ?: 0L) else 0L
-        ExifTime.withOffset(exif?.dateTimeOriginal, exif?.offsetTimeOriginal, exif?.subsecOriginal)?.let { return (it - durationAdjust) to TakenTimeSource.EXIF_WITH_OFFSET }
-        if (exif?.dateTimeOriginal != null) {
-            // Local time: convert with the zone of the segment in force then (not the phone's zone now).
-            val guess = c.dateTakenMs ?: (c.dateAddedS ?: 0L) * 1000
-            val tz = segmentFor(guess, segments, nowUtcMs)?.tzId ?: segments.last().tzId
-            ExifTime.local(exif.dateTimeOriginal, tz, exif.subsecOriginal)?.let { return (it - durationAdjust) to TakenTimeSource.EXIF_LOCAL }
-        }
-        c.dateTakenMs?.let { return (it - durationAdjust) to TakenTimeSource.MEDIASTORE }
-        return ((c.dateModifiedS ?: c.dateAddedS ?: nowUtcMs / 1000) * 1000 - durationAdjust) to TakenTimeSource.FILE_MTIME
-    }
+    companion object {
+        private const val TAG = "Bitacora"
 
-    private companion object {
-        const val TAG = "Bitacora"
+        /**
+         * DISENO §7.5 priority list. Pure: testable without MediaStore. Videos: the
+         * container's creation time is the END of the clip (review R7), so the
+         * duration is subtracted.
+         */
+        fun resolveTakenTime(c: MediaCandidate, segments: List<Segment>, nowUtcMs: Long): Pair<Long, TakenTimeSource> {
+            val exif = c.exif
+            val durationAdjust = if (c.kind == MediaKind.VIDEO) (c.durationMs ?: 0L) else 0L
+            ExifTime.withOffset(exif?.dateTimeOriginal, exif?.offsetTimeOriginal, exif?.subsecOriginal)?.let { return (it - durationAdjust) to TakenTimeSource.EXIF_WITH_OFFSET }
+            if (exif?.dateTimeOriginal != null) {
+                // Local time: convert with the zone of the segment in force then (not the phone's zone now).
+                val guess = c.dateTakenMs ?: (c.dateAddedS ?: 0L) * 1000
+                val tz = segmentFor(guess, segments, nowUtcMs)?.tzId ?: segments.lastOrNull()?.tzId ?: "UTC"
+                ExifTime.local(exif.dateTimeOriginal, tz, exif.subsecOriginal)?.let { return (it - durationAdjust) to TakenTimeSource.EXIF_LOCAL }
+            }
+            c.dateTakenMs?.let { return (it - durationAdjust) to TakenTimeSource.MEDIASTORE }
+            return ((c.dateModifiedS ?: c.dateAddedS ?: nowUtcMs / 1000) * 1000 - durationAdjust) to TakenTimeSource.FILE_MTIME
+        }
     }
 }

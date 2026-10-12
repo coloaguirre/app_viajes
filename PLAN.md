@@ -239,18 +239,18 @@ su aceptación es la evidencia que él aporta, registrada en
       8 %/h se abre un ítem de ajuste de perfiles.
 
 ### Fase 2 — Fotos, voz y línea de tiempo (MVP 2)  (est: 12.5 días)
-- [ ] 2.1 Permisos de medios en contexto (Android 13/14+, acceso parcial,
+- [x] 2.1 Permisos de medios en contexto (Android 13/14+, acceso parcial,
       `ACCESS_MEDIA_LOCATION` con original) con pantallas explicativas y
       funcionamiento degradado.  (est: 1)
       Aceptación: E2E en emulador con acceso parcial muestra el aviso y
       ofrece "seleccionar más"; sin permiso, el registro sigue.
-- [ ] 2.2 `MediaScanner` + observador + barrido incremental por
+- [x] 2.2 `MediaScanner` + observador + barrido incremental por
       generación (excluyendo pendientes); lectura de hora EXIF con
       offset y de la hora GPS UTC; videos con fecha de fin menos
       duración; exclusiones configurables.  (est: 2)
       Aceptación: `tools/sample-trips/make_photos.py` genera fixtures
       que cubren todas las fuentes de hora de §7.5; tests verdes.
-- [ ] 2.3 Vinculación en `core/geo` (§7.6) con ventana configurable por
+- [x] 2.3 Vinculación en `core/geo` (§7.6) con ventana configurable por
       medio de transporte, desfase de reloj de cámara automático (GPS
       UTC) y manual, confianza por método.  (est: 1.5)
       Aceptación: un test por caso de §7.6, todos verdes.
