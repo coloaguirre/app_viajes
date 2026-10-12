@@ -88,6 +88,22 @@ class TrackingController @Inject constructor(
 
     fun pause() = send(TrackingService.ACTION_PAUSE)
 
+    /** PLAN item 2.9: persist the change (segment + timeline note) and retune the running service. */
+    suspend fun changeTransport(transport: Transport): Boolean {
+        val live = stateHolder.state.value
+        val id = live.segmentId ?: repository.getOpenSegment()?.id ?: return false
+        val updated = repository.changeTransport(id, transport, live.lastPoint?.lat, live.lastPoint?.lon) ?: return false
+        if (live.isRunning) {
+            context.startService(
+                Intent(context, TrackingService::class.java)
+                    .setAction(TrackingService.ACTION_CHANGE_TRANSPORT)
+                    .putExtra(TrackingService.EXTRA_TRANSPORT, transport.name)
+                    .putExtra(TrackingService.EXTRA_PROFILE, updated.samplingProfile),
+            )
+        }
+        return true
+    }
+
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
     }

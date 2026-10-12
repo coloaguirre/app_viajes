@@ -1,6 +1,12 @@
 package com.bitacoraviaje.app.ui.active
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.FilterChip
+import com.bitacoraviaje.app.ui.common.transportLabelRes
+import com.bitacoraviaje.core.model.Transport
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,11 +56,13 @@ fun ActiveSessionRoute(mapRenderer: MapRenderer, onFinish: (String) -> Unit, vie
     val snackbar = remember { SnackbarHostState() }
     val savedMarker = stringResource(R.string.active_marker_saved)
     val savedHighlight = stringResource(R.string.active_highlight_saved)
+    val resources = androidx.compose.ui.platform.LocalResources.current
     LaunchedEffect(Unit) {
         viewModel.events.collect { e ->
             when (e) {
                 ActiveSessionEvent.OpenVoiceNote -> context.startActivity(VoiceNoteActivity.intent(context))
                 is ActiveSessionEvent.Saved -> snackbar.showSnackbar(if (e.kind == TextNoteKind.HIGHLIGHT) savedHighlight else savedMarker)
+                is ActiveSessionEvent.TransportChanged -> snackbar.showSnackbar(resources.getString(R.string.active_transport_changed, resources.getString(transportLabelRes(e.transport))))
             }
         }
     }
@@ -68,7 +76,7 @@ fun ActiveSessionRoute(mapRenderer: MapRenderer, onFinish: (String) -> Unit, vie
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ActiveSessionScreen(
     state: ActiveSessionUiState,
@@ -78,6 +86,7 @@ fun ActiveSessionScreen(
 ) {
     val live = state.live
     var markerDialog by remember { mutableStateOf(false) }
+    var transportDialog by remember { mutableStateOf(false) }
     var markerText by remember { mutableStateOf("") }
     Scaffold(
         topBar = { TopAppBar(title = { Text(state.segment?.title ?: stringResource(R.string.active_title)) }) },
@@ -99,6 +108,13 @@ fun ActiveSessionScreen(
                             modifier = Modifier.testTag("active_gps"),
                         )
                         Text(stringResource(R.string.active_profile, live.profile.name), style = MaterialTheme.typography.labelSmall)
+                        // PLAN item 2.9: tap to change the means of transport without closing the stage.
+                        Text(
+                            stringResource(R.string.active_transport, stringResource(transportLabelRes(state.segment?.transport ?: Transport.WALK))),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { transportDialog = true }.padding(vertical = 4.dp).testTag("active_transport"),
+                        )
                         if (live.isPaused) Text(stringResource(R.string.active_paused), style = MaterialTheme.typography.labelLarge, modifier = Modifier.testTag("active_paused"))
                         if (live.isResting) Text(stringResource(R.string.active_resting), style = MaterialTheme.typography.labelLarge, modifier = Modifier.testTag("active_resting"))
                     }
@@ -129,6 +145,25 @@ fun ActiveSessionScreen(
                 }
             }
         }
+    }
+    if (transportDialog) {
+        AlertDialog(
+            onDismissRequest = { transportDialog = false },
+            title = { Text(stringResource(R.string.transport_change_title)) },
+            text = {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Transport.entries.forEach { t ->
+                        FilterChip(
+                            selected = state.segment?.transport == t,
+                            onClick = { onAction(ActiveSessionAction.ChangeTransport(t)); transportDialog = false },
+                            label = { Text(stringResource(transportLabelRes(t))) },
+                            modifier = Modifier.testTag("transport_${t.name}"),
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { transportDialog = false }) { Text(stringResource(R.string.active_cancel)) } },
+        )
     }
     if (markerDialog) {
         AlertDialog(

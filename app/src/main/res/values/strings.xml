@@ -74,6 +74,10 @@
     <string name="ev_voice_failed">Nota de voz (sin transcribir, tocá para reintentar)</string>
     <string name="ev_marker">Lugar marcado</string>
     <string name="ev_highlight">Momento destacado</string>
+    <string name="ev_transport_change">Cambio de medio: %1$s</string>
+    <string name="active_transport">Medio: %1$s · cambiar</string>
+    <string name="active_transport_changed">Ahora vas en %1$s</string>
+    <string name="transport_change_title">¿Cómo seguís?</string>
     <string name="ev_summary">Recorriste %1$s en %2$s</string>
     <string name="photos_review_pending">%1$d fotos para revisar (sin ubicación o dudosas)</string>
     <string name="photos_review_action">Revisar</string>

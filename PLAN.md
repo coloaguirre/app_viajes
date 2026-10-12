@@ -276,7 +276,7 @@ su aceptación es la evidencia que él aporta, registrada en
 - [ ] 2.8 **(usuario)** Salida real con fotos y notas de voz.  (est: 0.5)
       Aceptación: porcentaje de fotos vinculadas sin intervención y
       observaciones registrados en `docs/PROGRESS.md`.
-- [ ] 2.9 Cambiar el medio de transporte durante la sesión (agregado
+- [x] 2.9 Cambiar el medio de transporte durante la sesión (agregado
       2026-10-12 a pedido del usuario): botón en la sesión activa que cambia
       perfil de GPS y filtro sin cerrar la etapa; el cambio queda como evento
       `TransportChange` para la línea de tiempo. La detección automática

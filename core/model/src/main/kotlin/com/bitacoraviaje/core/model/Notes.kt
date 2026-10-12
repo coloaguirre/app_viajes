@@ -27,7 +27,8 @@ data class VoiceNote(
     val displayText: String? get() = transcriptEdited ?: transcript
 }
 
-enum class TextNoteKind { NOTE, MARKER, HIGHLIGHT }
+/** [TRANSPORT_CHANGE] rows carry the new [Transport] name in `text` (PLAN item 2.9). */
+enum class TextNoteKind { NOTE, MARKER, HIGHLIGHT, TRANSPORT_CHANGE }
 
 /** Typed note, marker ("this viewpoint") or highlight ("this moment matters") (DISENO §8.4). */
 data class TextNote(

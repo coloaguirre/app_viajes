@@ -11,7 +11,7 @@
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
-| 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.3, 2.5-2.7 cerrados; 2.4 cumplido en emulador (micrófono real pendiente con 2.8); 2.8 (campo) y 2.9 pendientes | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · fotos reales del test en `local-data/` (gitignorado) |
+| 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.3, 2.5-2.7 cerrados; 2.4 cumplido en emulador (micrófono real pendiente con 2.8); 2.9 cerrado; 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
@@ -47,6 +47,7 @@
 | 2026-10-12 | Esquema v5: `camera_clock_offset` (viaje, cámara → desfase). La corrección de reloj de cámara se guarda y el vinculador la aplica en cada barrido; antes el barrido recalculaba la hora desde EXIF y deshacía el ajuste | DISENO §7.6 paso 4; hallazgo E2E 2.7 |
 | 2026-10-12 | Línea de tiempo (`core/timeline`): momentos de fotos con ventana 2 min / 100 m, resúmenes intermedios a partir de 300 m y 10 min, cambio de día por medianoche local de la etapa; eventos sin posición propia la toman del recorrido (`positionAt`) | DISENO §9 |
 | 2026-10-12 | Detalle del viaje: tocar un evento cambia a la pestaña Mapa y centra la cámara; la revisión de fotos ofrece la corrección de reloj solo si el desfase implícito supera 1 min | DISENO §14.1 |
+| 2026-10-12 | Cambio de medio en sesión (2.9) sin tabla nueva: `text_note.kind = TRANSPORT_CHANGE` con el medio en `text`; la etapa guarda el último medio y perfil; el servicio re-siembra el filtro con el último punto aceptado | Pedido del usuario 2026-10-12; evita esquema v6 |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas

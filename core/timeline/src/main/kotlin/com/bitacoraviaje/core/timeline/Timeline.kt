@@ -15,6 +15,7 @@ import com.bitacoraviaje.core.model.Stop
 import com.bitacoraviaje.core.model.TextNote
 import com.bitacoraviaje.core.model.TextNoteKind
 import com.bitacoraviaje.core.model.TrackPoint
+import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.model.VoiceNote
 
 /** One row of the unified timeline (DISENO §9). Times are UTC ms; the UI formats them in the segment's zone. */
@@ -39,6 +40,9 @@ sealed interface TimelineEvent {
     data class Voice(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val note: VoiceNote) : TimelineEvent
     data class Text(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val note: TextNote) : TimelineEvent
     data class Highlight(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val note: TextNote) : TimelineEvent
+
+    /** The user switched means of transport mid-segment (PLAN item 2.9); [transport] is null if the stored name is unknown. */
+    data class TransportChange(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val transport: Transport?, val note: TextNote) : TimelineEvent
     data class DayChange(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val localDate: java.time.LocalDate) : TimelineEvent
 
     /** "You covered 12.4 km in 2 h 10 min" between two events (DISENO §9). */
@@ -98,7 +102,11 @@ fun buildTimeline(input: TimelineInput, config: TimelineConfig = TimelineConfig(
     }
     for (n in input.textNotes) {
         val (la, lo) = if (n.lat != null && n.lon != null) n.lat to n.lon else at(n.timeUtcMs)
-        events += if (n.kind == TextNoteKind.HIGHLIGHT) TimelineEvent.Highlight(n.timeUtcMs, la, lo, n) else TimelineEvent.Text(n.timeUtcMs, la, lo, n)
+        events += when (n.kind) {
+            TextNoteKind.HIGHLIGHT -> TimelineEvent.Highlight(n.timeUtcMs, la, lo, n)
+            TextNoteKind.TRANSPORT_CHANGE -> TimelineEvent.TransportChange(n.timeUtcMs, la, lo, n.text?.let { t -> Transport.entries.firstOrNull { it.name == t } }, n)
+            TextNoteKind.NOTE, TextNoteKind.MARKER -> TimelineEvent.Text(n.timeUtcMs, la, lo, n)
+        }
     }
     // Day separators at every local midnight crossed between start and end.
     var midnight = DayBoundary.nextLocalMidnightUtcMs(s.startedUtcMs, s.tzId)
@@ -117,7 +125,7 @@ private fun rank(e: TimelineEvent): Int = when (e) {
     is TimelineEvent.DayChange -> 1
     is TimelineEvent.Resume -> 2
     is TimelineEvent.StopArrived -> 3
-    is TimelineEvent.Moment, is TimelineEvent.Voice, is TimelineEvent.Text, is TimelineEvent.Highlight -> 4
+    is TimelineEvent.Moment, is TimelineEvent.Voice, is TimelineEvent.Text, is TimelineEvent.Highlight, is TimelineEvent.TransportChange -> 4
     is TimelineEvent.StopLeft -> 5
     is TimelineEvent.Pause -> 6
     is TimelineEvent.Summary -> 7

@@ -14,6 +14,8 @@ import com.bitacoraviaje.core.model.SegmentStats
 import com.bitacoraviaje.core.model.SegmentStatus
 import com.bitacoraviaje.core.model.SegmentType
 import com.bitacoraviaje.core.model.Stop
+import com.bitacoraviaje.core.model.TextNote
+import com.bitacoraviaje.core.model.TextNoteKind
 import com.bitacoraviaje.core.model.TrackPoint
 import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.model.Trip
@@ -123,6 +125,21 @@ class TrackingRepository @Inject constructor(
         )
         segments.insert(segment.toEntity())
         segment
+    }
+
+    /**
+     * PLAN item 2.9: switch the means of transport mid-segment. Updates the segment's
+     * transport and sampling profile (so a restart picks the right one) and records a
+     * `TRANSPORT_CHANGE` note for the timeline. Returns the updated segment, or null if
+     * the segment is gone or already closed.
+     */
+    suspend fun changeTransport(segmentId: String, transport: Transport, lat: Double? = null, lon: Double? = null): Segment? = db.withTransaction {
+        val s = segments.getById(segmentId)?.toDomain() ?: return@withTransaction null
+        if (s.status != SegmentStatus.ACTIVE && s.status != SegmentStatus.PAUSED) return@withTransaction null
+        val updated = s.copy(transport = transport, samplingProfile = SamplingProfile.forSession(s.type, transport, s.recordingMode).name)
+        segments.update(updated.toEntity())
+        db.textNoteDao().insert(TextNote(UUID.randomUUID().toString(), segmentId, clock.nowUtcMs(), lat, lon, TextNoteKind.TRANSPORT_CHANGE, transport.name).toEntity())
+        updated
     }
 
     suspend fun insertPoints(batch: List<TrackPoint>) {

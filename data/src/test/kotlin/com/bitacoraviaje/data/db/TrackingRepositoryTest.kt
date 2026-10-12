@@ -8,6 +8,7 @@ import com.bitacoraviaje.core.model.RecordingMode
 import com.bitacoraviaje.core.model.SegmentStatus
 import com.bitacoraviaje.core.model.SegmentType
 import com.bitacoraviaje.core.model.TrackPoint
+import com.bitacoraviaje.core.model.TextNoteKind
 import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.model.TripStatus
 import com.bitacoraviaje.data.repository.Clock
@@ -52,6 +53,22 @@ class TrackingRepositoryTest {
         assertEquals(trip.id, s.tripId)
         assertEquals("WALK", s.samplingProfile)
         assertEquals(s.id, repo.getOpenSegment()?.id)
+    }
+
+    @Test
+    fun `changing transport mid-segment updates profile and records a timeline note`() = runTest {
+        val s = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
+        now += 60_000
+        val u = assertNotNull(repo.changeTransport(s.id, Transport.CAR, -34.6, -58.4))
+        assertEquals(Transport.CAR, u.transport)
+        assertEquals("VEHICLE", u.samplingProfile)
+        assertEquals(Transport.CAR, repo.getSegment(s.id)?.transport)
+        val note = db.textNoteDao().observeBySegment(s.id).first().single()
+        assertEquals(TextNoteKind.TRANSPORT_CHANGE.name, note.kind)
+        assertEquals("CAR", note.text)
+        assertEquals(now, note.timeUtcMs)
+        repo.finishSegment(s.id)
+        assertEquals(null, repo.changeTransport(s.id, Transport.BIKE), "closed segments are left alone")
     }
 
     @Test

@@ -124,6 +124,11 @@ class TrackingService : LifecycleService() {
             )
             ACTION_PAUSE -> lifecycleScope.launch(pipeline) { pause(record = true) }
             ACTION_RESUME -> lifecycleScope.launch(pipeline) { resume() }
+            ACTION_CHANGE_TRANSPORT -> {
+                val t = Transport.valueOf(checkNotNull(intent.getStringExtra(EXTRA_TRANSPORT)))
+                val p = SamplingProfile.valueOf(checkNotNull(intent.getStringExtra(EXTRA_PROFILE)))
+                lifecycleScope.launch(pipeline) { changeTransport(t, p) }
+            }
             ACTION_STOP -> stop()
             null -> recoverFromRestart()
         }
@@ -364,6 +369,25 @@ class TrackingService : LifecycleService() {
         notifications.notify(stateHolder.state.value, now)
     }
 
+    /**
+     * PLAN item 2.9, runs on [pipeline]: new transport → new filter limits and sampling
+     * profile without closing the segment. The filter is re-seeded with the last accepted
+     * fix so the first point under the new limits is judged against where we are, and
+     * the battery-saver downgrade (if active) is kept.
+     */
+    private suspend fun changeTransport(t: Transport, p: SamplingProfile) {
+        transport = t
+        requestedProfile = p
+        profile = if (batterySaver) SamplingProfile.SAVER else p
+        filter = PointFilter(FilterConfig.forProfile(profile, transport))
+        stateHolder.state.value.lastPoint?.let { filter.seed(it) }
+        val live = stateHolder.state.value
+        if (!live.isPaused && !live.isResting) requestUpdates(profile)
+        stateHolder.update { it.copy(profile = profile) }
+        notifications.notify(stateHolder.state.value, System.currentTimeMillis())
+        Log.i(TAG, "transport changed to $t profile=$profile")
+    }
+
     /** Runs on [pipeline]. */
     private suspend fun resume() {
         val id = segmentId ?: return
@@ -408,6 +432,8 @@ class TrackingService : LifecycleService() {
         const val ACTION_PAUSE = "com.bitacoraviaje.app.tracking.PAUSE"
         const val ACTION_RESUME = "com.bitacoraviaje.app.tracking.RESUME"
         const val ACTION_STOP = "com.bitacoraviaje.app.tracking.STOP"
+        const val ACTION_CHANGE_TRANSPORT = "com.bitacoraviaje.app.tracking.CHANGE_TRANSPORT"
+        const val EXTRA_TRANSPORT = "transport"
         const val EXTRA_SEGMENT_ID = "segment_id"
         const val EXTRA_PROFILE = "profile"
         const val FLUSH_POINTS = 10

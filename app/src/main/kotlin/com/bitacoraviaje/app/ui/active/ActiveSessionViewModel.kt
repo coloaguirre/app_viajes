@@ -42,11 +42,13 @@ sealed interface ActiveSessionAction {
     data object VoiceNote : ActiveSessionAction
     data class Marker(val text: String?) : ActiveSessionAction
     data object Highlight : ActiveSessionAction
+    data class ChangeTransport(val transport: com.bitacoraviaje.core.model.Transport) : ActiveSessionAction
 }
 
 sealed interface ActiveSessionEvent {
     data object OpenVoiceNote : ActiveSessionEvent
     data class Saved(val kind: com.bitacoraviaje.core.model.TextNoteKind) : ActiveSessionEvent
+    data class TransportChanged(val transport: com.bitacoraviaje.core.model.Transport) : ActiveSessionEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,7 +67,8 @@ class ActiveSessionViewModel @Inject constructor(
 
     // The service may hand recording to another segment (day cut, nested hand-back): follow the live one.
     private val liveSegmentId = stateHolder.state.map { it.segmentId ?: segmentId }.distinctUntilChanged()
-    private val segmentFlow = liveSegmentId.flatMapLatest { id -> flow { emit(repository.getSegment(id)) } }
+    private val segmentRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
+    private val segmentFlow = combine(liveSegmentId, segmentRefresh) { id, _ -> id }.flatMapLatest { id -> flow { emit(repository.getSegment(id)) } }
     private val trackFlow = liveSegmentId.flatMapLatest { id -> repository.observeValidPoints(id) }
     private val ticker = flow {
         while (true) {
@@ -89,6 +92,12 @@ class ActiveSessionViewModel @Inject constructor(
             ActiveSessionAction.VoiceNote -> viewModelScope.launch { _events.send(ActiveSessionEvent.OpenVoiceNote) }
             is ActiveSessionAction.Marker -> viewModelScope.launch { notes.addMarker(a.text)?.let { _events.send(ActiveSessionEvent.Saved(it.kind)) } }
             ActiveSessionAction.Highlight -> viewModelScope.launch { notes.addHighlight()?.let { _events.send(ActiveSessionEvent.Saved(it.kind)) } }
+            is ActiveSessionAction.ChangeTransport -> viewModelScope.launch {
+                if (controller.changeTransport(a.transport)) {
+                    segmentRefresh.value++
+                    _events.send(ActiveSessionEvent.TransportChanged(a.transport))
+                }
+            }
         }
     }
 }

@@ -44,6 +44,7 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.app.map.MapRenderer
 import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.tracking.TrackingNotificationFactory
+import com.bitacoraviaje.app.ui.common.transportLabelRes
 import com.bitacoraviaje.core.model.MediaItem
 import com.bitacoraviaje.core.model.PauseKind
 import com.bitacoraviaje.core.model.TranscriptStatus
@@ -147,6 +148,7 @@ private fun EventRow(e: TimelineEvent, zone: ZoneId, selected: Boolean, onClick:
         is TimelineEvent.Voice -> "🎙" to (e.note.displayText ?: stringResource(if (e.note.transcriptStatus == TranscriptStatus.FAILED) R.string.ev_voice_failed else R.string.ev_voice_pending))
         is TimelineEvent.Text -> "📝" to (e.note.text ?: stringResource(R.string.ev_marker))
         is TimelineEvent.Highlight -> "⭐" to stringResource(R.string.ev_highlight)
+        is TimelineEvent.TransportChange -> "🔀" to stringResource(R.string.ev_transport_change, e.transport?.let { stringResource(transportLabelRes(it)) } ?: (e.note.text ?: ""))
         is TimelineEvent.DayChange -> "📅" to DateTimeFormatter.ofPattern("EEEE d 'de' MMMM").format(e.localDate)
         is TimelineEvent.Summary -> "↝" to stringResource(R.string.ev_summary, TrackingNotificationFactory.formatKm(e.distanceM), TrackingNotificationFactory.formatElapsed(e.durationMs))
     }
