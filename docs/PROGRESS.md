@@ -3,14 +3,14 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **0 — Esqueleto y entorno, en cierre** (0.1, 0.2 y 0.3 cerrados; 0.4 se cierra con el merge del PR #1)
+- Fase: **0 — Esqueleto y entorno, CERRADA (2026-10-12)**. Siguiente: Fase 1 — Recorrido continuo (ítem 1.1).
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
-| 0 — Esqueleto | 🟨 En cierre | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
-| 1 — Recorrido | ⬜ Pendiente | |
+| 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
+| 1 — Recorrido | ⬜ Pendiente | Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
