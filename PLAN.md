@@ -210,7 +210,7 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: E2E con `tools/gpx-replay` sobre el trekking de ejemplo
       produce una etapa con distancia ±2 % y las paradas esperadas; el
       mismo GPX en modo Económico produce ≤ 1/5 de los puntos.
-- [ ] 1.4 Viaje continuo: máquina de estados del viaje (ACTIVE hasta
+- [x] 1.4 Viaje continuo: máquina de estados del viaje (ACTIVE hasta
       "Terminar viaje"), corte automático de etapa diaria a medianoche
       local, reposo automático con umbrales configurables, sub-etapas
       excursión/trekking anidadas que pausan y reanudan la principal.  (est: 2.5)

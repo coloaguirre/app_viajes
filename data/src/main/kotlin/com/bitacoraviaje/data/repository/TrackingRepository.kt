@@ -10,6 +10,7 @@ import com.bitacoraviaje.core.model.RecordingMode
 import com.bitacoraviaje.core.model.SamplingProfile
 import com.bitacoraviaje.core.model.Segment
 import com.bitacoraviaje.core.model.SegmentPause
+import com.bitacoraviaje.core.model.SegmentStats
 import com.bitacoraviaje.core.model.SegmentStatus
 import com.bitacoraviaje.core.model.SegmentType
 import com.bitacoraviaje.core.model.Stop
@@ -123,6 +124,35 @@ class TrackingRepository @Inject constructor(
         val now = clock.nowUtcMs()
         segments.getOpenPause(segmentId)?.let { segments.updatePause(it.copy(resumedUtcMs = now)) }
         segments.update(s.copy(status = SegmentStatus.ACTIVE).toEntity())
+    }
+
+    /**
+     * Local midnight passed (adenda 1): close the daily segment and open the next one
+     * with the same trip, transport, mode and time zone, flagged as auto-created.
+     * Nested segments (excursions) are never cut: they end when the user says so.
+     */
+    suspend fun cutDay(segmentId: String): Segment? = db.withTransaction {
+        val s = segments.getById(segmentId)?.toDomain() ?: return@withTransaction null
+        if (s.parentSegmentId != null) return@withTransaction null
+        val now = clock.nowUtcMs()
+        val wasPaused = s.status == SegmentStatus.PAUSED
+        val openPauseKind = segments.getOpenPause(s.id)?.kind
+        finishInternal(s, now, SegmentStatus.FINISHED)
+        val next = s.copy(
+            id = UUID.randomUUID().toString(),
+            type = SegmentType.STAGE,
+            title = null,
+            intentText = null,
+            startedUtcMs = now,
+            endedUtcMs = null,
+            autoCreated = true,
+            status = SegmentStatus.ACTIVE,
+            stats = SegmentStats(),
+        )
+        segments.insert(next.toEntity())
+        // Carry an automatic rest across midnight so the new day starts in the same state.
+        if (wasPaused && openPauseKind == PauseKind.AUTO_REST.name) pauseInternal(next, PauseKind.AUTO_REST, now)
+        next
     }
 
     /** Closes the segment: stats, stops and simplification are computed and stored atomically. */

@@ -38,25 +38,38 @@ class TrackingController @Inject constructor(
     suspend fun startSession(type: SegmentType, transport: Transport?, mode: RecordingMode, title: String? = null, intentText: String? = null): String {
         check(hasLocationPermission()) { "location permission required" }
         val segment = repository.startSession(type, transport, mode, TimeZone.getDefault().id, title, intentText)
+        startService(segment.id, segment.samplingProfile)
+        return segment.id
+    }
+
+    private fun startService(segmentId: String, profile: String) {
         ContextCompat.startForegroundService(
             context,
             Intent(context, TrackingService::class.java)
                 .setAction(TrackingService.ACTION_START)
-                .putExtra(TrackingService.EXTRA_SEGMENT_ID, segment.id)
-                .putExtra(TrackingService.EXTRA_PROFILE, segment.samplingProfile),
+                .putExtra(TrackingService.EXTRA_SEGMENT_ID, segmentId)
+                .putExtra(TrackingService.EXTRA_PROFILE, profile),
         )
-        return segment.id
     }
 
     fun pause() = send(TrackingService.ACTION_PAUSE)
 
     fun resume() = send(TrackingService.ACTION_RESUME)
 
-    /** Stops the service (which flushes its buffer) and closes the segment with stats. */
-    suspend fun finishSegment(segmentId: String) {
+    /**
+     * Stops the service (which flushes its buffer) and closes the segment with stats.
+     * A nested excursion/trek hands recording back to its paused parent (adenda 1:
+     * the trip keeps going); returns the segment now recording, if any.
+     */
+    suspend fun finishSegment(segmentId: String): String? {
         send(TrackingService.ACTION_STOP)
-        repository.finishSegment(segmentId, SegmentStatus.FINISHED)
+        val done = repository.finishSegment(segmentId, SegmentStatus.FINISHED)
         stateHolder.reset()
+        val parentId = done?.parentSegmentId ?: return null
+        val parent = repository.getSegment(parentId)?.takeIf { it.status == SegmentStatus.PAUSED } ?: return null
+        repository.resume(parent.id)
+        startService(parent.id, parent.samplingProfile)
+        return parent.id
     }
 
     suspend fun finishTrip(tripId: String) {

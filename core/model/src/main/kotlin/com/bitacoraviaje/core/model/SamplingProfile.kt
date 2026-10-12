@@ -28,7 +28,9 @@ enum class SamplingProfile(
     PLANE(LocationPriority.BALANCED_POWER, 60_000, 30_000, 500f, 120_000),
     SAVER(LocationPriority.BALANCED_POWER, 30_000, 15_000, 50f, 60_000),
     ECONOMY(LocationPriority.HIGH_ACCURACY, 30_000, 20_000, 40f, 60_000),
-    REST(LocationPriority.BALANCED_POWER, 120_000, 60_000, 100f, 180_000),
+    // REST: high accuracy for the same reason as ECONOMY; 50 m min distance so leaving the rest radius (60 m) is seen promptly.
+    // No batching while resting: a batched fix would delay the exit by up to maxDelay (measured 2026-10-12).
+    REST(LocationPriority.HIGH_ACCURACY, 60_000, 30_000, 40f, 0),
     ;
 
     companion object {

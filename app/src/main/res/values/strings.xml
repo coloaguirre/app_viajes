@@ -18,6 +18,8 @@
     <string name="active_gps_ok">GPS activo</string>
     <string name="active_gps_waiting">Esperando GPS…</string>
     <string name="active_paused">En pausa</string>
+    <string name="active_resting">En reposo (GPS al mínimo)</string>
+    <string name="notif_resting">En reposo</string>
     <string name="active_profile">Perfil %1$s</string>
     <string name="active_finish_confirm_title">¿Terminar la etapa?</string>
     <string name="active_finish_confirm_body">Se cierra el registro de esta etapa y se calculan sus estadísticas. El viaje sigue abierto.</string>
@@ -43,6 +45,12 @@
     <string name="settings_recording_mode_full_desc">Máximo detalle del recorrido. Consume más batería.</string>
     <string name="settings_recording_mode_economy">Económico</string>
     <string name="settings_recording_mode_economy_desc">Para trekkings largos sin recarga. Pierde detalle en zigzags y puede subestimar la distancia.</string>
+    <string name="settings_rest_after">Reposo automático</string>
+    <string name="settings_rest_after_desc">Si no te movés durante este tiempo, el GPS baja al mínimo hasta que vuelvas a moverte. El viaje sigue abierto.</string>
+    <plurals name="settings_rest_after_option">
+        <item quantity="one">Después de %1$d minuto quieto</item>
+        <item quantity="other">Después de %1$d minutos quieto</item>
+    </plurals>
     <string name="settings_transcription_language">Idioma de transcripción</string>
     <string name="settings_about">Acerca de</string>
     <string name="settings_version">Versión %1$s</string>

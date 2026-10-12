@@ -23,4 +23,6 @@ class SettingsViewModel @Inject constructor(private val prefs: UserPreferences) 
     fun setRecordingMode(mode: RecordingMode) = viewModelScope.launch { prefs.setRecordingMode(mode) }
 
     fun setTranscriptionLanguage(tag: String) = viewModelScope.launch { prefs.setTranscriptionLanguage(tag) }
+
+    fun setRestAfterMin(minutes: Int) = viewModelScope.launch { prefs.setRestAfterMin(minutes) }
 }

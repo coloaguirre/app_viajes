@@ -11,6 +11,13 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.bitacoraviaje.core.geo.FilterConfig
 import com.bitacoraviaje.core.geo.PointFilter
+import com.bitacoraviaje.core.geo.ContinuityAction
+import com.bitacoraviaje.core.geo.RestConfig
+import com.bitacoraviaje.core.geo.TripContinuityPolicy
+import com.bitacoraviaje.app.settings.UserPreferences
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import com.bitacoraviaje.core.model.LocationPriority
 import com.bitacoraviaje.core.model.PauseKind
 import com.bitacoraviaje.core.model.SamplingProfile
@@ -46,6 +53,8 @@ class TrackingService : LifecycleService() {
 
     @Inject lateinit var notifications: TrackingNotificationFactory
 
+    @Inject lateinit var prefs: UserPreferences
+
     private var segmentId: String? = null
     private var profile: SamplingProfile = SamplingProfile.WALK
     private var filter: PointFilter = PointFilter(FilterConfig.WALK)
@@ -53,6 +62,9 @@ class TrackingService : LifecycleService() {
     private val bufferLock = Mutex()
     private var lastFlushMs = 0L
     private var lastNotifyMs = 0L
+    private var policy: TripContinuityPolicy? = null
+    private var tickerJob: Job? = null
+    private var tzId: String = java.util.TimeZone.getDefault().id
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -93,7 +105,63 @@ class TrackingService : LifecycleService() {
         val fgsType = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
         ServiceCompat.startForeground(this, TrackingNotificationFactory.NOTIFICATION_ID, notifications.build(stateHolder.state.value, now), fgsType)
         requestUpdates(p)
+        lifecycleScope.launch { installPolicy(id) }
         Log.i(TAG, "tracking started segment=$id profile=$p")
+    }
+
+    /** Continuous-trip policy for this segment: day cuts (not for nested ones) and automatic rest. */
+    private suspend fun installPolicy(id: String) {
+        val segment = repository.getSegment(id) ?: return
+        tzId = segment.tzId
+        val restAfterMin = prefs.settings.first().restAfterMin
+        policy = TripContinuityPolicy(
+            tzId = segment.tzId,
+            segmentStartedUtcMs = segment.startedUtcMs,
+            restConfig = RestConfig(enterAfterMs = restAfterMin * 60_000L),
+            cutDays = segment.parentSegmentId == null,
+        )
+        tickerJob?.cancel()
+        tickerJob = lifecycleScope.launch {
+            while (true) {
+                delay(TICK_INTERVAL_MS)
+                policy?.onTick(System.currentTimeMillis())?.forEach { apply(it) }
+            }
+        }
+    }
+
+    private suspend fun apply(action: ContinuityAction) {
+        val id = segmentId ?: return
+        when (action) {
+            ContinuityAction.CutDay -> {
+                flush()
+                val next = repository.cutDay(id) ?: return
+                segmentId = next.id
+                filter = PointFilter(FilterConfig.forProfile(profile))
+                val now = System.currentTimeMillis()
+                stateHolder.update { s -> s.copy(segmentId = next.id, startedUtcMs = now, pausedAccumMs = 0, pausedSinceUtcMs = if (s.isPaused || s.isResting) now else null, distanceM = 0.0, acceptedPoints = 0, rejectedPoints = 0) }
+                Log.i(TAG, "day cut: new segment=${next.id}")
+            }
+            ContinuityAction.EnterRest -> {
+                flush()
+                repository.pause(id, PauseKind.AUTO_REST)
+                val now = System.currentTimeMillis()
+                stateHolder.update { it.copy(isResting = true, pausedSinceUtcMs = now, currentSpeedMps = null) }
+                requestUpdates(SamplingProfile.REST)
+                notifications.notify(stateHolder.state.value, now)
+                Log.i(TAG, "rest entered segment=$id")
+            }
+            ContinuityAction.ExitRest -> {
+                repository.resume(id)
+                val now = System.currentTimeMillis()
+                stateHolder.update { s ->
+                    val restedFor = s.pausedSinceUtcMs?.let { now - it } ?: 0
+                    s.copy(isResting = false, pausedSinceUtcMs = null, pausedAccumMs = s.pausedAccumMs + restedFor)
+                }
+                requestUpdates(profile)
+                notifications.notify(stateHolder.state.value, now)
+                Log.i(TAG, "rest exited segment=$id")
+            }
+        }
     }
 
     /** START_STICKY restart after the system killed us: resume the open segment or quit. */
@@ -143,6 +211,7 @@ class TrackingService : LifecycleService() {
                 s.copy(rejectedPoints = s.rejectedPoints + 1)
             }
         }
+        if (verdict.accepted) policy?.onPoint(raw)?.forEach { apply(it) }
         val now = System.currentTimeMillis()
         if (buffer.size >= FLUSH_POINTS || now - lastFlushMs > FLUSH_INTERVAL_MS) flush()
         if (now - lastNotifyMs > NOTIFY_INTERVAL_MS) {
@@ -161,7 +230,7 @@ class TrackingService : LifecycleService() {
         val id = segmentId ?: return
         fused.removeLocationUpdates(callback)
         val now = System.currentTimeMillis()
-        stateHolder.update { it.copy(isPaused = true, pausedSinceUtcMs = now, currentSpeedMps = null) }
+        stateHolder.update { it.copy(isPaused = true, isResting = false, pausedSinceUtcMs = it.pausedSinceUtcMs ?: now, currentSpeedMps = null) }
         lifecycleScope.launch {
             flush()
             if (record) repository.pause(id, PauseKind.USER)
@@ -187,6 +256,7 @@ class TrackingService : LifecycleService() {
 
     private fun stop() {
         fused.removeLocationUpdates(callback)
+        tickerJob?.cancel()
         lifecycleScope.launch {
             flush()
             stateHolder.update { it.copy(isRunning = false) }
@@ -213,5 +283,6 @@ class TrackingService : LifecycleService() {
         const val FLUSH_POINTS = 10
         const val FLUSH_INTERVAL_MS = 30_000L
         const val NOTIFY_INTERVAL_MS = 5_000L
+        const val TICK_INTERVAL_MS = 60_000L
     }
 }

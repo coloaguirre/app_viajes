@@ -13,6 +13,8 @@ data class LiveTrackingState(
     val segmentId: String? = null,
     val isRunning: Boolean = false,
     val isPaused: Boolean = false,
+    /** Automatic rest (adenda 1): still for a while, GPS at minimum, trip still open. */
+    val isResting: Boolean = false,
     val startedUtcMs: Long = 0,
     val pausedAccumMs: Long = 0,
     val pausedSinceUtcMs: Long? = null,

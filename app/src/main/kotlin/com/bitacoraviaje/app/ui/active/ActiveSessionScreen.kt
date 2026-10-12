@@ -53,6 +53,7 @@ fun ActiveSessionScreen(state: ActiveSessionUiState, onAction: (ActiveSessionAct
                     )
                     Text(stringResource(R.string.active_profile, live.profile.name), style = MaterialTheme.typography.bodySmall)
                     if (live.isPaused) Text(stringResource(R.string.active_paused), style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("active_paused"))
+                    if (live.isResting) Text(stringResource(R.string.active_resting), style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("active_resting"))
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

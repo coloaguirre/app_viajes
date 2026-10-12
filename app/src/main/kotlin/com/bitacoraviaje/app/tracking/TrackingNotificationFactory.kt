@@ -26,7 +26,11 @@ class TrackingNotificationFactory @Inject constructor(@ApplicationContext privat
     }
 
     fun build(state: LiveTrackingState, nowUtcMs: Long): Notification {
-        val title = if (state.isPaused) context.getString(R.string.notif_paused) else context.getString(R.string.notif_recording)
+        val title = when {
+            state.isPaused -> context.getString(R.string.notif_paused)
+            state.isResting -> context.getString(R.string.notif_resting)
+            else -> context.getString(R.string.notif_recording)
+        }
         val text = context.getString(R.string.notif_summary, formatElapsed(state.elapsedMs(nowUtcMs)), formatKm(state.distanceM))
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),

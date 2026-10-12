@@ -191,8 +191,35 @@ def car():
     }
 
 
+def continuity():
+    """E2E fixture for the continuous trip (adenda 1), meant for 1x replay: 2 min walk,
+    4 min standing still (rest threshold set to 3 min in Settings), 3 min walk. 9 min total."""
+    rnd = random.Random(3)
+    drift = Drift(rnd, sigma_m=2.0)
+    lat, lon = -34.6037, -58.3816
+    pts, truth = [], 0.0
+    t = START
+    per_fix = 1.1 * 5
+    for phase, n in (("walk", 24), ("still", 48), ("walk", 36)):
+        for i in range(n):
+            if phase == "walk":
+                nlat, nlon = step(lat, lon, per_fix, 90 + 15 * math.sin(i / 5.0))
+                truth += haversine(lat, lon, nlat, nlon)
+                lat, lon = nlat, nlon
+            dx, dy = drift.next()
+            jlat, jlon = jitter(lat, lon, dx, dy)
+            pts.append({"t": t, "lat": jlat, "lon": jlon, "ele": 25.0})
+            t += timedelta(seconds=5)
+    return pts, {
+        "distance_m": round(truth, 1),
+        "still_s": 240,
+        "duration_s": int((pts[-1]["t"] - pts[0]["t"]).total_seconds()),
+        "points": len(pts),
+    }
+
+
 def main():
-    for name, fn in (("trekking", trekking), ("car", car)):
+    for name, fn in (("trekking", trekking), ("car", car), ("continuity", continuity)):
         d = ROOT / name
         d.mkdir(exist_ok=True)
         pts, truth = fn()
