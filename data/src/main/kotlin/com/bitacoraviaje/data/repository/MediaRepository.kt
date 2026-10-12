@@ -2,6 +2,7 @@ package com.bitacoraviaje.data.repository
 
 import com.bitacoraviaje.core.model.LinkMethod
 import com.bitacoraviaje.core.model.MediaItem
+import androidx.room.withTransaction
 import com.bitacoraviaje.data.db.BitacoraDatabase
 import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
 import com.bitacoraviaje.data.mapper.toDomain
@@ -20,6 +21,23 @@ class MediaRepository @Inject constructor(private val db: BitacoraDatabase) {
     }
 
     suspend fun getByMediaStoreId(id: Long): MediaItem? = dao.getByMediaStoreId(id)?.toDomain()
+
+    /**
+     * Linker write path: inserts the new items and re-links the known ones in one
+     * transaction, skipping rows the user placed by hand or excluded in the meantime.
+     * Returns how many known rows were actually re-linked.
+     */
+    suspend fun applyLinks(newItems: List<MediaItem>, relinked: List<MediaItem>): Int = db.withTransaction {
+        if (newItems.isNotEmpty()) dao.insertIgnore(newItems.map { it.toEntity() })
+        var n = 0
+        for (m in relinked) {
+            n += dao.relink(
+                m.id, m.segmentId, m.takenUtcMs, m.takenTimeSource.name, m.exifLat, m.exifLon, m.cameraMake, m.cameraModel,
+                m.linkedLat, m.linkedLon, m.linkMethod.name, m.linkConfidence, m.linkTimeGapMs, m.needsReview,
+            )
+        }
+        n
+    }
 
     suspend fun get(id: String): MediaItem? = dao.getById(id)?.toDomain()
 

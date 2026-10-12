@@ -93,6 +93,14 @@ class TimelineTest {
     }
 
     @Test
+    fun `no points at all still yields start, end and unplaced media without positions`() {
+        val m = MediaItem("m", "t", "s", MediaKind.PHOTO, MediaSource.MEDIASTORE, takenUtcMs = t0 + 60_000, takenTimeSource = TakenTimeSource.MEDIASTORE)
+        val tl = buildTimeline(TimelineInput(seg(end = t0 + 120_000), emptyList(), media = listOf(m)))
+        assertEquals(listOf("SegmentStart", "Moment", "SegmentEnd"), tl.map { it::class.simpleName })
+        assertTrue(tl.all { it.lat == null && it.lon == null })
+    }
+
+    @Test
     fun `open segment uses now and has no end event`() {
         val pts = walk(61)
         val tl = buildTimeline(TimelineInput(seg(), pts, nowUtcMs = pts.last().timeUtcMs + 10_000))

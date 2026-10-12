@@ -19,6 +19,12 @@ import javax.inject.Inject
 class VoiceRecorder @Inject constructor(@ApplicationContext private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var focus: AudioFocusRequest? = null
+
+    /** Set when the 5-minute cap stopped the recorder by itself: the file is complete, not short (review B1). */
+    @Volatile private var autoStopped = false
+
+    /** Called (on the recorder's event thread) when the cap is reached; the caller should save the note. */
+    @Volatile var onMaxDurationReached: (() -> Unit)? = null
     private val audio = context.getSystemService(AudioManager::class.java)
 
     val isRecording: Boolean get() = recorder != null
@@ -35,18 +41,32 @@ class VoiceRecorder @Inject constructor(@ApplicationContext private val context:
     fun start(out: File) {
         out.parentFile?.mkdirs()
         requestFocus()
+        autoStopped = false
         val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
-        r.apply {
-            setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioChannels(1)
-            setAudioSamplingRate(SAMPLE_RATE)
-            setAudioEncodingBitRate(32_000)
-            setMaxDuration(MAX_DURATION_MS)
-            setOutputFile(out.absolutePath)
-            prepare()
-            start()
+        try {
+            r.apply {
+                setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioChannels(1)
+                setAudioSamplingRate(SAMPLE_RATE)
+                setAudioEncodingBitRate(32_000)
+                setMaxDuration(MAX_DURATION_MS)
+                setOutputFile(out.absolutePath)
+                setOnInfoListener { _, what, _ ->
+                    if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+                        autoStopped = true
+                        onMaxDurationReached?.invoke()
+                    }
+                }
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            // prepare()/start() failed: release the half-built recorder or the mic stays taken (review I2).
+            runCatching { r.release() }
+            abandonFocus()
+            throw e
         }
         recorder = r
     }
@@ -54,6 +74,13 @@ class VoiceRecorder @Inject constructor(@ApplicationContext private val context:
     /** Returns false when the note was too short to produce a file (DISENO §8.1): caller discards it. */
     fun stop(): Boolean {
         val r = recorder ?: return false
+        if (autoStopped) {
+            // The cap already stopped it; stop() now would throw and the file is complete.
+            r.release()
+            recorder = null
+            abandonFocus()
+            return true
+        }
         return try {
             r.stop()
             true

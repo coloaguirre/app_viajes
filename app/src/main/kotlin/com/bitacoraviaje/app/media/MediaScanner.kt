@@ -63,38 +63,33 @@ data class ExifData(
     }
 }
 
+/** What the linker needs from the device's media catalog; MediaStore in production, a fake in tests. */
+interface MediaCatalog {
+    suspend fun queryByTime(fromUtcMs: Long, toUtcMs: Long): List<MediaCandidate>
+}
+
 /**
- * MediaStore access (DISENO §7.3). Queries by time window and by generation (API 30+)
- * so the live observer only looks at what changed; excludes screenshots, messaging
- * folders and downloads by relative path.
+ * MediaStore access (DISENO §7.3). Queries by time window; excludes screenshots,
+ * messaging folders and downloads by path. The live observer triggers a windowed
+ * rescan of the open segment (the generation-based incremental query is deferred,
+ * see PLAN 2.2).
  */
 @Singleton
 class MediaScanner @Inject constructor(
     @ApplicationContext private val context: Context,
     private val permissions: MediaPermissions,
-) {
+) : MediaCatalog {
     private val resolver: ContentResolver get() = context.contentResolver
 
-    var excludedPathPrefixes: List<String> = listOf("Pictures/Screenshots", "WhatsApp", "Download", "Telegram", "Android/media")
+    val excludedPathPrefixes: List<String> = listOf("Pictures/Screenshots", "WhatsApp", "Download", "Telegram", "Android/media")
 
     /** Images and videos whose capture time falls inside [fromUtcMs, toUtcMs]. */
-    suspend fun queryByTime(fromUtcMs: Long, toUtcMs: Long): List<MediaCandidate> = withContext(Dispatchers.IO) {
+    override suspend fun queryByTime(fromUtcMs: Long, toUtcMs: Long): List<MediaCandidate> = withContext(Dispatchers.IO) {
         val sel = "(${MediaStore.MediaColumns.DATE_TAKEN} BETWEEN ? AND ?) OR " +
             "((${MediaStore.MediaColumns.DATE_TAKEN} IS NULL OR ${MediaStore.MediaColumns.DATE_TAKEN} = 0) AND ${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?)"
         val args = arrayOf("$fromUtcMs", "$toUtcMs", "${fromUtcMs / 1000}", "${toUtcMs / 1000}")
         query(MediaKind.PHOTO, sel, args) + query(MediaKind.VIDEO, sel, args)
     }
-
-    /** Rows added since [generation] (MediaStore.getGeneration, API 30+); null → everything recent. */
-    suspend fun queryAddedSince(generation: Long): List<MediaCandidate> = withContext(Dispatchers.IO) {
-        if (Build.VERSION.SDK_INT < 30) return@withContext emptyList()
-        val sel = "${MediaStore.MediaColumns.GENERATION_ADDED} > ?"
-        val args = arrayOf("$generation")
-        query(MediaKind.PHOTO, sel, args) + query(MediaKind.VIDEO, sel, args)
-    }
-
-    fun currentGeneration(): Long =
-        if (Build.VERSION.SDK_INT >= 30) runCatching { MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL_PRIMARY) }.getOrDefault(0L) else 0L
 
     private fun query(kind: MediaKind, selection: String, args: Array<String>): List<MediaCandidate> {
         if (permissions.access() == MediaAccess.NONE) return emptyList()
@@ -104,12 +99,21 @@ class MediaScanner @Inject constructor(
             Build.VERSION.SDK_INT >= 29 -> MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
             else -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         }
+        // RELATIVE_PATH, IS_PENDING and ORIENTATION-for-videos exist from API 29; on 26–28 the
+        // provider rejects unknown columns, so the projection is built per API level (review I4).
+        val api29 = Build.VERSION.SDK_INT >= 29
         val proj = mutableListOf(
             MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DATE_TAKEN, MediaStore.MediaColumns.DATE_ADDED,
             MediaStore.MediaColumns.DATE_MODIFIED, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.MIME_TYPE,
             MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.WIDTH, MediaStore.MediaColumns.HEIGHT,
-            MediaStore.MediaColumns.ORIENTATION, MediaStore.MediaColumns.RELATIVE_PATH, MediaStore.MediaColumns.IS_PENDING,
         )
+        if (api29) {
+            proj += listOf(MediaStore.MediaColumns.ORIENTATION, MediaStore.MediaColumns.RELATIVE_PATH, MediaStore.MediaColumns.IS_PENDING)
+        } else {
+            @Suppress("DEPRECATION")
+            proj += MediaStore.MediaColumns.DATA
+            if (kind == MediaKind.PHOTO) proj += COLUMN_ORIENTATION
+        }
         if (kind == MediaKind.VIDEO) proj += MediaStore.MediaColumns.DURATION
         val out = ArrayList<MediaCandidate>()
         resolver.query(uri, proj.toTypedArray(), selection, args, "${MediaStore.MediaColumns.DATE_TAKEN} ASC")?.use { c ->
@@ -122,14 +126,15 @@ class MediaScanner @Inject constructor(
             val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
             val iW = c.getColumnIndexOrThrow(MediaStore.MediaColumns.WIDTH)
             val iH = c.getColumnIndexOrThrow(MediaStore.MediaColumns.HEIGHT)
-            val iOri = c.getColumnIndexOrThrow(MediaStore.MediaColumns.ORIENTATION)
-            val iPath = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
-            val iPending = c.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_PENDING)
+            val iOri = c.getColumnIndex(COLUMN_ORIENTATION)
+            @Suppress("DEPRECATION")
+            val iPath = if (api29) c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH) else c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
+            val iPending = if (api29) c.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_PENDING) else -1
             val iDur = if (kind == MediaKind.VIDEO) c.getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION) else -1
             while (c.moveToNext()) {
-                if (c.getInt(iPending) == 1) continue // still being written (review G5): the next scan picks it up
+                if (iPending >= 0 && c.getInt(iPending) == 1) continue // still being written (review G5): the next scan picks it up
                 val path = c.getString(iPath)
-                if (path != null && excludedPathPrefixes.any { path.startsWith(it, ignoreCase = true) }) continue
+                if (path != null && isExcludedPath(path, api29)) continue
                 val id = c.getLong(iId)
                 val item = ContentUris.withAppendedId(uri, id)
                 out += MediaCandidate(
@@ -138,7 +143,7 @@ class MediaScanner @Inject constructor(
                     sizeBytes = if (c.isNull(iSize)) null else c.getLong(iSize),
                     width = if (c.isNull(iW)) null else c.getInt(iW), height = if (c.isNull(iH)) null else c.getInt(iH),
                     durationMs = if (iDur >= 0 && !c.isNull(iDur)) c.getLong(iDur) else null,
-                    orientationDeg = if (c.isNull(iOri)) null else c.getInt(iOri),
+                    orientationDeg = if (iOri < 0 || c.isNull(iOri)) null else c.getInt(iOri),
                     dateTakenMs = if (c.isNull(iTaken)) null else c.getLong(iTaken).takeIf { it > 0 },
                     dateAddedS = if (c.isNull(iAdded)) null else c.getLong(iAdded),
                     dateModifiedS = if (c.isNull(iMod)) null else c.getLong(iMod),
@@ -149,6 +154,10 @@ class MediaScanner @Inject constructor(
         }
         return out
     }
+
+    /** Relative path ("Pictures/Screenshots/x.jpg") on API 29+; absolute `_data` before that. */
+    internal fun isExcludedPath(path: String, relative: Boolean): Boolean =
+        excludedPathPrefixes.any { if (relative) path.startsWith(it, ignoreCase = true) else path.contains("/$it", ignoreCase = true) }
 
     /** EXIF with the original (un-redacted) stream when ACCESS_MEDIA_LOCATION is granted (DISENO §7.4). */
     private fun readExif(contentUri: Uri): ExifData? {
@@ -197,7 +206,10 @@ class MediaScanner @Inject constructor(
         return "$y:$mo:$da $h:$mi:$s"
     }
 
-    private companion object {
-        const val TAG = "Bitacora"
+    companion object {
+        private const val TAG = "Bitacora"
+
+        /** Same column name on every API level; typed constants differ (Images.Media vs MediaColumns). */
+        const val COLUMN_ORIENTATION = "orientation"
     }
 }

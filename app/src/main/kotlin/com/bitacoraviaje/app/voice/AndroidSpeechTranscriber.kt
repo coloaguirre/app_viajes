@@ -22,15 +22,15 @@ import kotlinx.coroutines.withTimeout
 
 /**
  * The system recognizer fed from a file (`EXTRA_AUDIO_SOURCE`, API 33+; researcher G1).
- * Trap: on devices that do not honour the audio source it silently opens the mic
- * instead, so the result is only trusted when it arrives before [RESULT_TIMEOUT_MS]
- * and the engine reported on-device support.
+ * Trap: a cloud/network engine may ignore the audio-source extra and silently open the
+ * microphone instead. Only the on-device recognizer is used (review I3); where there is
+ * none the engine reports itself unavailable and the note waits for whisper (Fase 3).
  */
 class AndroidSpeechTranscriber @Inject constructor(@ApplicationContext private val context: Context) : Transcriber {
     override val id: String = "android-speech"
 
     override suspend fun isAvailable(): Boolean = withContext(Dispatchers.Main) {
-        Build.VERSION.SDK_INT >= 33 && SpeechRecognizer.isRecognitionAvailable(context)
+        Build.VERSION.SDK_INT >= 33 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
     }
 
     override suspend fun transcribe(audio: File, languageTag: String): TranscriptResult {
@@ -53,11 +53,11 @@ class AndroidSpeechTranscriber @Inject constructor(@ApplicationContext private v
 
     private suspend fun recognize(readFd: ParcelFileDescriptor, languageTag: String): TranscriptResult = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine { cont ->
-            val recognizer = if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-            } else {
-                SpeechRecognizer.createSpeechRecognizer(context)
+            if (Build.VERSION.SDK_INT < 31 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+                cont.resumeWithException(TranscriptionException("no on-device recognizer"))
+                return@suspendCancellableCoroutine
             }
+            val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             val collected = StringBuilder()
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) = Unit

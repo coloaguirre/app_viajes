@@ -52,6 +52,10 @@ import com.bitacoraviaje.core.timeline.TimelineEvent
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+/** The app's texts are Spanish only; dates follow suit regardless of the phone's locale. */
+private val APP_LOCALE: Locale = Locale.forLanguageTag("es-AR")
 
 @Composable
 fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (String) -> Unit, onVoiceNote: (String) -> Unit, viewModel: TripDetailViewModel = hiltViewModel()) {
@@ -131,7 +135,7 @@ private fun segmentTitle(st: SegmentTimeline): String {
         else -> stringResource(R.string.type_stage)
     }
     val dist = s.stats.distanceM?.let { " · " + TrackingNotificationFactory.formatKm(it) } ?: ""
-    return "${DateTimeFormatter.ofPattern("EEE d MMM").format(date)} · ${s.title ?: kind}$dist"
+    return "${DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(date)} · ${s.title ?: kind}$dist"
 }
 
 @Composable
@@ -149,7 +153,7 @@ private fun EventRow(e: TimelineEvent, zone: ZoneId, selected: Boolean, onClick:
         is TimelineEvent.Text -> "📝" to (e.note.text ?: stringResource(R.string.ev_marker))
         is TimelineEvent.Highlight -> "⭐" to stringResource(R.string.ev_highlight)
         is TimelineEvent.TransportChange -> "🔀" to stringResource(R.string.ev_transport_change, e.transport?.let { stringResource(transportLabelRes(it)) } ?: (e.note.text ?: ""))
-        is TimelineEvent.DayChange -> "📅" to DateTimeFormatter.ofPattern("EEEE d 'de' MMMM").format(e.localDate)
+        is TimelineEvent.DayChange -> "📅" to DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", APP_LOCALE).format(e.localDate)
         is TimelineEvent.Summary -> "↝" to stringResource(R.string.ev_summary, TrackingNotificationFactory.formatKm(e.distanceM), TrackingNotificationFactory.formatElapsed(e.durationMs))
     }
     ListItem(

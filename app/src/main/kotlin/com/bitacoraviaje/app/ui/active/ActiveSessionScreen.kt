@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.FilterChip
+import com.bitacoraviaje.app.ui.common.profileLabelRes
 import com.bitacoraviaje.app.ui.common.transportLabelRes
 import com.bitacoraviaje.core.model.Transport
 import androidx.compose.foundation.layout.Box
@@ -107,7 +108,7 @@ fun ActiveSessionScreen(
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.testTag("active_gps"),
                         )
-                        Text(stringResource(R.string.active_profile, live.profile.name), style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.active_profile, stringResource(profileLabelRes(live.profile))), style = MaterialTheme.typography.labelSmall)
                         // PLAN item 2.9: tap to change the means of transport without closing the stage.
                         Text(
                             stringResource(R.string.active_transport, stringResource(transportLabelRes(state.segment?.transport ?: Transport.WALK))),

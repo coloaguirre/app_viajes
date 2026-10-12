@@ -127,6 +127,28 @@ interface MediaDao {
     @Update
     suspend fun update(item: MediaItemEntity)
 
+    /** New rows only: an existing mediastore_id is left untouched (review I6). */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIgnore(items: List<MediaItemEntity>): List<Long>
+
+    /**
+     * Re-link an existing row without clobbering what the user did meanwhile: manual
+     * placements and exclusions are skipped by the WHERE clause, caption/favourite are
+     * not in the SET list (review I6).
+     */
+    @Query(
+        "UPDATE media_item SET segment_id = :segmentId, taken_utc_ms = :takenUtcMs, taken_time_source = :takenTimeSource, " +
+            "exif_lat = :exifLat, exif_lon = :exifLon, camera_make = :cameraMake, camera_model = :cameraModel, " +
+            "linked_lat = :linkedLat, linked_lon = :linkedLon, link_method = :linkMethod, link_confidence = :linkConfidence, " +
+            "link_time_gap_ms = :linkTimeGapMs, needs_review = :needsReview " +
+            "WHERE id = :id AND link_method != 'MANUAL' AND is_excluded = 0",
+    )
+    suspend fun relink(
+        id: String, segmentId: String?, takenUtcMs: Long, takenTimeSource: String, exifLat: Double?, exifLon: Double?,
+        cameraMake: String?, cameraModel: String?, linkedLat: Double?, linkedLon: Double?, linkMethod: String,
+        linkConfidence: Double, linkTimeGapMs: Long?, needsReview: Boolean,
+    ): Int
+
     @Query("SELECT * FROM media_item WHERE id = :id")
     suspend fun getById(id: String): MediaItemEntity?
 

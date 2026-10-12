@@ -92,6 +92,17 @@
     <string name="link_none">sin ubicación</string>
     <string name="link_manual">ubicada a mano</string>
     <string name="link_auto">%1$s, confianza %2$d %%</string>
+    <string name="link_exif">ubicada por el GPS de la foto</string>
+    <string name="link_track_interpolated">ubicada por el recorrido</string>
+    <string name="link_track_nearest">ubicada por el punto más cercano del recorrido</string>
+    <string name="profile_trekking_high">Trekking (máxima precisión)</string>
+    <string name="profile_walk">A pie</string>
+    <string name="profile_bike">Bici</string>
+    <string name="profile_vehicle">Vehículo</string>
+    <string name="profile_plane">Avión</string>
+    <string name="profile_saver">Ahorro de batería</string>
+    <string name="profile_economy">Económico</string>
+    <string name="profile_rest">En reposo</string>
     <string name="voice_detail_title">Nota de voz</string>
     <string name="voice_play">Reproducir</string>
     <string name="voice_pause">Pausar</string>

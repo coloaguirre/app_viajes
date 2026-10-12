@@ -3,6 +3,7 @@ package com.bitacoraviaje.core.geo
 import com.bitacoraviaje.core.model.LinkMethod
 import com.bitacoraviaje.core.model.Segment
 import com.bitacoraviaje.core.model.TrackPoint
+import com.bitacoraviaje.core.model.Transport
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -23,7 +24,17 @@ data class LinkConfig(
     val exifTrackWindowMs: Long = 2 * 60_000,
     val exifTrackMaxDistanceM: Double = 500.0,
     val segmentMarginMs: Long = 10 * 60_000,
-)
+) {
+    companion object {
+        /** Vehicles move far between fixes: wider EXIF-vs-track tolerance and longer interpolation gaps. */
+        fun forTransport(transport: Transport?): LinkConfig = when (transport) {
+            Transport.CAR, Transport.BUS, Transport.TRAIN, Transport.BOAT, Transport.MIXED ->
+                LinkConfig(maxInterpGapMs = 10 * 60_000, exifTrackMaxDistanceM = 2_000.0)
+            Transport.PLANE -> LinkConfig(maxInterpGapMs = 30 * 60_000, maxNearestMs = 30 * 60_000, exifTrackMaxDistanceM = 20_000.0)
+            Transport.WALK, Transport.BIKE, null -> LinkConfig()
+        }
+    }
+}
 
 /**
  * Where the track was at [tUtcMs]. [points] must be the accepted points of one segment

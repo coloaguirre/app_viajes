@@ -40,6 +40,8 @@ import com.bitacoraviaje.app.map.MapPoint
 import com.bitacoraviaje.app.map.MapRenderer
 import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.tracking.TrackingNotificationFactory
+import com.bitacoraviaje.app.ui.common.linkMethodLabelRes
+import com.bitacoraviaje.core.model.LinkMethod
 
 @Composable
 fun MediaReviewRoute(mapRenderer: MapRenderer, onBack: () -> Unit, viewModel: MediaReviewViewModel = hiltViewModel()) {
@@ -114,7 +116,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ReviewBody(
             val m = state.selected
             if (m != null) {
                 Text(
-                    stringResource(R.string.review_hint, m.displayName ?: "", linkLabel(m.linkMethod.name, m.linkConfidence)),
+                    stringResource(R.string.review_hint, m.displayName ?: "", linkLabel(m.linkMethod, m.linkConfidence)),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
@@ -128,8 +130,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ReviewBody(
 }
 
 @Composable
-private fun linkLabel(method: String, confidence: Double): String = when (method) {
-    "NONE" -> stringResource(R.string.link_none)
-    "MANUAL" -> stringResource(R.string.link_manual)
-    else -> stringResource(R.string.link_auto, method, (confidence * 100).toInt())
+private fun linkLabel(method: LinkMethod, confidence: Double): String = when (method) {
+    LinkMethod.NONE, LinkMethod.MANUAL -> stringResource(linkMethodLabelRes(method))
+    else -> stringResource(R.string.link_auto, stringResource(linkMethodLabelRes(method)), (confidence * 100).toInt())
 }

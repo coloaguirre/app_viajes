@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -84,7 +85,7 @@ class TripDetailViewModel @Inject constructor(
     ) { pts, med, voice, text, (stops, pauses) ->
         val events = buildTimeline(TimelineInput(s, pts, pauses, stops, med, voice, text, nowUtcMs = System.currentTimeMillis()))
         SegmentTimeline(s, events, pts.map { MapPoint(it.lat, it.lon) })
-    }
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default) // timeline building off the main thread (review M5)
 
     val state: StateFlow<TripDetailUiState> = combine(tripFlow, segmentsFlow, media.observeByTrip(tripId), media.observeReviewQueue(tripId), tab, focus) { arr ->
         @Suppress("UNCHECKED_CAST")

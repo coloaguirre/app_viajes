@@ -48,6 +48,8 @@
 | 2026-10-12 | Línea de tiempo (`core/timeline`): momentos de fotos con ventana 2 min / 100 m, resúmenes intermedios a partir de 300 m y 10 min, cambio de día por medianoche local de la etapa; eventos sin posición propia la toman del recorrido (`positionAt`) | DISENO §9 |
 | 2026-10-12 | Detalle del viaje: tocar un evento cambia a la pestaña Mapa y centra la cámara; la revisión de fotos ofrece la corrección de reloj solo si el desfase implícito supera 1 min | DISENO §14.1 |
 | 2026-10-12 | Cambio de medio en sesión (2.9) sin tabla nueva: `text_note.kind = TRANSPORT_CHANGE` con el medio en `text`; la etapa guarda el último medio y perfil; el servicio re-siembra el filtro con el último punto aceptado | Pedido del usuario 2026-10-12; evita esquema v6 |
+| 2026-10-12 | Revisión de código Fase 2 (PR #5) aplicada antes del merge: tope de 5 min guarda la nota (antes se borraba), rotación no cancela la grabación, grabador liberado si falla el arranque, solo reconocedor on-device (nunca el micrófono en segundo plano), escáner compatible API 26–28, ventana de barrido ensanchada por el desfase de cámara, re-vinculación con UPDATE condicionado (no pisa ubicaciones manuales), desfase automático por hora GPS, config de vinculación por medio de transporte | PR #5 |
+| 2026-10-12 | Diferidos con registro: barrido incremental por generación (Fase 3); claves foráneas de `camera_clock_offset`→`trip` y `voice_note.media_item_id` (entran con el próximo cambio de esquema); acceso solo-video en permisos; `creation_time` de MP4 asumido UTC hasta validarlo con un video real en 2.8 | Revisión PR #5 (NIT, M6) |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas

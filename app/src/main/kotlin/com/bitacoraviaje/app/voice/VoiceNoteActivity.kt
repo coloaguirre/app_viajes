@@ -158,6 +158,8 @@ class VoiceNoteActivity : ComponentActivity() {
             return
         }
         state = State.SAVING // "preparing" while the recorder starts off the main thread
+        // 5-minute cap reached: save what was recorded instead of letting a later stop() discard it (review B1).
+        recorder.onMaxDurationReached = { runOnUiThread { if (state == State.RECORDING) finishRecording() } }
         lifecycleScope.launch {
             // MediaRecorder.start() can block for seconds when the audio HAL is missing or busy
             // (measured: ANR on the emulator without audio). Never on the main thread, and bounded.
@@ -206,7 +208,9 @@ class VoiceNoteActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (recorder.isRecording) recorder.cancel()
+        // A configuration change keeps the Activity (manifest configChanges); any other destroy while
+        // recording is a real teardown and the half note is not worth keeping (review I1).
+        if (!isChangingConfigurations && recorder.isRecording) recorder.cancel()
         super.onDestroy()
     }
 

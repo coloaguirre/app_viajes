@@ -244,10 +244,13 @@ su aceptación es la evidencia que él aporta, registrada en
       funcionamiento degradado.  (est: 1)
       Aceptación: E2E en emulador con acceso parcial muestra el aviso y
       ofrece "seleccionar más"; sin permiso, el registro sigue.
-- [x] 2.2 `MediaScanner` + observador + barrido incremental por
-      generación (excluyendo pendientes); lectura de hora EXIF con
-      offset y de la hora GPS UTC; videos con fecha de fin menos
-      duración; exclusiones configurables.  (est: 2)
+- [x] 2.2 `MediaScanner` + observador + barrido por ventana de la etapa
+      (excluyendo pendientes); lectura de hora EXIF con offset y de la
+      hora GPS UTC; videos con fecha de fin menos duración; exclusiones
+      configurables. (Ajuste 2026-10-12, revisión de código: el barrido
+      incremental por generación de MediaStore se difiere a Fase 3; el
+      observador dispara un barrido por ventana de la etapa abierta, que
+      alcanza para el volumen de un viaje.)  (est: 2)
       Aceptación: `tools/sample-trips/make_photos.py` genera fixtures
       que cubren todas las fuentes de hora de §7.5; tests verdes.
 - [x] 2.3 Vinculación en `core/geo` (§7.6) con ventana configurable por

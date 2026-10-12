@@ -63,11 +63,18 @@ class VoiceNoteDetailViewModel @Inject constructor(
         if (p == null) {
             val file = File(context.filesDir, n.audioPath)
             if (!file.exists()) return
-            player = MediaPlayer().apply {
-                setDataSource(file.absolutePath)
-                setOnCompletionListener { playing.value = false }
-                prepare()
+            val mp = MediaPlayer()
+            try {
+                mp.setDataSource(file.absolutePath)
+                mp.setOnCompletionListener { playing.value = false }
+                mp.prepare()
+            } catch (e: Exception) {
+                // Corrupt or truncated file: do not crash the screen, do not leak the player (review M2).
+                android.util.Log.w("Bitacora", "voice note playback failed: ${e.javaClass.simpleName}")
+                mp.release()
+                return
             }
+            player = mp
         }
         player?.start()
         playing.value = true
@@ -82,7 +89,7 @@ class VoiceNoteDetailViewModel @Inject constructor(
     fun retryTranscription() {
         viewModelScope.launch {
             notes.setTranscriptStatus(noteId, TranscriptStatus.PENDING)
-            TranscribeWorker.enqueue(context, noteId, prefs.settings.first().transcriptionLanguage)
+            TranscribeWorker.enqueue(context, noteId, prefs.settings.first().transcriptionLanguage, replace = true)
         }
     }
 

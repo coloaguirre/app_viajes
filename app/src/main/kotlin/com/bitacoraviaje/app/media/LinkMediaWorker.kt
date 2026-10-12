@@ -12,8 +12,8 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
 /**
- * Background linking (DISENO §4.4 step 6). Unique per trip (`link-<tripId>`),
- * KEEP policy so a burst of observer events does not pile up work.
+ * Background linking (DISENO §4.4 step 6). Unique per trip (`link-<tripId>`) with
+ * APPEND_OR_REPLACE: a burst of observer events queues at most one more sweep.
  */
 @HiltWorker
 class LinkMediaWorker @AssistedInject constructor(
@@ -28,6 +28,7 @@ class LinkMediaWorker @AssistedInject constructor(
             val r = linker.linkTrip(tripId, segmentId?.let { setOf(it) })
             Result.success(Data.Builder().putInt("scanned", r.scanned).putInt("linked", r.linked).putInt("review", r.review).build())
         } catch (e: Exception) {
+            android.util.Log.w("Bitacora", "media link failed trip=$tripId attempt=$runAttemptCount: ${e.javaClass.simpleName} ${e.message}")
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
     }

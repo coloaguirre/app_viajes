@@ -48,8 +48,11 @@ class TranscribeWorker @AssistedInject constructor(
                 Log.w(TAG, "engine ${engine.id} failed for note=$id: ${e.message}")
             }
         }
-        notes.setTranscriptStatus(id, TranscriptStatus.FAILED)
-        return if (runAttemptCount < 2) Result.retry() else Result.failure()
+        // FAILED only when WorkManager will not try again; otherwise the detail would offer a
+        // manual retry while an automatic one is already scheduled (review M1).
+        val willRetry = runAttemptCount < 2
+        notes.setTranscriptStatus(id, if (willRetry) TranscriptStatus.PENDING else TranscriptStatus.FAILED)
+        return if (willRetry) Result.retry() else Result.failure()
     }
 
     private fun segmentsJson(segments: List<TranscriptSegment>): String? =
@@ -62,13 +65,13 @@ class TranscribeWorker @AssistedInject constructor(
         const val KEY_NOTE_ID = "note_id"
         const val KEY_LANG = "lang"
 
-        fun enqueue(context: Context, noteId: String, languageTag: String) {
+        fun enqueue(context: Context, noteId: String, languageTag: String, replace: Boolean = false) {
             val req = OneTimeWorkRequestBuilder<TranscribeWorker>()
                 .setInputData(Data.Builder().putString(KEY_NOTE_ID, noteId).putString(KEY_LANG, languageTag).build())
                 .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork("transcribe-$noteId", ExistingWorkPolicy.KEEP, req)
+            WorkManager.getInstance(context).enqueueUniqueWork("transcribe-$noteId", if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP, req)
         }
     }
 }

@@ -23,6 +23,14 @@ class MediaLinkingTest {
     )
 
     @Test
+    fun `link config widens tolerances for vehicles and planes only`() {
+        assertEquals(LinkConfig(), LinkConfig.forTransport(com.bitacoraviaje.core.model.Transport.WALK))
+        assertEquals(LinkConfig(), LinkConfig.forTransport(null))
+        assertEquals(2_000.0, LinkConfig.forTransport(com.bitacoraviaje.core.model.Transport.BUS).exifTrackMaxDistanceM)
+        assertEquals(30 * 60_000L, LinkConfig.forTransport(com.bitacoraviaje.core.model.Transport.PLANE).maxNearestMs)
+    }
+
+    @Test
     fun `positionAt interpolates between neighbours and hits exact points`() {
         val p = positionAt(track, t0 + 2_500) as PositionAt.Interpolated
         assertEquals(track[0].lat + (track[1].lat - track[0].lat) / 2, p.lat, 1e-9)

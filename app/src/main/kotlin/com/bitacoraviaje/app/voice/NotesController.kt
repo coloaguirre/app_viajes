@@ -1,7 +1,6 @@
 package com.bitacoraviaje.app.voice
 
 import android.content.Context
-import android.os.Looper
 import com.bitacoraviaje.app.settings.UserPreferences
 import com.bitacoraviaje.app.tracking.TrackingStateHolder
 import com.bitacoraviaje.core.model.TextNote
@@ -48,9 +47,14 @@ class NotesController @Inject constructor(
         val cts = CancellationTokenSource()
         cont.invokeOnCancellation { cts.cancel() }
         val req = CurrentLocationRequest.Builder().setPriority(Priority.PRIORITY_HIGH_ACCURACY).setDurationMillis(CURRENT_LOCATION_TIMEOUT_MS).build()
-        fused.getCurrentLocation(req, cts.token)
-            .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
-            .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+        try {
+            fused.getCurrentLocation(req, cts.token)
+                .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
+                .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+        } catch (e: SecurityException) {
+            // Permission revoked after the segment was opened: the note is saved without a position (review M3).
+            if (cont.isActive) cont.resume(null)
+        }
     }
 
     /** Persists a finished recording and queues its transcription. */
@@ -79,6 +83,5 @@ class NotesController @Inject constructor(
     companion object {
         const val FRESH_FIX_MS = 30_000L
         const val CURRENT_LOCATION_TIMEOUT_MS = 5_000L
-        @Suppress("unused") private val mainLooper: Looper = Looper.getMainLooper()
     }
 }
