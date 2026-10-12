@@ -69,6 +69,18 @@ class PointFilter(private val config: FilterConfig, private val rejectMock: Bool
     private var stillAnchor: TrackPoint? = null
     private val pendingJump = ArrayList<TrackPoint>()
 
+    /**
+     * Seed the filter with the last accepted point of a segment being resumed, so the
+     * first new fix is judged against it. Without this, a stale or bogus first fix
+     * after a process restart is accepted unconditionally (measured 2026-10-12: the
+     * emulator's default location 10 000 km away was accepted after a restart).
+     */
+    fun seed(last: TrackPoint) {
+        lastAccepted = last
+        stillAnchor = last
+        pendingJump.clear()
+    }
+
     fun offer(p: TrackPoint): FilterVerdict {
         val last = lastAccepted
         if (last != null && p.timeUtcMs <= last.timeUtcMs) return FilterVerdict(false, RejectReason.DUPLICATE_TIME)

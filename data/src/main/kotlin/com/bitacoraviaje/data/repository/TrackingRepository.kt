@@ -170,6 +170,8 @@ class TrackingRepository @Inject constructor(
 
     suspend fun validPoints(segmentId: String): List<TrackPoint> = points.getValidBySegment(segmentId).map { it.toDomain() }
 
+    suspend fun lastValidPoint(segmentId: String): TrackPoint? = points.getLastValid(segmentId)?.toDomain()
+
     suspend fun stopsOf(segmentId: String): List<Stop> = stops.getBySegment(segmentId).map { it.toDomain() }
 
     suspend fun pausesOf(segmentId: String): List<SegmentPause> = segments.getPauses(segmentId).map { it.toDomain() }

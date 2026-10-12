@@ -58,6 +58,29 @@ class TrackingNotificationFactory @Inject constructor(@ApplicationContext privat
 
     fun notify(state: LiveTrackingState, nowUtcMs: Long) = manager.notify(NOTIFICATION_ID, build(state, nowUtcMs))
 
+    /**
+     * After a reboot a location foreground service cannot restart itself (DISENO §6.9):
+     * tell the user the recording was interrupted and let a tap bring the app back.
+     */
+    fun notifyResumeNeeded() {
+        ensureChannel()
+        val open = PendingIntent.getActivity(
+            context, 3, Intent(context, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_tracking)
+            .setContentTitle(context.getString(R.string.notif_interrupted_title))
+            .setContentText(context.getString(R.string.notif_interrupted_body))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .build()
+        manager.notify(RESUME_NOTIFICATION_ID, n)
+    }
+
+    fun cancelResumeNeeded() = manager.cancel(RESUME_NOTIFICATION_ID)
+
     private fun servicePending(code: Int, action: String): PendingIntent = PendingIntent.getService(
         context, code, Intent(context, TrackingService::class.java).setAction(action),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -66,6 +89,7 @@ class TrackingNotificationFactory @Inject constructor(@ApplicationContext privat
     companion object {
         const val CHANNEL_ID = "tracking"
         const val NOTIFICATION_ID = 1001
+        const val RESUME_NOTIFICATION_ID = 1002
 
         fun formatElapsed(ms: Long): String {
             val s = ms / 1000

@@ -61,6 +61,16 @@ class PointFilterTest {
     }
 
     @Test
+    fun `a seeded filter rejects a bogus first fix after a restart`() {
+        val walk = straightWalk(3)
+        val fresh = PointFilter(FilterConfig.WALK)
+        assertTrue(fresh.offer(walk[0].copy(lat = 37.42, lon = -122.08)).accepted, "unseeded: anything goes")
+        val seeded = PointFilter(FilterConfig.WALK).apply { seed(walk[1]) }
+        assertEquals(RejectReason.IMPOSSIBLE_JUMP, seeded.offer(walk[2].copy(lat = 37.42, lon = -122.08)).reason)
+        assertTrue(seeded.offer(walk[2]).accepted)
+    }
+
+    @Test
     fun `profiles map transports to thresholds`() {
         assertEquals(70.0, FilterConfig.forTransport(com.bitacoraviaje.core.model.Transport.BUS).maxSpeedMps)
         assertEquals(4.0, FilterConfig.forTransport(null).maxSpeedMps)

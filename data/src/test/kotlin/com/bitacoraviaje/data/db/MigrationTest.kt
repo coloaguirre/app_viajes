@@ -33,10 +33,25 @@ class MigrationTest {
     }
 
     @Test
-    fun `current version equals the latest exported schema`() {
-        // When VERSION grows, add MIGRATION_1_2 to BitacoraDatabase and call
-        // helper.runMigrationsAndValidate(DB_NAME, 2, true, MIGRATION_1_2) here.
-        assertEquals(1, BitacoraDatabase.VERSION)
+    fun `migrate 1 to 2 keeps rows and adds monotonic_ms`() {
+        helper.createDatabase(DB_NAME, 1).use { v1 ->
+            v1.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v1.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'ACTIVE')")
+            v1.execSQL("INSERT INTO track_point (segment_id,time_utc_ms,lat,lon,is_mock,is_filtered_out,is_simplified_keep) VALUES ('s',5,1.0,2.0,0,0,1)")
+        }
+        val v2 = helper.runMigrationsAndValidate(DB_NAME, 2, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v2.query("SELECT monotonic_ms, lat FROM track_point").use { c ->
+            assertTrue(c.moveToFirst())
+            assertTrue(c.isNull(0), "new column defaults to NULL for old rows")
+            assertEquals(1.0, c.getDouble(1))
+        }
+        v2.close()
+    }
+
+    @Test
+    fun `current version has an exported schema and every bump a migration`() {
+        assertEquals(2, BitacoraDatabase.VERSION)
+        assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 
     private companion object {

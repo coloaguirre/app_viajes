@@ -23,6 +23,7 @@ class TrackingController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: TrackingRepository,
     private val stateHolder: TrackingStateHolder,
+    private val notifications: TrackingNotificationFactory,
 ) {
     fun requiredPermissions(): List<String> = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -50,6 +51,24 @@ class TrackingController @Inject constructor(
                 .putExtra(TrackingService.EXTRA_SEGMENT_ID, segmentId)
                 .putExtra(TrackingService.EXTRA_PROFILE, profile),
         )
+    }
+
+    /** Whether the recording service is alive in this process (false after a process death). */
+    fun isServiceRunning(): Boolean = stateHolder.state.value.isRunning
+
+    /**
+     * Recovery (DISENO §6.9): an open segment in the database but no running service.
+     * Restarts the service on that segment; a PAUSED segment stays paused.
+     */
+    fun resumeOpenSegment(segment: com.bitacoraviaje.core.model.Segment) {
+        check(hasLocationPermission()) { "location permission required" }
+        startService(segment.id, segment.samplingProfile)
+    }
+
+    /** Recovery dialog, "close": the segment keeps what was saved and is marked RECOVERED. */
+    suspend fun closeOpenSegmentAsRecovered(segmentId: String) {
+        repository.finishSegment(segmentId, SegmentStatus.RECOVERED)
+        notifications.cancelResumeNeeded()
     }
 
     fun pause() = send(TrackingService.ACTION_PAUSE)

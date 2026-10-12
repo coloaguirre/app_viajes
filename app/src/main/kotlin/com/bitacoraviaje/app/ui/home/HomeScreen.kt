@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +65,8 @@ fun HomeRoute(onOpenSettings: () -> Unit, onOpenActiveSession: (String) -> Unit,
         onOpenSettings = onOpenSettings,
         onNewRecording = { permissionLauncher.launch(viewModel.requiredPermissions().toTypedArray()) },
         onResumeActive = { id -> onOpenActiveSession(id) },
+        onRecoverResume = viewModel::resumeOpenSegment,
+        onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
     )
 }
 
@@ -75,7 +78,18 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onNewRecording: () -> Unit,
     onResumeActive: (String) -> Unit,
+    onRecoverResume: () -> Unit = {},
+    onRecoverClose: () -> Unit = {},
 ) {
+    if (state.needsRecovery) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(stringResource(R.string.recover_title)) },
+            text = { Text(stringResource(R.string.recover_body)) },
+            confirmButton = { TextButton(onClick = onRecoverResume) { Text(stringResource(R.string.recover_resume)) } },
+            dismissButton = { TextButton(onClick = onRecoverClose) { Text(stringResource(R.string.recover_close)) } },
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(

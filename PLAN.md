@@ -217,7 +217,7 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: tests JVM de la máquina de estados; E2E con un GPX que
       incluye una parada de 20 min y un cruce de medianoche simulado
       produce dos etapas y un período de reposo registrado.
-- [ ] 1.5 Recuperación ante fallos: `START_STICKY`, etapa ACTIVE sin
+- [x] 1.5 Recuperación ante fallos: `START_STICKY`, etapa ACTIVE sin
       servicio → reanudar/cerrar, notificación tras reinicio del
       teléfono, referencia monótona de tiempo ante cambios de hora,
       marcado de ubicaciones simuladas.  (est: 1.5)

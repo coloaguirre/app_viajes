@@ -24,6 +24,7 @@ object DataModule {
         Room.databaseBuilder(context, BitacoraDatabase::class.java, BitacoraDatabase.NAME)
             // WAL is Room's default on API 16+; made explicit because the spec relies on it (§3).
             .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+            .addMigrations(*BitacoraDatabase.ALL_MIGRATIONS)
             // No fallbackToDestructiveMigration: a missing migration must fail loudly, never wipe a trip.
             .build()
 

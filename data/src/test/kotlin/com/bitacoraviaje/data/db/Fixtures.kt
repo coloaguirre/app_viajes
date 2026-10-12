@@ -25,6 +25,6 @@ object Fixtures {
     fun point(segmentId: String = "s1", i: Int, filtered: Boolean = false) = TrackPointEntity(
         segmentId = segmentId, timeUtcMs = T0 + i * 5_000L, lat = -34.6 + i * 1e-4, lon = -58.4,
         altM = 20.0, altMslM = null, hAccuracyM = 5f, vAccuracyM = null, speedMps = 1.2f, speedAccuracyMps = null,
-        bearingDeg = null, provider = "fused", activity = null, isMock = false, isFilteredOut = filtered, isSimplifiedKeep = true,
+        bearingDeg = null, provider = "fused", activity = null, isMock = false, monotonicMs = null, isFilteredOut = filtered, isSimplifiedKeep = true,
     )
 }

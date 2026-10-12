@@ -19,4 +19,5 @@ fun Location.toTrackPoint(segmentId: String): TrackPoint = TrackPoint(
     bearingDeg = if (hasBearing()) bearing else null,
     provider = provider,
     isMock = if (Build.VERSION.SDK_INT >= 31) isMock else false,
+    monotonicMs = elapsedRealtimeNanos / 1_000_000,
 )

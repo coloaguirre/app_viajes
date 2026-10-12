@@ -8,6 +8,12 @@
     <string name="home_new_recording">Nuevo registro</string>
     <string name="home_active_banner">Registro en curso</string>
     <string name="home_active_banner_action">Volver a la sesión</string>
+    <string name="recover_title">Tu registro se interrumpió</string>
+    <string name="recover_body">Hay una etapa abierta pero el registro no está corriendo (la app se cerró o el teléfono se reinició). ¿Querés seguir registrándola o cerrarla con lo guardado hasta ahora?</string>
+    <string name="recover_resume">Reanudar</string>
+    <string name="recover_close">Cerrar etapa</string>
+    <string name="notif_interrupted_title">Tu registro se interrumpió</string>
+    <string name="notif_interrupted_body">Tocá para volver a la app y reanudar el recorrido.</string>
     <string name="home_permission_denied">Sin permiso de ubicación no se puede registrar el recorrido.</string>
 
     <string name="active_title">Sesión activa</string>

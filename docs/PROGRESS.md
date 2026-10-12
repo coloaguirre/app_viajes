@@ -3,14 +3,14 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **1 — Recorrido continuo, en curso** (1.1 a 1.4 cerrados 2026-10-12; siguiente 1.5 recuperación ante fallos).
+- Fase: **1 — Recorrido continuo, en curso** (1.1 a 1.5 cerrados 2026-10-12; siguiente 1.6 UI de la fase con mapa — requiere clave de MapTiler).
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
-| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
+| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
@@ -33,6 +33,8 @@
 | 2026-10-12 | Perfil ECONOMY con prioridad de alta precisión (GPS) e intervalo 30 s / 40 m / lote 60 s, no prioridad balanceada | Sin Wi-Fi ni celdas en montaña la prioridad balanceada no tiene de dónde ubicar; el ahorro viene del intervalo largo |
 | 2026-10-12 | Reposo automático: entra por silencio (sin puntos durante N min) además de por puntos agrupados; umbral configurable en Ajustes (3/5/10/15 min, default 5) | El proveedor no entrega puntos sin movimiento mayor a la distancia mínima |
 | 2026-10-12 | Perfil REST: alta precisión, 60 s / 40 m, sin agrupación | Con agrupación la salida del reposo se demoraba hasta 3 min |
+| 2026-10-12 | Esquema v2: `track_point.monotonic_ms`; tiempo de cada punto re-derivado del reloj monótono ante saltos del reloj de pared (`ClockGuard`) | DISENO §16.2 cambio manual de hora |
+| 2026-10-12 | El filtro se siembra con el último punto de la etapa al (re)iniciar el servicio | Un primer punto espurio tras un reinicio se aceptaba sin historia |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -75,6 +77,10 @@ Observaciones de la verificación (ítem 0.1):
   un comando con sudo del usuario.
 
 ## Problemas conocidos
+- `adb shell am kill` no mata un proceso con servicio en primer plano; para
+  simular una muerte por memoria usar `kill -9 <pid>` (con `adb root`).
+- Tras `adb reboot`, `persist.sys.timezone` del emulador vuelve a UTC; fijarla
+  de nuevo antes de pruebas que dependan de la medianoche local.
 - El emulador no reproduce fielmente la altitud de `geo fix` (la mantiene
   durante descensos). El desnivel se valida con el test JVM sobre el GPX y
   en el Pixel 8 Pro; no confiar en el emulador para esa métrica.

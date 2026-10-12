@@ -11,6 +11,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.bitacoraviaje.core.geo.FilterConfig
 import com.bitacoraviaje.core.geo.PointFilter
+import com.bitacoraviaje.core.geo.ClockGuard
 import com.bitacoraviaje.core.geo.ContinuityAction
 import com.bitacoraviaje.core.geo.RestConfig
 import com.bitacoraviaje.core.geo.TripContinuityPolicy
@@ -63,6 +64,8 @@ class TrackingService : LifecycleService() {
     private var lastFlushMs = 0L
     private var lastNotifyMs = 0L
     private var policy: TripContinuityPolicy? = null
+    private var clockGuard = ClockGuard()
+    private var loggedCorrections = 0
     private var tickerJob: Job? = null
     private var tzId: String = java.util.TimeZone.getDefault().id
 
@@ -97,6 +100,7 @@ class TrackingService : LifecycleService() {
         segmentId = id
         profile = p
         filter = PointFilter(FilterConfig.forProfile(p))
+        clockGuard = ClockGuard()
         notifications.ensureChannel()
         val now = System.currentTimeMillis()
         stateHolder.update { LiveTrackingState(segmentId = id, isRunning = true, startedUtcMs = now, profile = p) }
@@ -104,8 +108,16 @@ class TrackingService : LifecycleService() {
         @Suppress("InlinedApi")
         val fgsType = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
         ServiceCompat.startForeground(this, TrackingNotificationFactory.NOTIFICATION_ID, notifications.build(stateHolder.state.value, now), fgsType)
-        requestUpdates(p)
-        lifecycleScope.launch { installPolicy(id) }
+        lifecycleScope.launch {
+            // Seed the filter with the segment's last point BEFORE asking for updates: a resumed
+            // segment must judge its first new fix against where it left off.
+            repository.lastValidPoint(id)?.let { filter.seed(it) }
+            installPolicy(id)
+            requestUpdates(p)
+            // Resuming a segment the database says is PAUSED (recovery flow): keep it paused.
+            if (repository.getSegment(id)?.status == SegmentStatus.PAUSED) pause(record = false)
+            notifications.cancelResumeNeeded()
+        }
         Log.i(TAG, "tracking started segment=$id profile=$p")
     }
 
@@ -195,8 +207,15 @@ class TrackingService : LifecycleService() {
         fused.requestLocationUpdates(request, callback, Looper.getMainLooper())
     }
 
-    private suspend fun onPoint(raw: TrackPoint) {
+    private suspend fun onPoint(incoming: TrackPoint) {
         if (stateHolder.state.value.isPaused) return
+        // Wall-clock changes must not reorder or stretch the track: re-derive time from the monotonic clock.
+        val fixedUtc = clockGuard.resolve(incoming.timeUtcMs, incoming.monotonicMs)
+        val raw = if (fixedUtc != incoming.timeUtcMs) incoming.copy(timeUtcMs = fixedUtc) else incoming
+        if (clockGuard.corrections > loggedCorrections) {
+            loggedCorrections = clockGuard.corrections
+            Log.w(TAG, "wall clock jump detected; fix time corrected from monotonic clock (total $loggedCorrections)")
+        }
         val verdict = filter.offer(raw)
         val stored = raw.copy(isFilteredOut = !verdict.accepted)
         bufferLock.withLock {

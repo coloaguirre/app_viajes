@@ -81,14 +81,14 @@ fun SegmentPause.toEntity() =
 fun TrackPointEntity.toDomain() = TrackPoint(
     id = id, segmentId = segmentId, timeUtcMs = timeUtcMs, lat = lat, lon = lon, altM = altM, altMslM = altMslM,
     hAccuracyM = hAccuracyM, vAccuracyM = vAccuracyM, speedMps = speedMps, speedAccuracyMps = speedAccuracyMps,
-    bearingDeg = bearingDeg, provider = provider, activity = activity, isMock = isMock,
+    bearingDeg = bearingDeg, provider = provider, activity = activity, isMock = isMock, monotonicMs = monotonicMs,
     isFilteredOut = isFilteredOut, isSimplifiedKeep = isSimplifiedKeep,
 )
 
 fun TrackPoint.toEntity() = TrackPointEntity(
     id = id, segmentId = segmentId, timeUtcMs = timeUtcMs, lat = lat, lon = lon, altM = altM, altMslM = altMslM,
     hAccuracyM = hAccuracyM, vAccuracyM = vAccuracyM, speedMps = speedMps, speedAccuracyMps = speedAccuracyMps,
-    bearingDeg = bearingDeg, provider = provider, activity = activity, isMock = isMock,
+    bearingDeg = bearingDeg, provider = provider, activity = activity, isMock = isMock, monotonicMs = monotonicMs,
     isFilteredOut = isFilteredOut, isSimplifiedKeep = isSimplifiedKeep,
 )
 

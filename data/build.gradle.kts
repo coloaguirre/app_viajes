@@ -53,3 +53,15 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+
+// The exported schema is produced by KSP; make sure the unit-test asset merge
+// sees the freshly exported version (otherwise MigrationTestHelper misses N.json
+// on the first build after a schema bump).
+androidComponents {
+    onVariants { variant ->
+        val cap = variant.name.replaceFirstChar { it.uppercase() }
+        tasks.matching { it.name == "merge${cap}UnitTestAssets" }.configureEach {
+            dependsOn("ksp${cap}Kotlin")
+        }
+    }
+}

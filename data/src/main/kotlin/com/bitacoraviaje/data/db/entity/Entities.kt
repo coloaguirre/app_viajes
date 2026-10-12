@@ -97,6 +97,7 @@ data class TrackPointEntity(
     val provider: String?,
     val activity: String?,
     @ColumnInfo(name = "is_mock") val isMock: Boolean,
+    @ColumnInfo(name = "monotonic_ms") val monotonicMs: Long?,
     @ColumnInfo(name = "is_filtered_out") val isFilteredOut: Boolean,
     @ColumnInfo(name = "is_simplified_keep") val isSimplifiedKeep: Boolean,
 )

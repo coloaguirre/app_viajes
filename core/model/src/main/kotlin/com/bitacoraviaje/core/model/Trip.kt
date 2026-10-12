@@ -76,6 +76,8 @@ data class TrackPoint(
     val provider: String? = null,
     val activity: String? = null,
     val isMock: Boolean = false,
+    /** Monotonic clock (ms since boot) of the fix; immune to wall-clock changes. Schema v2. */
+    val monotonicMs: Long? = null,
     val isFilteredOut: Boolean = false,
     val isSimplifiedKeep: Boolean = true,
 )
