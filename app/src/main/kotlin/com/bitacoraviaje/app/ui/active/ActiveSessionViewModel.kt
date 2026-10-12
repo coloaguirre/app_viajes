@@ -58,16 +58,12 @@ class ActiveSessionViewModel @Inject constructor(
         }
     }
 
-    val state: StateFlow<ActiveSessionUiState> = combine(segmentFlow, stateHolder.state, ticker, trackFlow) { seg, live, now, track ->
-        ActiveSessionUiState(
-            segment = seg,
-            live = live,
-            elapsedMs = live.elapsedMs(now),
-            map = TrackMapState(
-                track = track.map { MapPoint(it.lat, it.lon) },
-                current = live.lastPoint?.let { MapPoint(it.lat, it.lon) },
-            ),
-        )
+    private val mapFlow = combine(trackFlow, stateHolder.state.map { it.lastPoint }.distinctUntilChanged()) { track, last ->
+        TrackMapState(track = track.map { MapPoint(it.lat, it.lon) }, current = last?.let { MapPoint(it.lat, it.lon) })
+    }
+
+    val state: StateFlow<ActiveSessionUiState> = combine(segmentFlow, stateHolder.state, ticker, mapFlow) { seg, live, now, map ->
+        ActiveSessionUiState(segment = seg, live = live, elapsedMs = live.elapsedMs(now), map = map)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ActiveSessionUiState())
 
     fun onAction(a: ActiveSessionAction) {

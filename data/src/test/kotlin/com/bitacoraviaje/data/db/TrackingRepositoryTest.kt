@@ -56,15 +56,15 @@ class TrackingRepositoryTest {
 
     @Test
     fun `economy mode picks the economy profile`() = runTest {
-        val s = repo.startSession(SegmentType.TREKKING, Transport.WALK, RecordingMode.ECONOMY, "UTC")
+        val s = repo.startSession(SegmentType.TREKKING, Transport.WALK, RecordingMode.ECONOMY, "UTC", tripTitle = "T")
         assertEquals("ECONOMY", s.samplingProfile)
     }
 
     @Test
     fun `a new stage finishes the previous open one in the same trip`() = runTest {
-        val a = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC")
+        val a = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         now += 60_000
-        val b = repo.startSession(SegmentType.STAGE, Transport.BUS, RecordingMode.FULL, "UTC")
+        val b = repo.startSession(SegmentType.STAGE, Transport.BUS, RecordingMode.FULL, "UTC", tripTitle = "T")
         assertEquals(a.tripId, b.tripId)
         assertEquals(SegmentStatus.FINISHED, repo.getSegment(a.id)?.status)
         assertEquals(b.id, repo.getOpenSegment()?.id)
@@ -72,9 +72,9 @@ class TrackingRepositoryTest {
 
     @Test
     fun `an excursion nests under the open stage and pauses it`() = runTest {
-        val day = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC")
+        val day = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         now += 60_000
-        val hike = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC")
+        val hike = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         assertEquals(day.id, hike.parentSegmentId)
         assertEquals(SegmentStatus.PAUSED, repo.getSegment(day.id)?.status)
         val pauses = repo.pausesOf(day.id)
@@ -85,7 +85,7 @@ class TrackingRepositoryTest {
 
     @Test
     fun `pause and resume bracket a pause row`() = runTest {
-        val s = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC")
+        val s = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         now += 10_000
         repo.pause(s.id, PauseKind.USER)
         assertEquals(SegmentStatus.PAUSED, repo.getSegment(s.id)?.status)
@@ -99,7 +99,7 @@ class TrackingRepositoryTest {
 
     @Test
     fun `finishing computes stats, stops and simplification from accepted points`() = runTest {
-        val s = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC")
+        val s = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         // 10 min walk north at 1.1 m/s, then 6 min still, then 2 rejected points.
         val walk = (0 until 120).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = Fixtures.T0 + i * 5_000L, lat = -34.6 + i * 5.5 / 111_320, lon = -58.4, altM = 10.0) }
         val still = (0 until 72).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = walk.last().timeUtcMs + (i + 1) * 5_000L, lat = walk.last().lat, lon = -58.4, altM = 10.0) }
@@ -120,7 +120,7 @@ class TrackingRepositoryTest {
 
     @Test
     fun `cutDay closes the daily segment and opens an auto-created one in the same trip`() = runTest {
-        val day1 = repo.startSession(SegmentType.TRIP_START, Transport.BUS, RecordingMode.ECONOMY, "America/Argentina/Buenos_Aires")
+        val day1 = repo.startSession(SegmentType.TRIP_START, Transport.BUS, RecordingMode.ECONOMY, "America/Argentina/Buenos_Aires", tripTitle = "T")
         now += 3_600_000
         val day2 = assertNotNull(repo.cutDay(day1.id))
         assertEquals(SegmentStatus.FINISHED, repo.getSegment(day1.id)?.status)
@@ -135,7 +135,7 @@ class TrackingRepositoryTest {
 
     @Test
     fun `cutDay carries an automatic rest into the new day and never cuts a nested excursion`() = runTest {
-        val day = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC")
+        val day = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         repo.pause(day.id, PauseKind.AUTO_REST)
         now += 1_000
         val next = assertNotNull(repo.cutDay(day.id))
@@ -143,14 +143,47 @@ class TrackingRepositoryTest {
         assertEquals(PauseKind.AUTO_REST, repo.pausesOf(next.id).single().kind)
         now += 1_000
         repo.resume(next.id)
-        val hike = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC")
+        val hike = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         assertNull(repo.cutDay(hike.id), "nested segments are not cut at midnight")
         assertEquals(SegmentStatus.ACTIVE, repo.getSegment(hike.id)?.status)
     }
 
     @Test
+    fun `finishing the trip from a nested excursion also closes the paused parent`() = runTest {
+        val day = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
+        now += 1_000
+        val hike = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
+        now += 1_000
+        repo.finishTrip(day.tripId)
+        assertEquals(SegmentStatus.FINISHED, repo.getSegment(hike.id)?.status)
+        assertEquals(SegmentStatus.FINISHED, repo.getSegment(day.id)?.status)
+        assertNull(repo.getOpenSegment(), "no orphan left behind")
+        assertNotNull(repo.pausesOf(day.id).single().resumedUtcMs, "the NESTED pause is closed")
+    }
+
+    @Test
+    fun `an excursion inside an excursion closes the inner one and hangs from the stage`() = runTest {
+        val day = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
+        now += 1_000
+        val a = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
+        now += 1_000
+        val b = repo.startSession(SegmentType.TREKKING, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
+        assertEquals(SegmentStatus.FINISHED, repo.getSegment(a.id)?.status)
+        assertEquals(day.id, b.parentSegmentId)
+        assertEquals(SegmentStatus.PAUSED, repo.getSegment(day.id)?.status)
+    }
+
+    @Test
+    fun `cutDay stores the device time zone of the new day`() = runTest {
+        val day = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "America/Argentina/Buenos_Aires", tripTitle = "T")
+        now += 1_000
+        val next = assertNotNull(repo.cutDay(day.id, currentTzId = "Europe/Madrid"))
+        assertEquals("Europe/Madrid", next.tzId)
+    }
+
+    @Test
     fun `finishing the trip closes the open segment and the trip`() = runTest {
-        val s = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC")
+        val s = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "T")
         now += 5_000
         repo.finishTrip(s.tripId)
         assertEquals(SegmentStatus.FINISHED, repo.getSegment(s.id)?.status)

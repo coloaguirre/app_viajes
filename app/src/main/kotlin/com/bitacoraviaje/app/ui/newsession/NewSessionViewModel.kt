@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 
 data class NewSessionForm(
     val type: SegmentType? = null,
+    val tripTitle: String = "",
     val title: String = "",
     val intentText: String = "",
     val transport: Transport = Transport.WALK,
@@ -91,6 +92,7 @@ class NewSessionViewModel @Inject constructor(
                     mode = f.mode,
                     title = f.title.ifBlank { null },
                     intentText = f.intentText.ifBlank { null },
+                    tripTitle = f.tripTitle,
                 )
                 _events.send(NewSessionEvent.Started(id))
             } finally {

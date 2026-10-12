@@ -46,11 +46,7 @@ def read_gpx(path: str):
     for p in root.iterfind(".//g:trkpt", NS):
         t = p.find("g:time", NS)
         e = p.find("g:ele", NS)
-        ts = (
-            datetime.fromisoformat(t.text.replace("Z", "+00:00")).timestamp()
-            if t is not None
-            else None
-        )
+        ts = datetime.fromisoformat(t.text).timestamp() if t is not None else None
         pts.append(
             (
                 float(p.get("lon")),
@@ -102,7 +98,7 @@ def main() -> int:
         if a.dry_run:
             print(" ".join(cmd))
         else:
-            r = subprocess.run(cmd, capture_output=True, text=True)
+            r = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if r.returncode != 0 or "KO" in r.stdout:
                 print(
                     f"fix {i} failed: {r.stdout.strip()} {r.stderr.strip()}",

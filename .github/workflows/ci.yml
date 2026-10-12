@@ -49,6 +49,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Run pytest where a pyproject exists
         run: |
+          uv run --with ruff ruff check tools/
           ran=0
           for proj in desktop-renderer tools/gpx-replay; do
             if [ -f "$proj/pyproject.toml" ]; then

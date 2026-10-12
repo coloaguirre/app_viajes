@@ -37,6 +37,8 @@
 | 2026-10-12 | El filtro se siembra con el último punto de la etapa al (re)iniciar el servicio | Un primer punto espurio tras un reinicio se aceptaba sin historia |
 | 2026-10-12 | Mapa: MapLibre 13.6.1 + MapTiler estilo `outdoor-v2`, clave en `local.properties` → `BuildConfig.MAPTILER_KEY` (sin clave la app compila y muestra un aviso) | D2 |
 | 2026-10-12 | Cerrar etapa espera el volcado del búfer del servicio (tope 5 s) | Estadísticas sin los últimos puntos (0 m en una excursión corta) |
+| 2026-10-12 | Revisión de código de Fase 1 aplicada: pipeline del servicio en un solo hilo; volcado del búfer también por tiempo desde el ticker y limpieza solo tras persistir; `finishTrip` cierra todas las etapas abiertas del viaje; simplificación en lotes de 500 ids; corte diario con la zona horaria actual del teléfono; estado vivo rehidratado al retomar una etapa; primer tramo tras pausa/reinicio no suma; ClockGuard sembrado y con detección de reinicio; un solo nivel de anidado; nombre del viaje en el asistente | PR #4, revisión 2026-10-12 |
+| 2026-10-12 | Criterios adaptados en E2E: parada de 4 min (no 20) con umbral de 3 min en 1.4; relación Económico/Completo medida sobre 8 min a 1x en 1.3 | Límite de reproducción a 1x y de 10 min por comando |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -80,6 +82,12 @@ Observaciones de la verificación (ítem 0.1):
   un comando con sudo del usuario.
 
 ## Problemas conocidos
+- Backlog de la revisión de Fase 1 (no bloqueante): pantalla previa de
+  explicación antes de pedir permisos (§15.1); extraer el pipeline de puntos
+  a una clase pura `TrackRecorder` testeable con reloj inyectado; interacción
+  pausa manual + excursión anidada; fuente única de altitud (MSL vs
+  elipsoidal) por etapa; `ForegroundServiceStartNotAllowedException` a
+  vigilar en el Pixel durante 1.7.
 - `adb shell am kill` no mata un proceso con servicio en primer plano; para
   simular una muerte por memoria usar `kill -9 <pid>` (con `adb root`).
 - Tras `adb reboot`, `persist.sys.timezone` del emulador vuelve a UTC; fijarla

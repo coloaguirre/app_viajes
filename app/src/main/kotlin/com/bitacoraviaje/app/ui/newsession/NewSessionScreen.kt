@@ -90,13 +90,29 @@ fun NewSessionScreen(
     ) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.newsession_step_type), style = MaterialTheme.typography.titleMedium)
-            val types = if (state.hasActiveTrip) listOf(SegmentType.STAGE, SegmentType.EXCURSION, SegmentType.TREKKING) else listOf(SegmentType.TRIP_START, SegmentType.EXCURSION, SegmentType.TREKKING)
+            val nestedOpen = state.openSegment?.parentSegmentId != null
+            val types = when {
+                nestedOpen -> listOf(SegmentType.STAGE) // one nesting level (DISENO §16.2): finish the excursion first
+                state.hasActiveTrip -> listOf(SegmentType.STAGE, SegmentType.EXCURSION, SegmentType.TREKKING)
+                else -> listOf(SegmentType.TRIP_START, SegmentType.EXCURSION, SegmentType.TREKKING)
+            }
+            if (nestedOpen) Text(stringResource(R.string.newsession_nested_open), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             types.forEach { type -> TypeCard(type, selected = f.type == type, nestedUnder = state.openSegment?.takeIf { type != SegmentType.STAGE && type != SegmentType.TRIP_START }) { onUpdate { it.copy(type = type) } } }
             if (state.openSegment != null && f.type == SegmentType.STAGE) {
                 Text(stringResource(R.string.newsession_closes_open_stage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
 
             Text(stringResource(R.string.newsession_step_details), style = MaterialTheme.typography.titleMedium)
+            if (f.type == SegmentType.TRIP_START) {
+                OutlinedTextField(
+                    value = f.tripTitle,
+                    onValueChange = { v -> onUpdate { it.copy(tripTitle = v) } },
+                    label = { Text(stringResource(R.string.newsession_trip_title_label)) },
+                    placeholder = { Text(stringResource(R.string.default_trip_title)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("newsession_trip_title"),
+                )
+            }
             OutlinedTextField(
                 value = f.title,
                 onValueChange = { v -> onUpdate { it.copy(title = v) } },

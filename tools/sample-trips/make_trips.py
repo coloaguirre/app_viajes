@@ -16,12 +16,12 @@ from __future__ import annotations
 import json
 import math
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 R = 6_371_008.8
 ROOT = Path(__file__).resolve().parent
-START = datetime(2026, 3, 14, 9, 0, 0, tzinfo=timezone.utc)
+START = datetime(2026, 3, 14, 9, 0, 0, tzinfo=UTC)
 
 
 def haversine(lat1, lon1, lat2, lon2):

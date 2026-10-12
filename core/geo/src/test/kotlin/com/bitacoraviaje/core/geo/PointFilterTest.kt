@@ -71,8 +71,20 @@ class PointFilterTest {
     }
 
     @Test
-    fun `profiles map transports to thresholds`() {
+    fun `profiles map transports to thresholds and battery profiles keep the transport speed cap`() {
         assertEquals(70.0, FilterConfig.forTransport(com.bitacoraviaje.core.model.Transport.BUS).maxSpeedMps)
         assertEquals(4.0, FilterConfig.forTransport(null).maxSpeedMps)
+        val eco = FilterConfig.forProfile(com.bitacoraviaje.core.model.SamplingProfile.ECONOMY, com.bitacoraviaje.core.model.Transport.WALK)
+        assertEquals(4.0, eco.maxSpeedMps)
+        assertEquals(50.0, eco.maxAccuracyM)
+    }
+
+    @Test
+    fun `the first leg after seeding adds no distance`() {
+        val walk = straightWalk(4)
+        val f = PointFilter(FilterConfig.WALK).apply { seed(walk[0]) }
+        val far = walk[1].copy(lat = walk[1].lat + 10.0 / 111_320, timeUtcMs = walk[1].timeUtcMs + 3_600_000) // 1 h later, 15 m away
+        assertEquals(0.0, f.offer(far).addedDistanceM)
+        assertTrue(f.offer(walk[2].copy(timeUtcMs = far.timeUtcMs + 5_000)).addedDistanceM > 0)
     }
 }

@@ -57,6 +57,6 @@ class TripContinuityPolicy(
         return out
     }
 
-    /** After the service switched to the new daily segment, keep the rest state but not the anchor history. */
-    fun onSegmentCut() = Unit
+    /** User paused or resumed manually: forget the rest anchor so a stale one cannot fire. */
+    fun resetRest() = rest.reset()
 }

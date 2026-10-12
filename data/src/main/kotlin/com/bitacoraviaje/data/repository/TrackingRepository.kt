@@ -75,20 +75,34 @@ class TrackingRepository @Inject constructor(
         val now = clock.nowUtcMs()
         val trip = trips.getActive()?.toDomain() ?: Trip(
             id = UUID.randomUUID().toString(),
-            title = tripTitle ?: "Viaje",
+            title = requireNotNull(tripTitle) { "tripTitle is required when no trip is active" },
             createdUtcMs = now,
             startedUtcMs = now,
             status = TripStatus.ACTIVE,
         ).also { trips.insert(it.toEntity()) }
 
-        val open = segments.getOpen()?.toDomain()
+        var open = segments.getOpen()?.toDomain()
         var parentId: String? = null
         if (open != null) {
             if (type == SegmentType.EXCURSION || type == SegmentType.TREKKING) {
-                if (open.status == SegmentStatus.ACTIVE) pauseInternal(open, PauseKind.NESTED, now)
-                parentId = open.id
+                // One nesting level only (DISENO §16.2): an excursion started inside an
+                // excursion closes the inner one and hangs from the same parent stage.
+                if (open.parentSegmentId != null) {
+                    finishInternal(open, now, SegmentStatus.FINISHED)
+                    open = segments.getById(open.parentSegmentId!!)?.toDomain()
+                }
+                if (open != null) {
+                    if (open.status == SegmentStatus.ACTIVE) pauseInternal(open, PauseKind.NESTED, now)
+                    parentId = open.id
+                }
             } else {
-                finishInternal(open, now, SegmentStatus.FINISHED)
+                // A new stage closes whatever is open, nested child first.
+                if (open.parentSegmentId != null) {
+                    finishInternal(open, now, SegmentStatus.FINISHED)
+                    segments.getById(open.parentSegmentId!!)?.toDomain()?.let { finishInternal(it, now, SegmentStatus.FINISHED) }
+                } else {
+                    finishInternal(open, now, SegmentStatus.FINISHED)
+                }
             }
         }
         val segment = Segment(
@@ -131,7 +145,7 @@ class TrackingRepository @Inject constructor(
      * with the same trip, transport, mode and time zone, flagged as auto-created.
      * Nested segments (excursions) are never cut: they end when the user says so.
      */
-    suspend fun cutDay(segmentId: String): Segment? = db.withTransaction {
+    suspend fun cutDay(segmentId: String, currentTzId: String? = null): Segment? = db.withTransaction {
         val s = segments.getById(segmentId)?.toDomain() ?: return@withTransaction null
         if (s.parentSegmentId != null) return@withTransaction null
         val now = clock.nowUtcMs()
@@ -145,6 +159,8 @@ class TrackingRepository @Inject constructor(
             intentText = null,
             startedUtcMs = now,
             endedUtcMs = null,
+            // A multi-week trip crosses time zones: the new day belongs to where the phone is now (§16.2).
+            tzId = currentTzId ?: s.tzId,
             autoCreated = true,
             status = SegmentStatus.ACTIVE,
             stats = SegmentStats(),
@@ -164,7 +180,8 @@ class TrackingRepository @Inject constructor(
     /** Ends the trip and any open segment. */
     suspend fun finishTrip(tripId: String) = db.withTransaction {
         val now = clock.nowUtcMs()
-        segments.getOpen()?.toDomain()?.takeIf { it.tripId == tripId }?.let { finishInternal(it, now, SegmentStatus.FINISHED) }
+        // Children first (ordered newest-first by the query), then the parent stage.
+        segments.getOpenByTrip(tripId).forEach { finishInternal(it.toDomain(), now, SegmentStatus.FINISHED) }
         trips.getById(tripId)?.toDomain()?.let { trips.update(it.copy(status = TripStatus.FINISHED, endedUtcMs = now).toEntity()) }
     }
 
@@ -173,6 +190,20 @@ class TrackingRepository @Inject constructor(
     suspend fun lastValidPoint(segmentId: String): TrackPoint? = points.getLastValid(segmentId)?.toDomain()
 
     fun observeValidPoints(segmentId: String): Flow<List<TrackPoint>> = points.observeValidBySegment(segmentId).map { l -> l.map { it.toDomain() } }
+
+    /** What the live state of a resumed segment should start from (item 1.6 review, I9). */
+    data class Rehydration(val distanceM: Double, val acceptedPoints: Int, val pausedAccumMs: Long, val openPauseSinceUtcMs: Long?)
+
+    suspend fun rehydrate(segmentId: String, nowUtcMs: Long): Rehydration {
+        val s = segments.getById(segmentId)?.toDomain() ?: return Rehydration(0.0, 0, 0, null)
+        val valid = points.getValidBySegment(segmentId).map { it.toDomain() }
+        val pauseRows = segments.getPauses(segmentId)
+        val closed = pauseRows.filter { it.resumedUtcMs != null }.sumOf { it.resumedUtcMs!! - it.pausedUtcMs }
+        val openSince = pauseRows.firstOrNull { it.resumedUtcMs == null }?.pausedUtcMs
+        val intervals = pauseRows.map { TimeInterval(it.pausedUtcMs, it.resumedUtcMs ?: nowUtcMs) }
+        val distance = computeSegmentStats(valid, intervals, s.transport).distanceM ?: 0.0
+        return Rehydration(distance, valid.size, closed, openSince)
+    }
 
     suspend fun stopsOf(segmentId: String): List<Stop> = stops.getBySegment(segmentId).map { it.toDomain() }
 
@@ -184,10 +215,12 @@ class TrackingRepository @Inject constructor(
     }
 
     private suspend fun finishInternal(s: Segment, now: Long, status: SegmentStatus): Segment {
-        segments.getOpenPause(s.id)?.let { segments.updatePause(it.copy(resumedUtcMs = now)) }
         val valid = points.getValidBySegment(s.id).map { it.toDomain() }
-        val pauses = segments.getPauses(s.id).map { TimeInterval(it.pausedUtcMs, it.resumedUtcMs ?: now) }
-        val stats = computeSegmentStats(valid, pauses, s.transport, totalTimeMs = now - s.startedUtcMs)
+        // A recovery hours after the process died must not count the dead time: end at the last fix.
+        val end = if (status == SegmentStatus.RECOVERED) valid.lastOrNull()?.timeUtcMs?.coerceAtLeast(s.startedUtcMs) ?: now else now
+        segments.getOpenPause(s.id)?.let { segments.updatePause(it.copy(resumedUtcMs = minOf(end, maxOf(it.pausedUtcMs, end)))) }
+        val pauses = segments.getPauses(s.id).map { TimeInterval(it.pausedUtcMs, it.resumedUtcMs ?: end) }
+        val stats = computeSegmentStats(valid, pauses, s.transport, totalTimeMs = end - s.startedUtcMs)
         val detected = detectStops(valid, minDurationMs = if (s.transport.isVehicle()) 10 * 60_000 else 5 * 60_000)
         stops.replaceForSegment(
             s.id,
@@ -197,7 +230,7 @@ class TrackingRepository @Inject constructor(
             val keep = simplifyIndices(valid, 5.0).map { valid[it].id }
             points.markSimplified(s.id, keep)
         }
-        val done = s.copy(status = status, endedUtcMs = now, stats = stats)
+        val done = s.copy(status = status, endedUtcMs = end, stats = stats)
         segments.update(done.toEntity())
         return done
     }

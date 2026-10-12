@@ -21,13 +21,8 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        val pending = goAsync()
-        try {
-            // Receivers get ~10 s; one indexed query is well within budget.
-            val open = runBlocking { repository.getOpenSegment() }
-            if (open != null) notifications.notifyResumeNeeded()
-        } finally {
-            pending.finish()
-        }
+        // Receivers get ~10 s; one indexed query is well within budget.
+        val open = runBlocking { repository.getOpenSegment() }
+        if (open != null) notifications.notifyResumeNeeded()
     }
 }

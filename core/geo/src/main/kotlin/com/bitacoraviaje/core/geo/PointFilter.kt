@@ -19,13 +19,18 @@ data class FilterConfig(
         val VEHICLE = FilterConfig(maxAccuracyM = 50.0, maxSpeedMps = 70.0)
         val PLANE = FilterConfig(maxAccuracyM = 200.0, maxSpeedMps = 300.0)
 
-        fun forProfile(profile: SamplingProfile): FilterConfig = when (profile) {
+        /**
+         * Battery profiles (ECONOMY, REST, SAVER) keep the speed cap of the declared
+         * transport (a trekker in Economy still cannot move at 70 m/s) and only relax
+         * the accuracy threshold, because sparse fixes are less precise.
+         */
+        fun forProfile(profile: SamplingProfile, transport: Transport? = null): FilterConfig = when (profile) {
             SamplingProfile.TREKKING_HIGH, SamplingProfile.WALK -> WALK
             SamplingProfile.BIKE -> BIKE
             SamplingProfile.VEHICLE -> VEHICLE
             SamplingProfile.PLANE -> PLANE
-            // Battery modes relax accuracy (balanced power yields 20-50 m fixes) but keep a vehicle speed cap.
-            SamplingProfile.SAVER, SamplingProfile.ECONOMY, SamplingProfile.REST -> FilterConfig(maxAccuracyM = 100.0, maxSpeedMps = 70.0)
+            SamplingProfile.SAVER, SamplingProfile.ECONOMY, SamplingProfile.REST ->
+                forTransport(transport).let { it.copy(maxAccuracyM = maxOf(it.maxAccuracyM, 50.0)) }
         }
 
         fun forTransport(transport: Transport?): FilterConfig = when (transport) {
@@ -79,7 +84,12 @@ class PointFilter(private val config: FilterConfig, private val rejectMock: Bool
         lastAccepted = last
         stillAnchor = last
         pendingJump.clear()
+        // The leg from the seed to the first new fix spans whatever happened in between
+        // (a pause, a nested excursion, a restart): it must not count as distance.
+        suppressNextLeg = true
     }
+
+    private var suppressNextLeg = false
 
     fun offer(p: TrackPoint): FilterVerdict {
         val last = lastAccepted
@@ -133,6 +143,12 @@ class PointFilter(private val config: FilterConfig, private val rejectMock: Bool
     }
 
     private fun accept(p: TrackPoint, dist: Double, impliedSpeed: Double): FilterVerdict {
+        if (suppressNextLeg) {
+            suppressNextLeg = false
+            lastAccepted = p
+            stillAnchor = p
+            return FilterVerdict(true, addedDistanceM = 0.0)
+        }
         val reported = p.speedMps?.toDouble()
         val speed = reported ?: impliedSpeed
         val anchor = stillAnchor

@@ -24,6 +24,17 @@ class ClockGuardTest {
     }
 
     @Test
+    fun `a seeded guard corrects a clock that moved while the service was dead, and a reboot resets it`() {
+        val g = ClockGuard()
+        g.seed(1_000_000, 50_000)
+        // 10 s later by the monotonic clock, but the wall clock went 1 h back meanwhile
+        assertEquals(1_010_000L, g.resolve(1_000_000 - 3_600_000 + 10_000, 60_000))
+        // monotonic went backwards: reboot -> wall clock is the truth again
+        assertEquals(5_000_000L, g.resolve(5_000_000, 1_000))
+        assertEquals(5_005_000L, g.resolve(5_005_000, 6_000))
+    }
+
+    @Test
     fun `forward jumps and missing monotonic values`() {
         val g = ClockGuard()
         g.resolve(1_000_000, 50_000)

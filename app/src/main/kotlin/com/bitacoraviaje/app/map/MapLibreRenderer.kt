@@ -115,6 +115,9 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         private var trackSource: GeoJsonSource? = null
         private var pointSource: GeoJsonSource? = null
         private var framedOnce = false
+        private var lastTrack: List<MapPoint>? = null
+        private var lastCurrent: MapPoint? = null
+        private var lastStops: List<MapPoint>? = null
         var userMoved = false
 
         fun attach(map: MapLibreMap, style: Style) {
@@ -149,12 +152,20 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
 
         fun render(state: TrackMapState) {
             val m = map ?: return
-            val line = if (state.track.size >= 2) LineString.fromLngLats(state.track.map { Point.fromLngLat(it.lon, it.lat) }) else null
-            trackSource?.setGeoJson(if (line != null) FeatureCollection.fromFeature(Feature.fromGeometry(line)) else FeatureCollection.fromFeatures(emptyList()))
-            val features = ArrayList<Feature>()
-            state.stops.forEach { s -> features += Feature.fromGeometry(Point.fromLngLat(s.lon, s.lat)).also { it.addStringProperty("kind", "stop") } }
-            state.current?.let { c -> features += Feature.fromGeometry(Point.fromLngLat(c.lon, c.lat)).also { it.addStringProperty("kind", "current") } }
-            pointSource?.setGeoJson(FeatureCollection.fromFeatures(features))
+            // The screen recomposes every second (elapsed time); only touch the GPU sources when the data changed (I11).
+            if (state.track !== lastTrack) {
+                lastTrack = state.track
+                val line = if (state.track.size >= 2) LineString.fromLngLats(state.track.map { Point.fromLngLat(it.lon, it.lat) }) else null
+                trackSource?.setGeoJson(if (line != null) FeatureCollection.fromFeature(Feature.fromGeometry(line)) else FeatureCollection.fromFeatures(emptyList()))
+            }
+            if (state.current != lastCurrent || state.stops !== lastStops) {
+                lastCurrent = state.current
+                lastStops = state.stops
+                val features = ArrayList<Feature>()
+                state.stops.forEach { s -> features += Feature.fromGeometry(Point.fromLngLat(s.lon, s.lat)).also { it.addStringProperty("kind", "stop") } }
+                state.current?.let { c -> features += Feature.fromGeometry(Point.fromLngLat(c.lon, c.lat)).also { it.addStringProperty("kind", "current") } }
+                pointSource?.setGeoJson(FeatureCollection.fromFeatures(features))
+            }
 
             if (!framedOnce && state.track.size >= 2) {
                 val b = LatLngBounds.Builder().also { bb -> state.track.forEach { bb.include(LatLng(it.lat, it.lon)) } }.build()

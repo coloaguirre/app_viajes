@@ -17,12 +17,29 @@ class ClockGuard(private val toleranceMs: Long = 2_000) {
     var corrections: Int = 0
         private set
 
+    /**
+     * Seed with the last persisted fix of a resumed segment so a wall clock that moved
+     * while the service was dead is corrected from the first new fix. A monotonic value
+     * smaller than the seed means the phone rebooted: the baseline is dropped and the
+     * wall clock is trusted again.
+     */
+    fun seed(utcMs: Long, monoMs: Long?) {
+        lastUtcMs = utcMs
+        lastMonoMs = monoMs
+    }
+
     /** Returns the UTC time to use for a fix with wall clock [utcMs] and monotonic [monoMs]. */
     fun resolve(utcMs: Long, monoMs: Long?): Long {
         val lu = lastUtcMs
         val lm = lastMonoMs
         var out = utcMs
-        if (monoMs != null && lu != null && lm != null && monoMs >= lm) {
+        if (monoMs != null && lm != null && monoMs < lm) {
+            // Reboot: monotonic clock restarted. Trust the wall clock from here on.
+            lastUtcMs = utcMs
+            lastMonoMs = monoMs
+            return utcMs
+        }
+        if (monoMs != null && lu != null && lm != null) {
             val expected = lu + (monoMs - lm)
             if (abs(utcMs - expected) > toleranceMs) {
                 out = expected

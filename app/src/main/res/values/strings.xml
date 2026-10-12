@@ -20,6 +20,9 @@
     <string name="newsession_title">Nuevo registro</string>
     <string name="newsession_step_type">¿Qué estás haciendo?</string>
     <string name="newsession_step_details">Detalles (opcional)</string>
+    <string name="newsession_trip_title_label">Nombre del viaje</string>
+    <string name="default_trip_title">Viaje</string>
+    <string name="newsession_nested_open">Hay una excursión en curso: terminala antes de empezar otra. Una nueva etapa la cierra.</string>
     <string name="newsession_title_label">Nombre de la etapa</string>
     <string name="newsession_intent_label">¿Qué tenés pensado?</string>
     <string name="newsession_intent_hint">Por ejemplo: "Hoy vamos de El Calafate al glaciar". Queda en la bitácora.</string>

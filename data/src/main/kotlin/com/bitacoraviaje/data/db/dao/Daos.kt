@@ -62,6 +62,10 @@ interface SegmentDao {
     @Query("SELECT * FROM segment WHERE status IN ('ACTIVE','PAUSED') ORDER BY started_utc_ms DESC LIMIT 1")
     fun observeOpen(): Flow<SegmentEntity?>
 
+    /** Every open segment of a trip, children first (newest start first). */
+    @Query("SELECT * FROM segment WHERE trip_id = :tripId AND status IN ('ACTIVE','PAUSED') ORDER BY started_utc_ms DESC")
+    suspend fun getOpenByTrip(tripId: String): List<SegmentEntity>
+
     @Insert
     suspend fun insertPause(pause: SegmentPauseEntity)
 
@@ -96,8 +100,18 @@ interface TrackPointDao {
     @Query("SELECT * FROM track_point WHERE segment_id = :segmentId AND is_filtered_out = 0 ORDER BY time_utc_ms DESC LIMIT 1")
     suspend fun getLastValid(segmentId: String): TrackPointEntity?
 
-    @Query("UPDATE track_point SET is_simplified_keep = CASE WHEN id IN (:keepIds) THEN 1 ELSE 0 END WHERE segment_id = :segmentId")
-    suspend fun markSimplified(segmentId: String, keepIds: List<Long>)
+    @Query("UPDATE track_point SET is_simplified_keep = 0 WHERE segment_id = :segmentId")
+    suspend fun clearSimplified(segmentId: String)
+
+    /** Callers chunk [ids] (SQLite < 3.32 allows 999 bound variables; API 26-30 ship older SQLite). */
+    @Query("UPDATE track_point SET is_simplified_keep = 1 WHERE id IN (:ids)")
+    suspend fun markKeep(ids: List<Long>)
+
+    @Transaction
+    suspend fun markSimplified(segmentId: String, keepIds: List<Long>) {
+        clearSimplified(segmentId)
+        keepIds.chunked(500).forEach { markKeep(it) }
+    }
 }
 
 @Dao

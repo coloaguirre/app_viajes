@@ -88,10 +88,10 @@ trekking y propiedad total de los datos.
   sub-etapas declaradas por el usuario que pausan y reanudan la principal.
   Sin permiso de ubicación en segundo plano en la versión 1.
 - **Modo Full / Económico** elegido por el usuario (adenda 1). Full =
-  perfiles de la spec §6.2. Económico = prioridad balanceada, intervalo
-  30-60 s, distancia mínima 50 m, agrupación de actualizaciones, reposo
-  agresivo; la UI avisa que pierde detalle en zigzags y subestima
-  distancia (5-10 %).
+  perfiles de la spec §6.2. Económico = GPS de alta precisión con intervalo
+  30 s, distancia mínima 40 m y lote de 60 s (cambiado el 2026-10-12: con
+  prioridad balanceada no hay fijaciones sin Wi-Fi ni celdas); la UI avisa
+  que pierde detalle en zigzags y subestima distancia (5-10 %).
 - **Mapas**: abstracción `MapRenderer`; en v1 solo MapLibre + MapTiler
   (clave en `local.properties`). Google Maps queda como implementación
   futura. Para el video se componen teselas de MapTiler: zona gris de

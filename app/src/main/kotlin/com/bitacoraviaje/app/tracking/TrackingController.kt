@@ -38,9 +38,21 @@ class TrackingController @Inject constructor(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     /** Must be called while the app is visible (foreground service start rules). */
-    suspend fun startSession(type: SegmentType, transport: Transport?, mode: RecordingMode, title: String? = null, intentText: String? = null): String {
+    suspend fun startSession(
+        type: SegmentType,
+        transport: Transport?,
+        mode: RecordingMode,
+        title: String? = null,
+        intentText: String? = null,
+        tripTitle: String? = null,
+    ): String {
         check(hasLocationPermission()) { "location permission required" }
-        val segment = repository.startSession(type, transport, mode, TimeZone.getDefault().id, title, intentText)
+        // A new stage closes the open one: let the service persist its buffer first (I3).
+        if (type == SegmentType.TRIP_START || type == SegmentType.STAGE) stopServiceAndAwaitFlush()
+        val segment = repository.startSession(
+            type, transport, mode, TimeZone.getDefault().id, title, intentText,
+            tripTitle = tripTitle?.ifBlank { null } ?: context.getString(com.bitacoraviaje.app.R.string.default_trip_title),
+        )
         startService(segment.id, segment.samplingProfile)
         return segment.id
     }

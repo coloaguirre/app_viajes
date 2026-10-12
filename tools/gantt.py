@@ -83,7 +83,7 @@ def parse_plan():
             phases.append(cur)
             i += 1
             continue
-        if ln.startswith("## ") or ln.startswith("### Calendario"):
+        if ln.startswith(("## ", "### Calendario")):
             cur = None
         m = RE_ITEM.match(ln)
         if m and cur is not None:
