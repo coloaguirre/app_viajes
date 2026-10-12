@@ -62,6 +62,8 @@ androidComponents {
         val cap = variant.name.replaceFirstChar { it.uppercase() }
         tasks.matching { it.name == "merge${cap}UnitTestAssets" }.configureEach {
             dependsOn("ksp${cap}Kotlin")
+            // The Room Gradle plugin copies the exported schema in its own task after KSP.
+            dependsOn(tasks.matching { it.name.startsWith("copyRoomSchemas") })
         }
     }
 }

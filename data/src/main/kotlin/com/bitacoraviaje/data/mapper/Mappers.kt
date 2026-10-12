@@ -6,6 +6,10 @@ import com.bitacoraviaje.core.model.MediaItem
 import com.bitacoraviaje.core.model.MediaKind
 import com.bitacoraviaje.core.model.MediaSource
 import com.bitacoraviaje.core.model.TakenTimeSource
+import com.bitacoraviaje.core.model.TextNote
+import com.bitacoraviaje.core.model.TextNoteKind
+import com.bitacoraviaje.core.model.TranscriptStatus
+import com.bitacoraviaje.core.model.VoiceNote
 import com.bitacoraviaje.core.model.PauseKind
 import com.bitacoraviaje.core.model.RecordingMode
 import com.bitacoraviaje.core.model.Segment
@@ -22,6 +26,8 @@ import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
 import com.bitacoraviaje.data.db.entity.StopEntity
+import com.bitacoraviaje.data.db.entity.TextNoteEntity
+import com.bitacoraviaje.data.db.entity.VoiceNoteEntity
 import com.bitacoraviaje.data.db.entity.TrackPointEntity
 import com.bitacoraviaje.data.db.entity.TripEntity
 
@@ -119,6 +125,24 @@ fun MediaItem.toEntity() = MediaItemEntity(
     linkTimeGapMs = linkTimeGapMs, needsReview = needsReview, sha256 = sha256, userCaption = userCaption,
     isFavorite = isFavorite, isExcluded = isExcluded,
 )
+
+fun VoiceNoteEntity.toDomain() = VoiceNote(
+    id = id, segmentId = segmentId, startedUtcMs = startedUtcMs, durationMs = durationMs, lat = lat, lon = lon, hAccuracyM = hAccuracyM,
+    audioPath = audioPath, audioFormat = audioFormat, transcript = transcript, transcriptEdited = transcriptEdited, transcriptLang = transcriptLang,
+    transcriptEngine = transcriptEngine, transcriptStatus = TranscriptStatus.valueOf(transcriptStatus), transcriptSegmentsJson = transcriptSegmentsJson,
+    mediaItemId = mediaItemId,
+)
+
+fun VoiceNote.toEntity() = VoiceNoteEntity(
+    id = id, segmentId = segmentId, startedUtcMs = startedUtcMs, durationMs = durationMs, lat = lat, lon = lon, hAccuracyM = hAccuracyM,
+    audioPath = audioPath, audioFormat = audioFormat, transcript = transcript, transcriptEdited = transcriptEdited, transcriptLang = transcriptLang,
+    transcriptEngine = transcriptEngine, transcriptStatus = transcriptStatus.name, transcriptSegmentsJson = transcriptSegmentsJson,
+    mediaItemId = mediaItemId,
+)
+
+fun TextNoteEntity.toDomain() = TextNote(id = id, segmentId = segmentId, timeUtcMs = timeUtcMs, lat = lat, lon = lon, kind = TextNoteKind.valueOf(kind), text = text)
+
+fun TextNote.toEntity() = TextNoteEntity(id = id, segmentId = segmentId, timeUtcMs = timeUtcMs, lat = lat, lon = lon, kind = kind.name, text = text)
 
 fun StopEntity.toDomain() = Stop(
     id = id, segmentId = segmentId, startUtcMs = startUtcMs, endUtcMs = endUtcMs,

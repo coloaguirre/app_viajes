@@ -9,6 +9,10 @@ import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.tracking.LiveTrackingState
 import com.bitacoraviaje.app.tracking.TrackingController
 import com.bitacoraviaje.app.tracking.TrackingStateHolder
+import com.bitacoraviaje.app.voice.NotesController
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import com.bitacoraviaje.app.ui.navigation.Route
 import com.bitacoraviaje.core.model.Segment
 import com.bitacoraviaje.data.repository.TrackingRepository
@@ -35,6 +39,14 @@ data class ActiveSessionUiState(
 sealed interface ActiveSessionAction {
     data object TogglePause : ActiveSessionAction
     data object Finish : ActiveSessionAction
+    data object VoiceNote : ActiveSessionAction
+    data class Marker(val text: String?) : ActiveSessionAction
+    data object Highlight : ActiveSessionAction
+}
+
+sealed interface ActiveSessionEvent {
+    data object OpenVoiceNote : ActiveSessionEvent
+    data class Saved(val kind: com.bitacoraviaje.core.model.TextNoteKind) : ActiveSessionEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -44,7 +56,11 @@ class ActiveSessionViewModel @Inject constructor(
     repository: TrackingRepository,
     private val controller: TrackingController,
     stateHolder: TrackingStateHolder,
+    private val notes: NotesController,
 ) : ViewModel() {
+    private val _events = Channel<ActiveSessionEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
+
     val segmentId: String = savedState.toRoute<Route.ActiveSession>().segmentId
 
     // The service may hand recording to another segment (day cut, nested hand-back): follow the live one.
@@ -70,6 +86,9 @@ class ActiveSessionViewModel @Inject constructor(
         when (a) {
             ActiveSessionAction.TogglePause -> if (state.value.live.isPaused) controller.resume() else controller.pause()
             ActiveSessionAction.Finish -> Unit // navigation handled by the route
+            ActiveSessionAction.VoiceNote -> viewModelScope.launch { _events.send(ActiveSessionEvent.OpenVoiceNote) }
+            is ActiveSessionAction.Marker -> viewModelScope.launch { notes.addMarker(a.text)?.let { _events.send(ActiveSessionEvent.Saved(it.kind)) } }
+            ActiveSessionAction.Highlight -> viewModelScope.launch { notes.addHighlight()?.let { _events.send(ActiveSessionEvent.Saved(it.kind)) } }
         }
     }
 }

@@ -83,6 +83,26 @@
     <string name="active_finish_segment">Cerrar etapa</string>
     <string name="active_cancel">Cancelar</string>
     <string name="action_pause">Pausar</string>
+    <string name="action_voice_note">Nota de voz</string>
+    <string name="action_marker">Marcar</string>
+    <string name="action_highlight">Destacar</string>
+    <string name="active_marker_saved">Lugar marcado</string>
+    <string name="active_highlight_saved">Momento destacado</string>
+    <string name="marker_title">Marcar este lugar</string>
+    <string name="marker_hint">Texto opcional, por ejemplo "mirador increíble"</string>
+    <string name="marker_save">Guardar</string>
+
+    <string name="voice_rationale_title">Notas de voz</string>
+    <string name="voice_rationale_body">Para dictar una nota la app necesita usar el micrófono. El audio queda guardado en el teléfono y se transcribe acá mismo; no se envía a ningún lado salvo que actives la transcripción en la nube.</string>
+    <string name="voice_allow">Permitir micrófono</string>
+    <string name="voice_permission_denied">Sin micrófono no se pueden grabar notas de voz. Podés escribir una nota con "Marcar".</string>
+    <string name="voice_recording">Grabando… tocá Listo al terminar</string>
+    <string name="voice_done">Listo</string>
+    <string name="voice_saving">Guardando la nota…</string>
+    <string name="voice_close">Cerrar</string>
+    <string name="voice_no_session">No hay un registro en curso: iniciá una etapa para dictar notas.</string>
+    <string name="voice_no_space">No hay espacio suficiente en el teléfono para grabar.</string>
+    <string name="voice_mic_failed">No se pudo usar el micrófono. ¿Otra app lo está usando?</string>
     <string name="action_resume">Reanudar</string>
     <string name="action_finish">Terminar</string>
 

@@ -148,6 +148,45 @@ data class MediaItemEntity(
 )
 
 @Entity(
+    tableName = "voice_note",
+    foreignKeys = [ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["segment_id", "started_utc_ms"], name = "idx_voice_segment_time")],
+)
+data class VoiceNoteEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "segment_id") val segmentId: String,
+    @ColumnInfo(name = "started_utc_ms") val startedUtcMs: Long,
+    @ColumnInfo(name = "duration_ms") val durationMs: Long,
+    val lat: Double?,
+    val lon: Double?,
+    @ColumnInfo(name = "h_accuracy_m") val hAccuracyM: Float?,
+    @ColumnInfo(name = "audio_path") val audioPath: String,
+    @ColumnInfo(name = "audio_format") val audioFormat: String,
+    val transcript: String?,
+    @ColumnInfo(name = "transcript_edited") val transcriptEdited: String?,
+    @ColumnInfo(name = "transcript_lang") val transcriptLang: String?,
+    @ColumnInfo(name = "transcript_engine") val transcriptEngine: String?,
+    @ColumnInfo(name = "transcript_status") val transcriptStatus: String,
+    @ColumnInfo(name = "transcript_segments_json") val transcriptSegmentsJson: String?,
+    @ColumnInfo(name = "media_item_id") val mediaItemId: String?,
+)
+
+@Entity(
+    tableName = "text_note",
+    foreignKeys = [ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["segment_id", "time_utc_ms"], name = "idx_text_segment_time")],
+)
+data class TextNoteEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "segment_id") val segmentId: String,
+    @ColumnInfo(name = "time_utc_ms") val timeUtcMs: Long,
+    val lat: Double?,
+    val lon: Double?,
+    val kind: String,
+    val text: String?,
+)
+
+@Entity(
     tableName = "stop",
     foreignKeys = [ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE)],
     indices = [Index(value = ["segment_id", "start_utc_ms"], name = "idx_stop_segment")],

@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- ACCESS_BACKGROUND_LOCATION is deliberately NOT requested in v1 (DISENO §6.1). -->
 
     <application
@@ -33,6 +35,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".voice.VoiceNoteActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Bitacora.Translucent"
+            tools:targetApi="27" />
 
         <!-- WorkManager is initialised by BitacoraApp (Hilt worker factory). -->
         <provider

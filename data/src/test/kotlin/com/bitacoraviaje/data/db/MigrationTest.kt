@@ -62,8 +62,21 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 3 to 4 adds voice_note and text_note`() {
+        helper.createDatabase(DB_NAME, 3).use { v3 ->
+            v3.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v3.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'ACTIVE')")
+        }
+        val v4 = helper.runMigrationsAndValidate(DB_NAME, 4, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v4.execSQL("INSERT INTO voice_note (id,segment_id,started_utc_ms,duration_ms,audio_path,audio_format,transcript_status) VALUES ('v','s',5,1000,'audio/t/v.m4a','m4a-aac','PENDING')")
+        v4.execSQL("INSERT INTO text_note (id,segment_id,time_utc_ms,kind) VALUES ('n','s',6,'HIGHLIGHT')")
+        v4.query("SELECT COUNT(*) FROM voice_note").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+        v4.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(3, BitacoraDatabase.VERSION)
+        assertEquals(4, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 
