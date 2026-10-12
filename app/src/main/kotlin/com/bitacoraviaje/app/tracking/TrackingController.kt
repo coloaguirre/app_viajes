@@ -81,8 +81,9 @@ class TrackingController @Inject constructor(
 
     /** Recovery dialog, "close": the segment keeps what was saved and is marked RECOVERED. */
     suspend fun closeOpenSegmentAsRecovered(segmentId: String) {
-        repository.finishSegment(segmentId, SegmentStatus.RECOVERED)
+        val done = repository.finishSegment(segmentId, SegmentStatus.RECOVERED)
         notifications.cancelResumeNeeded()
+        done?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, it.tripId, it.id) }
     }
 
     fun pause() = send(TrackingService.ACTION_PAUSE)
@@ -102,6 +103,7 @@ class TrackingController @Inject constructor(
         stopServiceAndAwaitFlush()
         val done = repository.finishSegment(segmentId, SegmentStatus.FINISHED)
         stateHolder.reset()
+        done?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, it.tripId, it.id) }
         val parentId = done?.parentSegmentId ?: return null
         val parent = repository.getSegment(parentId)?.takeIf { it.status == SegmentStatus.PAUSED } ?: return null
         repository.resume(parent.id)
@@ -113,6 +115,7 @@ class TrackingController @Inject constructor(
         stopServiceAndAwaitFlush()
         repository.finishTrip(tripId)
         stateHolder.reset()
+        com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, tripId)
     }
 
     suspend fun pauseInDb(segmentId: String, kind: PauseKind) = repository.pause(segmentId, kind)

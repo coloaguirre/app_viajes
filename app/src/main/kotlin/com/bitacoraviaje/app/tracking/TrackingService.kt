@@ -7,6 +7,11 @@ import android.content.pm.ServiceInfo
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Looper
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Handler
+import android.provider.MediaStore
+import com.bitacoraviaje.app.media.LinkMediaWorker
 import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
@@ -83,6 +88,20 @@ class TrackingService : LifecycleService() {
     private var lastFlushMs = 0L
     private var lastNotifyMs = 0L
     private var tickerJob: Job? = null
+    private var mediaJob: Job? = null
+    private var tripId: String? = null
+
+    /** New photos/videos while recording (DISENO §7.3): debounced 2 s, linked by the worker. */
+    private val mediaObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean, uri: Uri?) {
+            mediaJob?.cancel()
+            mediaJob = lifecycleScope.launch {
+                delay(MEDIA_DEBOUNCE_MS)
+                tripId?.let { LinkMediaWorker.enqueue(this@TrackingService, it, segmentId) }
+            }
+        }
+    }
+    private var observingMedia = false
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -128,6 +147,8 @@ class TrackingService : LifecycleService() {
             batterySaver = false
             val segment = repository.getSegment(id)
             transport = segment?.transport
+            tripId = segment?.tripId
+            startMediaObserver()
             filter = PointFilter(FilterConfig.forProfile(p, transport))
             clockGuard = ClockGuard()
             loggedCorrections = 0
@@ -234,6 +255,19 @@ class TrackingService : LifecycleService() {
                 Log.i(TAG, "rest exited segment=$id")
             }
         }
+    }
+
+    private fun startMediaObserver() {
+        if (observingMedia) return
+        contentResolver.registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, mediaObserver)
+        contentResolver.registerContentObserver(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true, mediaObserver)
+        observingMedia = true
+    }
+
+    private fun stopMediaObserver() {
+        if (!observingMedia) return
+        contentResolver.unregisterContentObserver(mediaObserver)
+        observingMedia = false
     }
 
     @SuppressLint("MissingPermission") // checked by TrackingController before starting
@@ -349,6 +383,7 @@ class TrackingService : LifecycleService() {
     private fun stop() {
         fused.removeLocationUpdates(callback)
         tickerJob?.cancel()
+        stopMediaObserver()
         lifecycleScope.launch(pipeline) {
             flush()
             stateHolder.update { it.copy(isRunning = false) }
@@ -360,6 +395,7 @@ class TrackingService : LifecycleService() {
     override fun onDestroy() {
         fused.removeLocationUpdates(callback)
         tickerJob?.cancel()
+        stopMediaObserver()
         // The one accepted runBlocking: never lose buffered points on teardown.
         runBlocking(pipeline) { flush() }
         stateHolder.update { it.copy(isRunning = false) }
@@ -380,5 +416,6 @@ class TrackingService : LifecycleService() {
         const val NOTIFY_INTERVAL_MS = 15_000L
         const val TICK_INTERVAL_MS = 60_000L
         const val LOW_BATTERY_PCT = 15
+        const val MEDIA_DEBOUNCE_MS = 2_000L
     }
 }

@@ -47,6 +47,13 @@
     <string name="transport_plane">Avión</string>
     <string name="transport_mixed">Mixto</string>
 
+    <string name="media_card_title">Fotos y videos del viaje</string>
+    <string name="media_card_body">Con acceso a tu galería, las fotos y videos que saques durante el recorrido se ubican solos en el mapa por su hora y su posición. No se copian ni se modifican. Sin acceso, el recorrido se registra igual.</string>
+    <string name="media_access_full">Acceso completo a fotos y videos.</string>
+    <string name="media_access_partial">Acceso parcial: solo se ven las fotos que elegiste; las nuevas del viaje no se van a encontrar solas.</string>
+    <string name="media_access_none">Sin acceso a fotos: el recorrido se registra, pero las fotos no se vinculan.</string>
+    <string name="media_access_allow">Permitir acceso a fotos</string>
+    <string name="media_access_more">Permitir todas las fotos</string>
     <string name="finish_title">Terminar</string>
     <string name="finish_done_title">Etapa cerrada</string>
     <string name="finish_body">Se calculan las estadísticas de la etapa y se detectan las paradas. Cerrar la etapa deja el viaje abierto; cerrar el viaje lo termina.</string>

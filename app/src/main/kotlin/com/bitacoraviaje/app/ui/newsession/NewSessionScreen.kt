@@ -50,6 +50,7 @@ fun NewSessionRoute(onBack: () -> Unit, onStarted: (String) -> Unit, viewModel: 
     val snackbar = remember { SnackbarHostState() }
     val denied = stringResource(R.string.home_permission_denied)
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.start() }
+    val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshMediaAccess() }
     LaunchedEffect(Unit) {
         viewModel.events.collect { e ->
             when (e) {
@@ -64,6 +65,7 @@ fun NewSessionRoute(onBack: () -> Unit, onStarted: (String) -> Unit, viewModel: 
         onBack = onBack,
         onUpdate = viewModel::update,
         onStart = { permissionLauncher.launch(viewModel.requiredPermissions().toTypedArray()) },
+        onRequestMedia = { mediaLauncher.launch(viewModel.mediaPermissionSet()) },
     )
 }
 
@@ -75,6 +77,7 @@ fun NewSessionScreen(
     onBack: () -> Unit,
     onUpdate: ((NewSessionForm) -> NewSessionForm) -> Unit,
     onStart: () -> Unit,
+    onRequestMedia: () -> Unit = {},
 ) {
     val f = state.form
     Scaffold(
@@ -139,6 +142,25 @@ fun NewSessionScreen(
                 FilterChip(selected = f.mode == RecordingMode.ECONOMY, onClick = { onUpdate { it.copy(mode = RecordingMode.ECONOMY) } }, label = { Text(stringResource(R.string.settings_recording_mode_economy)) }, modifier = Modifier.testTag("newsession_mode_economy"))
             }
             if (f.mode == RecordingMode.ECONOMY) Text(stringResource(R.string.settings_recording_mode_economy_desc), style = MaterialTheme.typography.bodySmall)
+
+            // Media access, asked in context with its reason (DISENO §15.1). The session works without it.
+            Card(Modifier.fillMaxWidth().testTag("newsession_media_card")) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(stringResource(R.string.media_card_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.media_card_body), style = MaterialTheme.typography.bodyMedium)
+                    val status = when (state.mediaAccess) {
+                        com.bitacoraviaje.app.media.MediaAccess.FULL -> R.string.media_access_full
+                        com.bitacoraviaje.app.media.MediaAccess.PARTIAL -> R.string.media_access_partial
+                        com.bitacoraviaje.app.media.MediaAccess.NONE -> R.string.media_access_none
+                    }
+                    Text(stringResource(status), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.testTag("newsession_media_status"))
+                    if (state.mediaAccess != com.bitacoraviaje.app.media.MediaAccess.FULL) {
+                        androidx.compose.material3.TextButton(onClick = onRequestMedia, modifier = Modifier.testTag("newsession_media_request")) {
+                            Text(stringResource(if (state.mediaAccess == com.bitacoraviaje.app.media.MediaAccess.PARTIAL) R.string.media_access_more else R.string.media_access_allow))
+                        }
+                    }
+                }
+            }
 
             Button(onClick = onStart, enabled = state.canStart, modifier = Modifier.fillMaxWidth().height(64.dp).testTag("newsession_start")) {
                 Text(stringResource(R.string.newsession_start))

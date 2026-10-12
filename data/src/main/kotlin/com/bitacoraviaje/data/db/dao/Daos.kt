@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
 import com.bitacoraviaje.data.db.entity.StopEntity
@@ -112,6 +113,41 @@ interface TrackPointDao {
         clearSimplified(segmentId)
         keepIds.chunked(500).forEach { markKeep(it) }
     }
+}
+
+@Dao
+interface MediaDao {
+    /** Upsert by primary key; the unique index on mediastore_id makes duplicates from rescans impossible. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(items: List<MediaItemEntity>)
+
+    @Update
+    suspend fun update(item: MediaItemEntity)
+
+    @Query("SELECT * FROM media_item WHERE id = :id")
+    suspend fun getById(id: String): MediaItemEntity?
+
+    @Query("SELECT * FROM media_item WHERE mediastore_id = :mediaStoreId")
+    suspend fun getByMediaStoreId(mediaStoreId: Long): MediaItemEntity?
+
+    @Query("SELECT mediastore_id FROM media_item WHERE mediastore_id IS NOT NULL")
+    suspend fun knownMediaStoreIds(): List<Long>
+
+    @Query("SELECT * FROM media_item WHERE trip_id = :tripId AND is_excluded = 0 ORDER BY taken_utc_ms")
+    fun observeByTrip(tripId: String): Flow<List<MediaItemEntity>>
+
+    @Query("SELECT * FROM media_item WHERE segment_id = :segmentId AND is_excluded = 0 ORDER BY taken_utc_ms")
+    fun observeBySegment(segmentId: String): Flow<List<MediaItemEntity>>
+
+    @Query("SELECT * FROM media_item WHERE trip_id = :tripId ORDER BY taken_utc_ms")
+    suspend fun getByTrip(tripId: String): List<MediaItemEntity>
+
+    /** Review queue (DISENO §14.1 item 7): unplaced, low-confidence or flagged. */
+    @Query("SELECT * FROM media_item WHERE trip_id = :tripId AND is_excluded = 0 AND (link_method = 'NONE' OR link_confidence < 0.6 OR needs_review = 1) ORDER BY taken_utc_ms")
+    fun observeReviewQueue(tripId: String): Flow<List<MediaItemEntity>>
+
+    @Query("SELECT COUNT(*) FROM media_item WHERE trip_id = :tripId AND is_excluded = 0")
+    suspend fun countByTrip(tripId: String): Int
 }
 
 @Dao

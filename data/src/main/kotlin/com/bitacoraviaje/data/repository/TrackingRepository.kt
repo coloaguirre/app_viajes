@@ -58,6 +58,8 @@ class TrackingRepository @Inject constructor(
 
     fun observeSegments(tripId: String): Flow<List<Segment>> = segments.observeByTrip(tripId).map { l -> l.map { it.toDomain() } }
 
+    suspend fun segmentsOf(tripId: String): List<Segment> = segments.getByTrip(tripId).map { it.toDomain() }
+
     /**
      * Starts a recording session. Creates the trip when there is no ACTIVE one
      * (TRIP_START); otherwise appends to the active trip. A nested excursion or trek

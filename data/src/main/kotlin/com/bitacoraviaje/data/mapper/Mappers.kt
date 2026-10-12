@@ -1,6 +1,11 @@
 package com.bitacoraviaje.data.mapper
 
 import com.bitacoraviaje.core.model.BoundingBox
+import com.bitacoraviaje.core.model.LinkMethod
+import com.bitacoraviaje.core.model.MediaItem
+import com.bitacoraviaje.core.model.MediaKind
+import com.bitacoraviaje.core.model.MediaSource
+import com.bitacoraviaje.core.model.TakenTimeSource
 import com.bitacoraviaje.core.model.PauseKind
 import com.bitacoraviaje.core.model.RecordingMode
 import com.bitacoraviaje.core.model.Segment
@@ -13,6 +18,7 @@ import com.bitacoraviaje.core.model.TrackPoint
 import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.model.Trip
 import com.bitacoraviaje.core.model.TripStatus
+import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
 import com.bitacoraviaje.data.db.entity.StopEntity
@@ -90,6 +96,28 @@ fun TrackPoint.toEntity() = TrackPointEntity(
     hAccuracyM = hAccuracyM, vAccuracyM = vAccuracyM, speedMps = speedMps, speedAccuracyMps = speedAccuracyMps,
     bearingDeg = bearingDeg, provider = provider, activity = activity, isMock = isMock, monotonicMs = monotonicMs,
     isFilteredOut = isFilteredOut, isSimplifiedKeep = isSimplifiedKeep,
+)
+
+fun MediaItemEntity.toDomain() = MediaItem(
+    id = id, tripId = tripId, segmentId = segmentId, kind = MediaKind.valueOf(kind), source = MediaSource.valueOf(source),
+    contentUri = contentUri, mediaStoreId = mediaStoreId, displayName = displayName, mimeType = mimeType, sizeBytes = sizeBytes,
+    width = width, height = height, durationMs = durationMs, orientationDeg = orientationDeg,
+    takenUtcMs = takenUtcMs, takenTimeSource = TakenTimeSource.valueOf(takenTimeSource),
+    exifLat = exifLat, exifLon = exifLon, cameraMake = cameraMake, cameraModel = cameraModel,
+    linkedLat = linkedLat, linkedLon = linkedLon, linkMethod = LinkMethod.valueOf(linkMethod), linkConfidence = linkConfidence,
+    linkTimeGapMs = linkTimeGapMs, needsReview = needsReview, sha256 = sha256, userCaption = userCaption,
+    isFavorite = isFavorite, isExcluded = isExcluded,
+)
+
+fun MediaItem.toEntity() = MediaItemEntity(
+    id = id, tripId = tripId, segmentId = segmentId, kind = kind.name, source = source.name,
+    contentUri = contentUri, mediaStoreId = mediaStoreId, displayName = displayName, mimeType = mimeType, sizeBytes = sizeBytes,
+    width = width, height = height, durationMs = durationMs, orientationDeg = orientationDeg,
+    takenUtcMs = takenUtcMs, takenTimeSource = takenTimeSource.name,
+    exifLat = exifLat, exifLon = exifLon, cameraMake = cameraMake, cameraModel = cameraModel,
+    linkedLat = linkedLat, linkedLon = linkedLon, linkMethod = linkMethod.name, linkConfidence = linkConfidence,
+    linkTimeGapMs = linkTimeGapMs, needsReview = needsReview, sha256 = sha256, userCaption = userCaption,
+    isFavorite = isFavorite, isExcluded = isExcluded,
 )
 
 fun StopEntity.toDomain() = Stop(

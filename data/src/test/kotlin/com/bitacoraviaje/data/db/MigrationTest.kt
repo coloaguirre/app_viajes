@@ -49,8 +49,21 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 2 to 3 adds media_item and keeps points`() {
+        helper.createDatabase(DB_NAME, 2).use { v2 ->
+            v2.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v2.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'ACTIVE')")
+            v2.execSQL("INSERT INTO track_point (segment_id,time_utc_ms,lat,lon,is_mock,monotonic_ms,is_filtered_out,is_simplified_keep) VALUES ('s',5,1.0,2.0,0,7,0,1)")
+        }
+        val v3 = helper.runMigrationsAndValidate(DB_NAME, 3, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v3.query("SELECT COUNT(*) FROM track_point").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+        v3.query("SELECT COUNT(*) FROM media_item").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+        v3.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(2, BitacoraDatabase.VERSION)
+        assertEquals(3, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

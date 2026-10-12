@@ -103,6 +103,51 @@ data class TrackPointEntity(
 )
 
 @Entity(
+    tableName = "media_item",
+    foreignKeys = [
+        ForeignKey(entity = TripEntity::class, parentColumns = ["id"], childColumns = ["trip_id"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.SET_NULL),
+    ],
+    indices = [
+        Index(value = ["trip_id", "taken_utc_ms"], name = "idx_media_trip_time"),
+        Index(value = ["mediastore_id"], name = "idx_media_ms", unique = true),
+        Index("segment_id"),
+    ],
+)
+data class MediaItemEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "trip_id") val tripId: String,
+    @ColumnInfo(name = "segment_id") val segmentId: String?,
+    val kind: String,
+    val source: String,
+    @ColumnInfo(name = "content_uri") val contentUri: String?,
+    @ColumnInfo(name = "mediastore_id") val mediaStoreId: Long?,
+    @ColumnInfo(name = "display_name") val displayName: String?,
+    @ColumnInfo(name = "mime_type") val mimeType: String?,
+    @ColumnInfo(name = "size_bytes") val sizeBytes: Long?,
+    val width: Int?,
+    val height: Int?,
+    @ColumnInfo(name = "duration_ms") val durationMs: Long?,
+    @ColumnInfo(name = "orientation_deg") val orientationDeg: Int?,
+    @ColumnInfo(name = "taken_utc_ms") val takenUtcMs: Long,
+    @ColumnInfo(name = "taken_time_source") val takenTimeSource: String,
+    @ColumnInfo(name = "exif_lat") val exifLat: Double?,
+    @ColumnInfo(name = "exif_lon") val exifLon: Double?,
+    @ColumnInfo(name = "camera_make") val cameraMake: String?,
+    @ColumnInfo(name = "camera_model") val cameraModel: String?,
+    @ColumnInfo(name = "linked_lat") val linkedLat: Double?,
+    @ColumnInfo(name = "linked_lon") val linkedLon: Double?,
+    @ColumnInfo(name = "link_method") val linkMethod: String,
+    @ColumnInfo(name = "link_confidence") val linkConfidence: Double,
+    @ColumnInfo(name = "link_time_gap_ms") val linkTimeGapMs: Long?,
+    @ColumnInfo(name = "needs_review") val needsReview: Boolean,
+    val sha256: String?,
+    @ColumnInfo(name = "user_caption") val userCaption: String?,
+    @ColumnInfo(name = "is_favorite") val isFavorite: Boolean,
+    @ColumnInfo(name = "is_excluded") val isExcluded: Boolean,
+)
+
+@Entity(
     tableName = "stop",
     foreignKeys = [ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE)],
     indices = [Index(value = ["segment_id", "start_utc_ms"], name = "idx_stop_segment")],

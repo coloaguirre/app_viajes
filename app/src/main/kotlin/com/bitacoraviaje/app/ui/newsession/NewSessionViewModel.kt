@@ -2,6 +2,8 @@ package com.bitacoraviaje.app.ui.newsession
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.bitacoraviaje.app.media.MediaAccess
+import com.bitacoraviaje.app.media.MediaPermissions
 import com.bitacoraviaje.app.settings.UserPreferences
 import com.bitacoraviaje.app.tracking.TrackingController
 import com.bitacoraviaje.core.model.RecordingMode
@@ -36,6 +38,7 @@ data class NewSessionUiState(
     val openSegment: Segment? = null,
     val hasActiveTrip: Boolean = false,
     val starting: Boolean = false,
+    val mediaAccess: MediaAccess = MediaAccess.NONE,
 ) {
     val canStart: Boolean get() = form.type != null && !starting
 }
@@ -50,9 +53,11 @@ class NewSessionViewModel @Inject constructor(
     private val repository: TrackingRepository,
     private val controller: TrackingController,
     prefs: UserPreferences,
+    private val mediaPermissions: MediaPermissions,
 ) : ViewModel() {
     private val form = MutableStateFlow(NewSessionForm())
     private val starting = MutableStateFlow(false)
+    private val mediaAccess = MutableStateFlow(mediaPermissions.access())
 
     init {
         viewModelScope.launch {
@@ -61,14 +66,20 @@ class NewSessionViewModel @Inject constructor(
         }
     }
 
-    val state: StateFlow<NewSessionUiState> = combine(form, repository.observeOpenSegment(), repository.observeActiveTrip(), starting) { f, open, trip, st ->
-        NewSessionUiState(f, open, trip != null, st)
+    val state: StateFlow<NewSessionUiState> = combine(form, repository.observeOpenSegment(), repository.observeActiveTrip(), starting, mediaAccess) { f, open, trip, st, ma ->
+        NewSessionUiState(f, open, trip != null, st, ma)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewSessionUiState())
 
     private val _events = Channel<NewSessionEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
     fun requiredPermissions() = controller.requiredPermissions()
+
+    fun mediaPermissionSet(): Array<String> = mediaPermissions.requestSet()
+
+    fun refreshMediaAccess() {
+        mediaAccess.value = mediaPermissions.access()
+    }
 
     fun update(transform: (NewSessionForm) -> NewSessionForm) {
         form.value = transform(form.value)
