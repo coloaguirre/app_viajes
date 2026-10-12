@@ -8,6 +8,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Hooks run with a minimal environment: resolve the toolchain the same way
+# tools/setup-linux.sh installs it (user space), unless already configured.
+export JAVA_HOME="${JAVA_HOME:-$HOME/.local/opt/jdk17}"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$JAVA_HOME/bin:$HOME/.local/bin:$PATH"
+
 ran=0
 if [ -x ./gradlew ]; then
   echo "[run-tests] ./gradlew test"
