@@ -189,7 +189,7 @@ su aceptación es la evidencia que él aporta, registrada en
       `strings.xml` en español.  (est: 0.5)
       Aceptación: la app abre en el emulador; captura guardada en
       `docs/notes/evidencia/fase-0/`.
-- [ ] 0.4 Integración continua en GitHub Actions: lint, tests JVM,
+- [x] 0.4 Integración continua en GitHub Actions: lint, tests JVM,
       assembleDebug y pytest condicional; `tools/run-tests.sh` extendido.  (est: 0.5)
       Aceptación: pipeline verde en un push a `dev`.
 
