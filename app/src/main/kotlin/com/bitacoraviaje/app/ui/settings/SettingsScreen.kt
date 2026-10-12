@@ -30,7 +30,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitacoraviaje.app.BuildConfig
 import com.bitacoraviaje.app.R
-import com.bitacoraviaje.app.settings.Units
+import com.bitacoraviaje.core.model.Units
 import com.bitacoraviaje.core.model.RecordingMode
 
 @OptIn(ExperimentalMaterial3Api::class)

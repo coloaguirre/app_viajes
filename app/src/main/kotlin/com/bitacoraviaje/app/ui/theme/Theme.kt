@@ -11,7 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-// High-contrast palette: the active-session screen must be readable in full sun (DISENO §14.2).
+// High-contrast palette used by default: the active-session screen must be readable in
+// full sun (DISENO §14.2). Dynamic (wallpaper) colors are opt-in because they can be pale.
 private val LightColors = lightColorScheme(
     primary = Color(0xFF1F3864),
     onPrimary = Color.White,
@@ -33,7 +34,7 @@ private val DarkColors = darkColorScheme(
 @Composable
 fun BitacoraTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current

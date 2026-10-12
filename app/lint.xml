@@ -4,7 +4,9 @@
          compileSdk is 37 because current AndroidX needs it. Revisit at Phase 6. -->
     <issue id="OldTargetApi" severity="ignore" />
     <!-- Kotlin is pinned to the version Hilt validates against (gradle/libs.versions.toml). -->
-    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="NewerVersionAvailable">
+        <ignore regexp="org\.jetbrains\.kotlin" />
+    </issue>
     <!-- Adaptive icons must live in mipmap-anydpi-v26: AAPT2 rejects them in an unqualified folder
          even with minSdk 26. -->
     <issue id="ObsoleteSdkInt" severity="ignore">

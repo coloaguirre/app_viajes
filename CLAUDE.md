@@ -122,7 +122,9 @@ uv run --with openpyxl python tools/gantt.py   # regenera reports/gantt.xlsx des
   proveedor de teselas en la bitácora exportada y los créditos del video.
 - **PROHIBIDO mergear a `dev` o `main` con tests fallando**
   (`./tools/run-tests.sh`: corre `./gradlew test` y los `pytest` de los
-  subproyectos Python; el hook de git lo ejecuta antes de cada push).
+  subproyectos Python, igual que CI; el hook de Claude Code lo ejecuta antes
+  de cada push a esas ramas. Un push manual desde otra terminal lo saltea:
+  CI es la segunda red).
 
 ## Identificadores
 - `applicationId` / paquete: `com.bitacoraviaje.app` (provisorio, decisión D1).

@@ -2,7 +2,7 @@ package com.bitacoraviaje.app.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.bitacoraviaje.app.settings.Units
+import com.bitacoraviaje.core.model.Units
 import com.bitacoraviaje.app.settings.UserPreferences
 import com.bitacoraviaje.app.settings.UserSettings
 import com.bitacoraviaje.core.model.RecordingMode

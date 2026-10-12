@@ -11,7 +11,10 @@ ZIPALIGN=$(ls -d "$SDK"/build-tools/*/zipalign 2>/dev/null | sort -V | tail -1)
 [ -x "$ZIPALIGN" ] || { echo "zipalign no encontrado en $SDK/build-tools"; exit 2; }
 
 echo "[16kb] zipalign -c -P 16 -v 4 $APK"
-"$ZIPALIGN" -c -P 16 -v 4 "$APK" >/dev/null || { echo "[16kb] FALLA: alineación de zip"; exit 1; }
+if ! out=$("$ZIPALIGN" -c -P 16 -v 4 "$APK" 2>&1); then
+  echo "$out" | grep -vE "OK$|^Verifying" | tail -20
+  echo "[16kb] FALLA: alineación de zip"; exit 1
+fi
 
 libs=$(unzip -Z1 "$APK" 'lib/*/*.so' 2>/dev/null || true)
 if [ -z "$libs" ]; then

@@ -37,3 +37,9 @@ enum class TripStatus {
     PAUSED,
     FINISHED,
 }
+
+/** Display units. Lives in core so exporters and the UI format distances the same way. */
+enum class Units {
+    METRIC,
+    IMPERIAL,
+}

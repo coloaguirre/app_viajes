@@ -3,13 +3,13 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **0 — Esqueleto y entorno, por iniciar** (PLAN.md aprobado 2026-10-11)
-- Última actualización: 2026-10-11
+- Fase: **0 — Esqueleto y entorno, en curso** (ítem 0.2 cerrado; 0.1 y 0.3 esperan el emulador; 0.4 espera el merge)
+- Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
-| 0 — Esqueleto | ⬜ Pendiente | |
+| 0 — Esqueleto | 🟨 En curso | 0.2: `docs/notes/evidencia/fase-0/0.2-build-test-lint.md` · 0.4: `0.4-ci.md` (PR #1 verde) |
 | 1 — Recorrido | ⬜ Pendiente | |
 | 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
@@ -47,16 +47,19 @@
 | Room | 2.8.5 | 2026-10-11 |
 | Navigation Compose / Activity Compose / Lifecycle | 2.10.2 / 1.13.0 / 2.11.0 | 2026-10-11 |
 | WorkManager / DataStore / core-ktx | 2.12.0 / 1.2.1 / 1.19.1 | 2026-10-11 |
-| Coroutines | 1.11.0 | 2026-10-11 |
+| Coroutines / kotlinx-serialization | 1.11.0 / 1.11.0 | 2026-10-12 |
+| hilt-navigation-compose | 1.4.0 | 2026-10-11 |
+| JUnit / androidx.test.ext junit / Espresso / Robolectric | 4.13.2 / 1.3.0 / 3.7.0 / 4.17 | 2026-10-11 |
 | ffmpeg (build estático, user space) | 7.0.2 | 2026-10-11 |
 | Python / uv | 3.12.3 / 0.12.5 | 2026-10-11 |
 
 Observaciones de la verificación (ítem 0.1):
 - Existen SDK 37.0, 37.1 y 37.2 (Android 17 y sus versiones menores) e
-  imágenes de emulador con páginas de 16 KB (`google_apis_ps16k`). Se
-  mantiene compileSdk/targetSdk 36 según el PLAN; el Pixel 8 Pro con
-  Android 17 ejecuta la app sin cambios (compatibilidad hacia adelante).
-  Revisar en Fase 3 si conviene una imagen `ps16k` para probar whisper.
+  imágenes de emulador con páginas de 16 KB (`google_apis_ps16k`). El
+  PLAN preveía compileSdk 36, pero las librerías AndroidX vigentes exigen
+  API 37: se compila contra 37.0 y targetSdk queda en 36 (decisión del
+  2026-10-12). El emulador sigue en android-36. Revisar en Fase 3 si
+  conviene una imagen `ps16k` para probar whisper.
 - `sdkmanager` está marcado como deprecado en favor del nuevo comando
   `android sdk` (Android CLI). El script `tools/setup-linux.sh` sigue
   usando `sdkmanager` porque funciona; migrar cuando la doc del CLI esté
@@ -66,7 +69,15 @@ Observaciones de la verificación (ítem 0.1):
   un comando con sudo del usuario.
 
 ## Problemas conocidos
--
+- El emulador requiere pertenecer al grupo `kvm` (comando con sudo del
+  usuario, pendiente al 2026-10-12); hasta entonces los ítems 0.1 y 0.3
+  no pueden cerrarse.
+- Pendientes anotados por la revisión de código de Fase 0 (ver PR #1):
+  idioma de transcripción se muestra como etiqueta cruda y no es editable
+  (placeholder hasta Fase 3); `allowBackup` sin `dataExtractionRules`
+  (se decide en 1.1 con la base; ítem 3.5); el plugin de Room y
+  `schemaDirectory` se aplican en 1.1; cuatro `build.gradle.kts` de
+  `core/*` idénticos → convention plugin cuando entre `core/videoplan`.
 
 ## Pendientes del usuario
 - [x] Definir nombre y `applicationId` (D1) — default confirmado 2026-10-11
