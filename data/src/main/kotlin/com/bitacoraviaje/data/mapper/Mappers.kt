@@ -40,13 +40,13 @@ import com.bitacoraviaje.data.db.entity.TripEntity
 fun TripEntity.toDomain() = Trip(
     id = id, title = title, description = description, createdUtcMs = createdUtcMs,
     startedUtcMs = startedUtcMs, endedUtcMs = endedUtcMs, coverMediaId = coverMediaId,
-    status = TripStatus.valueOf(status),
+    status = TripStatus.valueOf(status), archived = archived,
 )
 
 fun Trip.toEntity() = TripEntity(
     id = id, title = title, description = description, createdUtcMs = createdUtcMs,
     startedUtcMs = startedUtcMs, endedUtcMs = endedUtcMs, coverMediaId = coverMediaId,
-    status = status.name,
+    status = status.name, archived = archived,
 )
 
 fun SegmentEntity.toDomain(): Segment {

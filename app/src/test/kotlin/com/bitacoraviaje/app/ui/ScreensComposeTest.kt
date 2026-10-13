@@ -14,6 +14,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollTo
@@ -215,5 +217,66 @@ class ScreensComposeTest {
         rule.onNodeWithTag("video_open").performClick()
         assertTrue("open:content://media/1" in events)
     }
-}
 
+    // Backlog D1: three-dot menu per trip and the folded archived section.
+
+    private fun trip(id: String, title: String, status: com.bitacoraviaje.core.model.TripStatus, archived: Boolean = false) =
+        com.bitacoraviaje.core.model.Trip(id = id, title = title, createdUtcMs = 1L, status = status, archived = archived)
+
+    @Test
+    fun `home trip menu blocks archive and delete only while that trip's segment is recording`() {
+        val actions = ArrayList<com.bitacoraviaje.app.ui.home.TripAction>()
+        val state = com.bitacoraviaje.app.ui.home.HomeUiState(
+            trips = listOf(trip("a", "Activo", com.bitacoraviaje.core.model.TripStatus.ACTIVE), trip("f", "Terminado", com.bitacoraviaje.core.model.TripStatus.FINISHED)),
+            openSegment = com.bitacoraviaje.core.model.Segment("s1", "a", null, com.bitacoraviaje.core.model.SegmentType.STAGE, null, "Etapa", null, 0L, null, "UTC", "WALK", com.bitacoraviaje.core.model.RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.ACTIVE),
+        )
+        rule.setContent { BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = state, snackbar = SnackbarHostState(), onOpenSettings = {}, onNewRecording = {}, onResumeActive = {}, onTripAction = { actions += it }) } }
+        rule.onNodeWithTag("trip_menu_a").performClick()
+        rule.onNodeWithTag("trip_archive_a").assertIsNotEnabled()
+        rule.onNodeWithTag("trip_delete_a").assertIsNotEnabled()
+        rule.onNodeWithTag("trip_video_a").performClick()
+        rule.onNodeWithTag("trip_menu_f").performClick()
+        rule.onNodeWithTag("trip_archive_f").assertIsEnabled()
+        rule.onNodeWithTag("trip_delete_f").assertIsEnabled()
+        rule.onNodeWithTag("trip_export_f").performClick()
+        assertEquals(listOf(com.bitacoraviaje.app.ui.home.TripAction.Video("a"), com.bitacoraviaje.app.ui.home.TripAction.Export("f")), actions)
+    }
+
+    @Test
+    fun `home trip menu reports rename, archive, delete and the folded archived section`() {
+        val actions = ArrayList<com.bitacoraviaje.app.ui.home.TripAction>()
+        val state = com.bitacoraviaje.app.ui.home.HomeUiState(
+            trips = listOf(trip("f", "Terminado", com.bitacoraviaje.core.model.TripStatus.FINISHED)),
+            archived = listOf(trip("z", "Guardado", com.bitacoraviaje.core.model.TripStatus.FINISHED, archived = true)),
+        )
+        rule.setContent { BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = state, snackbar = SnackbarHostState(), onOpenSettings = {}, onNewRecording = {}, onResumeActive = {}, onTripAction = { actions += it }) } }
+        rule.onNodeWithText("Guardado").assertDoesNotExist()
+        rule.onNodeWithTag("home_archived_toggle").performClick()
+        rule.onNodeWithText("Guardado").assertIsDisplayed()
+
+        rule.onNodeWithTag("trip_menu_f").performClick()
+        rule.onNodeWithTag("trip_archive_f").assertIsEnabled().performClick()
+        rule.onNodeWithTag("trip_menu_f").performClick()
+        rule.onNodeWithTag("trip_delete_f").performClick()
+        rule.onNodeWithTag("trip_delete_confirm").performClick()
+        rule.onNodeWithTag("trip_menu_f").performClick()
+        rule.onNodeWithTag("trip_rename_f").performClick()
+        rule.onNodeWithTag("trip_rename_field").performTextClearance()
+        rule.onNodeWithTag("trip_rename_field").performTextInput("Nuevo nombre")
+        rule.onNodeWithTag("trip_rename_save").performClick()
+
+        rule.onNodeWithTag("trip_menu_z").performClick()
+        rule.onNodeWithText("Desarchivar").assertExists()
+        rule.onNodeWithTag("trip_archive_z").performClick()
+
+        assertEquals(
+            listOf(
+                com.bitacoraviaje.app.ui.home.TripAction.Archive("f", true),
+                com.bitacoraviaje.app.ui.home.TripAction.Delete("f"),
+                com.bitacoraviaje.app.ui.home.TripAction.Rename("f", "Nuevo nombre"),
+                com.bitacoraviaje.app.ui.home.TripAction.Archive("z", false),
+            ),
+            actions,
+        )
+    }
+}

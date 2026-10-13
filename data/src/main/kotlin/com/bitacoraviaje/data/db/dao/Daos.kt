@@ -41,6 +41,12 @@ interface TripDao {
     /** Deleting a trip cascades to segments, pauses, points and stops. Callers confirm with the user first. */
     @Query("DELETE FROM trip WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("UPDATE trip SET archived = :archived WHERE id = :id")
+    suspend fun setArchived(id: String, archived: Boolean)
+
+    @Query("UPDATE trip SET title = :title WHERE id = :id")
+    suspend fun rename(id: String, title: String)
 }
 
 @Dao

@@ -207,4 +207,34 @@ class TrackingRepositoryTest {
         assertNull(repo.observeActiveTrip().first())
         assertEquals(TripStatus.FINISHED, repo.observeTrips().first().single().status)
     }
+
+    // Backlog D1: three-dot menu on the Home list.
+
+    @Test
+    fun `rename trims the title and archive flips the flag without touching the status`() = runTest {
+        val s = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Viejo")
+        repo.finishTrip(s.tripId)
+        repo.renameTrip(s.tripId, "  Nuevo  ")
+        repo.setTripArchived(s.tripId, true)
+        val t = assertNotNull(repo.getTrip(s.tripId))
+        assertEquals("Nuevo", t.title)
+        assertTrue(t.archived)
+        assertEquals(TripStatus.FINISHED, t.status)
+        repo.setTripArchived(s.tripId, false)
+        assertEquals(false, repo.getTrip(s.tripId)?.archived)
+    }
+
+    @Test
+    fun `deleteTrip refuses a trip with an open segment and otherwise cascades to its rows`() = runTest {
+        val s = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Borrar")
+        repo.insertPoints((0 until 5).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = Fixtures.T0 + i * 1000L, lat = -34.6 + i * 1e-4, lon = -58.4, altM = 10.0) })
+        assertEquals(false, repo.deleteTrip(s.tripId), "an open segment protects the trip")
+        assertNotNull(repo.getTrip(s.tripId))
+        repo.finishTrip(s.tripId)
+        assertTrue(repo.deleteTrip(s.tripId))
+        assertNull(repo.getTrip(s.tripId))
+        assertNull(repo.getSegment(s.id))
+        assertEquals(0, db.trackPointDao().countBySegment(s.id))
+        assertTrue(repo.observeTrips().first().isEmpty())
+    }
 }

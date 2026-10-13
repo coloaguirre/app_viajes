@@ -19,7 +19,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.ListItem
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -43,15 +46,21 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.model.Trip
 
 @Composable
-fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActiveSession: (String) -> Unit, onOpenTrip: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActiveSession: (String) -> Unit, onOpenTrip: (String) -> Unit = {}, onExportTrip: (String) -> Unit = {}, onCreateVideo: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val denied = stringResource(R.string.home_permission_denied)
     LaunchedEffect(Unit) {
         viewModel.events.collect { e ->
             when (e) {
                 is HomeEvent.OpenActiveSession -> onOpenActiveSession(e.segmentId)
                 HomeEvent.PermissionDenied -> snackbar.showSnackbar(denied)
+                is HomeEvent.TripDeleted -> {
+                    val r = snackbar.showSnackbar(resources.getString(R.string.trip_deleted, e.title), actionLabel = resources.getString(R.string.trip_delete_undo), duration = androidx.compose.material3.SnackbarDuration.Long)
+                    if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.undoDelete()
+                }
+                HomeEvent.TripInUse -> snackbar.showSnackbar(resources.getString(R.string.trip_delete_in_use))
             }
         }
     }
@@ -66,6 +75,15 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
         onRecoverResume = viewModel::resumeOpenSegment,
         onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
         onOpenTrip = onOpenTrip,
+        onTripAction = { a ->
+            when (a) {
+                is TripAction.Rename -> viewModel.renameTrip(a.tripId, a.title)
+                is TripAction.Archive -> viewModel.setArchived(a.tripId, a.archived)
+                is TripAction.Export -> onExportTrip(a.tripId)
+                is TripAction.Video -> onCreateVideo(a.tripId)
+                is TripAction.Delete -> viewModel.deleteTrip(a.tripId)
+            }
+        },
         onImport = { pickFile.launch(arrayOf("application/zip", "application/json", "application/gpx+xml", "application/octet-stream", "text/xml", "application/xml")) },
     )
     ImportDialog(
@@ -123,6 +141,7 @@ fun HomeScreen(
     onRecoverResume: () -> Unit = {},
     onRecoverClose: () -> Unit = {},
     onOpenTrip: (String) -> Unit = {},
+    onTripAction: (TripAction) -> Unit = {},
     onImport: () -> Unit = {},
 ) {
     if (state.needsRecovery) {
@@ -172,10 +191,10 @@ fun HomeScreen(
                     }
                 }
             }
-            if (state.trips.isEmpty()) {
+            if (state.trips.isEmpty() && state.archived.isEmpty()) {
                 EmptyTrips()
             } else {
-                TripList(state.trips, onOpenTrip)
+                TripList(state.trips, state.archived, state.openSegment?.tripId, onOpenTrip, onTripAction)
             }
         }
     }
@@ -198,15 +217,88 @@ private fun EmptyTrips() {
     }
 }
 
+/** Backlog D1: what the three-dot menu of a trip row can do. */
+sealed interface TripAction {
+    data class Rename(val tripId: String, val title: String) : TripAction
+    data class Archive(val tripId: String, val archived: Boolean) : TripAction
+    data class Export(val tripId: String) : TripAction
+    data class Video(val tripId: String) : TripAction
+    data class Delete(val tripId: String) : TripAction
+}
+
+/** [openTripId]: the trip with the segment being recorded; it cannot be archived or deleted until that segment is closed. */
 @Composable
-private fun TripList(trips: List<Trip>, onOpenTrip: (String) -> Unit) {
+private fun TripList(trips: List<Trip>, archived: List<Trip>, openTripId: String?, onOpenTrip: (String) -> Unit, onTripAction: (TripAction) -> Unit) {
+    var showArchived by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     LazyColumn(Modifier.fillMaxSize()) {
-        items(trips, key = { it.id }) { trip ->
-            ListItem(
-                headlineContent = { Text(trip.title) },
-                supportingContent = { Text(stringResource(if (trip.status == com.bitacoraviaje.core.model.TripStatus.ACTIVE) R.string.trip_status_active else R.string.trip_status_finished)) },
-                modifier = Modifier.clickable { onOpenTrip(trip.id) }.testTag("home_trip_${trip.id}"),
-            )
+        items(trips, key = { it.id }) { trip -> TripRow(trip, trip.id == openTripId, onOpenTrip, onTripAction) }
+        if (archived.isNotEmpty()) {
+            item(key = "archived-header") {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.home_archived, archived.size), style = MaterialTheme.typography.titleSmall) },
+                    trailingContent = { Text(if (showArchived) "▲" else "▼") },
+                    modifier = Modifier.clickable { showArchived = !showArchived }.testTag("home_archived_toggle"),
+                )
+            }
+            if (showArchived) items(archived, key = { it.id }) { trip -> TripRow(trip, trip.id == openTripId, onOpenTrip, onTripAction) }
         }
+    }
+}
+
+@Composable
+private fun TripRow(trip: Trip, recording: Boolean, onOpenTrip: (String) -> Unit, onTripAction: (TripAction) -> Unit) {
+    var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var rename by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var confirmDelete by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val active = trip.status == com.bitacoraviaje.core.model.TripStatus.ACTIVE
+    ListItem(
+        headlineContent = { Text(trip.title) },
+        supportingContent = { Text(stringResource(if (active) R.string.trip_status_active else if (trip.archived) R.string.trip_status_archived else R.string.trip_status_finished)) },
+        trailingContent = {
+            androidx.compose.foundation.layout.Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("trip_menu_${trip.id}")) { Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.trip_menu)) }
+                androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.trip_rename)) }, onClick = { menu = false; rename = trip.title }, modifier = Modifier.testTag("trip_rename_${trip.id}"))
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(stringResource(if (trip.archived) R.string.trip_unarchive else R.string.trip_archive)) },
+                        onClick = { menu = false; onTripAction(TripAction.Archive(trip.id, !trip.archived)) },
+                        enabled = !recording,
+                        modifier = Modifier.testTag("trip_archive_${trip.id}"),
+                    )
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.trip_export)) }, onClick = { menu = false; onTripAction(TripAction.Export(trip.id)) }, modifier = Modifier.testTag("trip_export_${trip.id}"))
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.trip_video)) }, onClick = { menu = false; onTripAction(TripAction.Video(trip.id)) }, modifier = Modifier.testTag("trip_video_${trip.id}"))
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(stringResource(R.string.trip_delete)) },
+                        onClick = { menu = false; confirmDelete = true },
+                        enabled = !recording,
+                        colors = androidx.compose.material3.MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.testTag("trip_delete_${trip.id}"),
+                    )
+                }
+            }
+        },
+        modifier = Modifier.clickable { onOpenTrip(trip.id) }.testTag("home_trip_${trip.id}"),
+    )
+    rename?.let { initial ->
+        // The whole title starts selected so typing replaces it (the common case is a fresh name).
+        var field by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) {
+            androidx.compose.runtime.mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(initial, androidx.compose.ui.text.TextRange(0, initial.length)))
+        }
+        AlertDialog(
+            onDismissRequest = { rename = null },
+            title = { Text(stringResource(R.string.trip_rename)) },
+            text = { androidx.compose.material3.OutlinedTextField(value = field, onValueChange = { field = it }, singleLine = true, modifier = Modifier.testTag("trip_rename_field")) },
+            confirmButton = { TextButton(onClick = { onTripAction(TripAction.Rename(trip.id, field.text)); rename = null }, enabled = field.text.isNotBlank(), modifier = Modifier.testTag("trip_rename_save")) { Text(stringResource(R.string.settings_privacy_save)) } },
+            dismissButton = { TextButton(onClick = { rename = null }) { Text(stringResource(R.string.active_cancel)) } },
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.trip_delete_title, trip.title)) },
+            text = { Text(stringResource(R.string.trip_delete_body)) },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onTripAction(TripAction.Delete(trip.id)) }, modifier = Modifier.testTag("trip_delete_confirm")) { Text(stringResource(R.string.trip_delete)) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.active_cancel)) } },
+        )
     }
 }

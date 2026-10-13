@@ -23,6 +23,7 @@ data class TripEntity(
     @ColumnInfo(name = "ended_utc_ms") val endedUtcMs: Long?,
     @ColumnInfo(name = "cover_media_id") val coverMediaId: String?,
     val status: String,
+    @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
 )
 
 @Entity(

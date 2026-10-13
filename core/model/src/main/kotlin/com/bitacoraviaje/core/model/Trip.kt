@@ -10,6 +10,8 @@ data class Trip(
     val endedUtcMs: Long? = null,
     val coverMediaId: String? = null,
     val status: TripStatus,
+    /** Hidden from the main list (backlog D1); everything else about the trip stays. */
+    val archived: Boolean = false,
 )
 
 /** Statistics computed when a segment closes (DISENO §6.5). All optional until then. */
