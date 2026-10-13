@@ -114,6 +114,22 @@
     <string name="voice_transcript_label">Texto de la nota (editable)</string>
     <string name="voice_save">Guardar corrección</string>
     <string name="voice_no_position">Esta nota no tiene ubicación.</string>
+    <string name="export_title">Exportar a la PC</string>
+    <string name="export_opt_media">Incluir fotos y videos originales</string>
+    <string name="export_opt_audio">Incluir audios de las notas de voz</string>
+    <string name="export_opt_filtered">Incluir puntos filtrados (depuración)</string>
+    <string name="export_destination_hint">El paquete es un ZIP con el diario (HTML y Markdown), el recorrido (GPX, KML, GeoJSON), las tablas CSV, trip.json y tus archivos. Elegí dónde dejarlo:</string>
+    <string name="export_dest_saf">Guardar en…</string>
+    <string name="export_dest_downloads">Dejar en Descargas/BitacoraViaje</string>
+    <string name="export_dest_share">Compartir (Drive, correo, Quick Share)</string>
+    <string name="export_running">Exportando… %1$d de %2$d</string>
+    <string name="export_done">Listo: %1$s.zip</string>
+    <string name="export_done_counts">Fotos y videos: %1$d de %2$d · Audios: %3$d de %4$d</string>
+    <string name="export_failed">No se pudo exportar: %1$s</string>
+    <string name="export_share">Compartir</string>
+    <string name="export_retry">Intentar de nuevo</string>
+    <string name="export_notif_channel">Exportaciones</string>
+    <string name="export_notif_title">Exportando el viaje</string>
     <string name="finish_title">Terminar</string>
     <string name="finish_done_title">Etapa cerrada</string>
     <string name="finish_body">Se calculan las estadísticas de la etapa y se detectan las paradas. Cerrar la etapa deja el viaje abierto; cerrar el viaje lo termina.</string>
@@ -194,4 +210,12 @@
 
     <string name="nav_settings">Ajustes</string>
     <string name="action_back">Volver</string>
+    <plurals name="export_done_missing">
+        <item quantity="one">%1$d archivo ya no estaba en el teléfono; está listado en LEEME.txt.</item>
+        <item quantity="other">%1$d archivos ya no estaban en el teléfono; están listados en LEEME.txt.</item>
+    </plurals>
+    <plurals name="export_notif_progress">
+        <item quantity="one">%1$d de %2$d archivo</item>
+        <item quantity="other">%1$d de %2$d archivos</item>
+    </plurals>
 </resources>

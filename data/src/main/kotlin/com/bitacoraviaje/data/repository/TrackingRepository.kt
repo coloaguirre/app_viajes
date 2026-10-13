@@ -206,6 +206,11 @@ class TrackingRepository @Inject constructor(
 
     suspend fun validPoints(segmentId: String): List<TrackPoint> = points.getValidBySegment(segmentId).map { it.toDomain() }
 
+    /** Every point, filtered ones included (export with the debugging option). */
+    suspend fun allPoints(segmentId: String): List<TrackPoint> = points.getBySegment(segmentId).map { it.toDomain() }
+
+    suspend fun getTrip(tripId: String): Trip? = trips.getById(tripId)?.toDomain()
+
     suspend fun lastValidPoint(segmentId: String): TrackPoint? = points.getLastValid(segmentId)?.toDomain()
 
     fun observeValidPoints(segmentId: String): Flow<List<TrackPoint>> = points.observeValidBySegment(segmentId).map { l -> l.map { it.toDomain() } }

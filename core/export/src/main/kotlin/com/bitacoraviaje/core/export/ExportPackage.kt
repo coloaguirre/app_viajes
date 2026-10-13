@@ -49,20 +49,7 @@ class ExportPackage(
             zip.closeEntry()
             entries += path
         }
-        val writers = ArrayList<TripWriter>()
-        writers += TripJsonWriter()
-        writers += MarkdownWriter()
-        writers += HtmlWriter()
-        writers += GpxWriter()
-        trip.segments.forEachIndexed { i, se -> writers += GpxWriter(listOf(i), "tracks/" + Names.segmentFile(i + 1, se.segment.startedUtcMs, se.segment.tzId, se.segment.title, "gpx")) }
-        writers += KmlWriter()
-        writers += KmzWriter(thumbnails)
-        writers += GeoJsonWriter()
-        writers += PointsCsvWriter()
-        writers += MediaCsvWriter()
-        writers += NotesCsvWriter()
-        writers += PlacesCsvWriter()
-        writers += SrtWriter()
+        val writers = writers(trip, thumbnails)
         val mediaPaths = if (includeMedia) trip.mediaFiles else emptyMap()
         val audioPaths = if (includeAudio) trip.audioFiles else emptyMap()
         val total = writers.size + mediaPaths.size + audioPaths.size + 1
@@ -109,6 +96,25 @@ class ExportPackage(
         onProgress?.invoke(++done, total)
         zip.finish()
         return report
+    }
+
+    companion object {
+        /** The document writers of a package, in ZIP order (DISENO §12.1). */
+        fun writers(trip: TripExport, thumbnails: Map<String, ByteArray>): List<TripWriter> = buildList {
+            add(TripJsonWriter())
+            add(MarkdownWriter())
+            add(HtmlWriter())
+            add(GpxWriter())
+            trip.segments.forEachIndexed { i, se -> add(GpxWriter(listOf(i), "tracks/" + Names.segmentFile(i + 1, se.segment.startedUtcMs, se.segment.tzId, se.segment.title, "gpx"))) }
+            add(KmlWriter())
+            add(KmzWriter(thumbnails))
+            add(GeoJsonWriter())
+            add(PointsCsvWriter())
+            add(MediaCsvWriter())
+            add(NotesCsvWriter())
+            add(PlacesCsvWriter())
+            add(SrtWriter())
+        }
     }
 
     /** ZipOutputStream must stay open between entries; writers may close what they get. */

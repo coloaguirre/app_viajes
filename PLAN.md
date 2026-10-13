@@ -298,11 +298,13 @@ su aceptación es la evidencia que él aporta, registrada en
       conteos base = ZIP con faltantes listados en `LEEME.txt`.
       Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.1-export.md`); sin
       extensiones de Garmin: la app no tiene los datos de sensores que llevan.
-- [ ] 3.2 Gestor de tareas largas (servicios `dataSync` /
+- [x] 3.2 Gestor de tareas largas (servicios `dataSync` /
       `mediaProcessing` con tiempo límite y reanudación por checkpoint);
       `ExportWorker` con ZIP y destinos (SAF, compartir, Download).  (est: 2)
       Aceptación: exporta un viaje sintético de 30 días; una interrupción
       simulada reanuda sin duplicar.
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.2-export-worker.md`);
+      `mediaProcessing` queda para el render de video (Fase 5).
 - [ ] 3.3 Importación de `trip.json` y de GPX externo.  (est: 1)
       Aceptación: exportar e importar un viaje da la misma base (test).
 - [ ] 3.4 whisper.cpp con NDK (alineado a 16 KB), descarga de modelo,

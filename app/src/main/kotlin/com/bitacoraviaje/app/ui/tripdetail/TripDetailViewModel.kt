@@ -8,6 +8,10 @@ import com.bitacoraviaje.app.map.MapMarker
 import com.bitacoraviaje.app.map.MapPoint
 import com.bitacoraviaje.app.map.MarkerKind
 import com.bitacoraviaje.app.map.TrackMapState
+import com.bitacoraviaje.app.export.ExportDestination
+import com.bitacoraviaje.app.export.ExportOptions
+import com.bitacoraviaje.app.export.ExportStatus
+import com.bitacoraviaje.app.export.ExportWorker
 import com.bitacoraviaje.app.media.LinkMediaWorker
 import com.bitacoraviaje.app.ui.navigation.Route
 import com.bitacoraviaje.core.model.MediaItem
@@ -58,6 +62,21 @@ class TripDetailViewModel @Inject constructor(
     private val notes: NotesRepository,
 ) : ViewModel() {
     val tripId: String = savedState.toRoute<Route.TripDetail>().tripId
+    private val appContext = context
+
+    /** Export job of this trip as the UI sees it (PLAN 3.2). */
+    val export: StateFlow<ExportStatus> = androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(ExportWorker.workName(tripId))
+        .map { infos -> ExportStatus.from(infos.firstOrNull()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportStatus())
+
+    fun startExport(options: ExportOptions, destination: ExportDestination, targetUri: android.net.Uri? = null) {
+        ExportWorker.enqueue(appContext, tripId, options, destination, targetUri)
+    }
+
+    /** Clears a finished job so the dialog can offer a new export. */
+    fun dismissExport() {
+        androidx.work.WorkManager.getInstance(appContext).pruneWork()
+    }
     private val tab = MutableStateFlow(0)
     private val focus = MutableStateFlow<Pair<String, MapPoint>?>(null)
 

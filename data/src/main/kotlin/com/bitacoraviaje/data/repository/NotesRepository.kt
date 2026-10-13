@@ -27,6 +27,8 @@ class NotesRepository @Inject constructor(private val db: BitacoraDatabase) {
 
     fun observeVoiceNotes(segmentId: String): Flow<List<VoiceNote>> = voice.observeBySegment(segmentId).map { l -> l.map { it.toDomain() } }
 
+    suspend fun voiceNotesOf(segmentId: String): List<VoiceNote> = voice.getBySegment(segmentId).map { it.toDomain() }
+
     fun observeVoiceNotesOfTrip(tripId: String): Flow<List<VoiceNote>> = voice.observeByTrip(tripId).map { l -> l.map { it.toDomain() } }
 
     suspend fun pendingTranscriptions(): List<VoiceNote> = voice.pendingTranscriptions().map { it.toDomain() }
@@ -56,6 +58,8 @@ class NotesRepository @Inject constructor(private val db: BitacoraDatabase) {
     }
 
     fun observeTextNotes(segmentId: String): Flow<List<TextNote>> = text.observeBySegment(segmentId).map { l -> l.map { it.toDomain() } }
+
+    suspend fun textNotesOf(segmentId: String): List<TextNote> = text.getBySegment(segmentId).map { it.toDomain() }
 
     fun observeTextNotesOfTrip(tripId: String): Flow<List<TextNote>> = text.observeByTrip(tripId).map { l -> l.map { it.toDomain() } }
 
