@@ -351,11 +351,13 @@ su aceptación es la evidencia que él aporta, registrada en
       Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.3-reescritura-ia.md`
       (la clave vive en un archivo cifrado con el Keystore, no en DataStore:
       las reglas de respaldo no lo incluyen).
-- [ ] 4.4 `core/videoplan`: planificador puro con preset "rápido 1 min"
+- [x] 4.4 `core/videoplan`: planificador puro con preset "rápido 1 min"
       y duraciones 1/3/5/10 min, selección por favorita > destacada >
       nitidez, sin duplicados.  (est: 1.5)
       Aceptación: tests; el plan de 1 min para el viaje de ejemplo entra
       en ±5 %.
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.4-videoplan.md`
+      (pHash y nitidez llegan nulos hasta que la Fase 5 los calcule).
 - [ ] 4.5 `desktop-renderer` (uv): CLI `plan` y `render`, mapa animado
       con teselas de MapTiler, Ken Burns, clips, tarjetas, subtítulos de
       voz, música con atenuación, créditos, HEIC, corrección de altitud
