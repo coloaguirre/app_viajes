@@ -183,7 +183,7 @@ class VoiceNoteActivity : ComponentActivity() {
         val seg = segmentId ?: return
         val trip = tripId ?: return
         state = State.SAVING
-        val duration = System.currentTimeMillis() - startedUtcMs
+        val wallClockMs = System.currentTimeMillis() - startedUtcMs
         lifecycleScope.launch {
             val ok = withContext(Dispatchers.IO) { recorder.stop() }
             vibrate(longArrayOf(0, 40, 80, 40))
@@ -192,6 +192,9 @@ class VoiceNoteActivity : ComponentActivity() {
                 finishAndRemoveTask()
                 return@launch
             }
+            // The encoded audio is ~100 ms shorter than the wall clock (start/stop latency); the video needs the
+            // real length, or its clip ends past the file and the export stalls (field report 2026-10-13).
+            val duration = withContext(Dispatchers.IO) { VoiceRecorder.durationMs(VoiceRecorder.fileFor(this@VoiceNoteActivity, trip, noteId)) } ?: wallClockMs
             val pos = controller.position(System.currentTimeMillis())
             controller.saveVoiceNote(seg, trip, noteId, startedUtcMs, duration, pos, mediaItemId = intent.getStringExtra(EXTRA_MEDIA_ITEM_ID))
             Log.i(TAG, "voice note saved id=$noteId duration=${duration}ms pos=${pos.lat != null}")

@@ -123,5 +123,8 @@ class VoiceRecorder @Inject constructor(@ApplicationContext private val context:
         fun fileFor(context: Context, tripId: String, noteId: String): File = File(context.filesDir, relativePath(tripId, noteId))
 
         fun relativePath(tripId: String, noteId: String): String = "audio/$tripId/$noteId.m4a"
+
+        /** Duration of a recorded note as the container reports it (null if unreadable). */
+        fun durationMs(file: File): Long? = com.bitacoraviaje.app.video.MediaDurations.of(file)
     }
 }

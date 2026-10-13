@@ -54,6 +54,17 @@ class VideoEngineTest {
         )
     }
 
+    /** A clip on disk (never decoded while building the composition): its sound must reach the audio-only pass. */
+    private fun clipWithFile(id: String): Map<String, com.bitacoraviaje.core.model.MediaItem> {
+        val f = File(ctx.cacheDir, "$id.mp4").apply { writeBytes(ByteArray(32)) }
+        return mapOf(
+            id to com.bitacoraviaje.core.model.MediaItem(
+                id, "t", "s1", com.bitacoraviaje.core.model.MediaKind.VIDEO, com.bitacoraviaje.core.model.MediaSource.MEDIASTORE, android.net.Uri.fromFile(f).toString(),
+                mimeType = "video/mp4", durationMs = 12_000, takenUtcMs = t0 + 1_500_000, takenTimeSource = com.bitacoraviaje.core.model.TakenTimeSource.MEDIASTORE,
+            ),
+        )
+    }
+
     /** The second stage's track, a day later (increasing times across stages, review I9). */
     private fun pts2(): List<TrackPoint> = (0 until 10).map { i -> TrackPoint(segmentId = "s2", timeUtcMs = t0 + 86_400_000 + i * 60_000L, lat = -49.40 + i * 1e-4, lon = -72.95 + i * 1e-4) }
 
@@ -63,12 +74,14 @@ class VideoEngineTest {
         val plan = Planner.plan(inp, PlanParams(180, voice = VoiceMode.BOTH))
         assertTrue(plan.scenes.count { it is VideoPlan.MapRoute } >= 2, "overview + per-segment maps")
         val audioFile = File(ctx.filesDir, "audio/t/v1.m4a").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(64)) }
+        // The stored 4 000 ms is wall clock; the container holds 3 900 ms (review I2): the note is used whole, not clipped past its end.
+        org.robolectric.shadows.ShadowMediaMetadataRetriever.addMetadata(audioFile.path, android.media.MediaMetadataRetriever.METADATA_KEY_DURATION, "3900")
         val music = File(ctx.cacheDir, "music.mp3").apply { writeBytes(ByteArray(64)) }
         val voices = mapOf("v1" to VoiceNote("v1", "s1", t0 + 1_230_000, 4_000, audioPath = "audio/t/v1.m4a", transcript = "Qué viento", transcriptStatus = com.bitacoraviaje.core.model.TranscriptStatus.DONE))
         val work = File(ctx.cacheDir, "engine-test").apply { mkdirs() }
         val options = MiniVideoComposer.Options(voice = VoiceMode.BOTH, animateMap = true, musicUri = android.net.Uri.fromFile(music), musicVolume = 0.3f)
         // m2 (favourite, 30 s before the voice note) exists on disk: its photo scene carries the subtitle_from_voice.
-        val built = MiniVideoComposer(ctx, work, 384, 216, options = options).build(plan, inp, photoWithFile("m2"), voices, mapOf("s1" to MiniVideoComposer.SegmentMedia(pts, null), "s2" to MiniVideoComposer.SegmentMedia(pts2(), null)))
+        val built = MiniVideoComposer(ctx, work, 384, 216, options = options).build(plan, inp, photoWithFile("m2") + clipWithFile("clip"), voices, mapOf("s1" to MiniVideoComposer.SegmentMedia(pts, null), "s2" to MiniVideoComposer.SegmentMedia(pts2(), null)))
         assertTrue(plan.scenes.filterIsInstance<VideoPlan.Photo>().any { it.media == "m2" && it.subtitle_from_voice == "v1" }, "the note subtitles m2")
         val maps = plan.scenes.filterIsInstance<VideoPlan.MapRoute>()
         val items = built.composition.sequences.first().editedMediaItems
@@ -84,18 +97,31 @@ class VideoEngineTest {
         assertTrue(built.hasAudio)
         val seqs = built.composition.sequences
         assertEquals(3, seqs.size, "video, voices, music")
+        // Two-pass material for the worker: the same items as a silent video, and the audio sequences apart.
+        assertEquals(1, built.videoOnly.sequences.size)
+        assertEquals(seqs.first().editedMediaItems.size, built.videoOnly.sequences.first().editedMediaItems.size)
         assertTrue(seqs.last().isLooping, "the music sequence loops")
         // Voice sequence: the note sits at its scene offset after a gap, clipped to the scene (review I9/I5).
         val voiceSeq = seqs[1]
-        // A gap is itself an item of the sequence: [gap, note].
+        // Gaps are items of the sequence: [gap, note, trailing gap up to the end of the video] (the trailing one
+        // keeps the audio track alive; without it the muxer timed out with 7002 in audio-only renders).
         val voiceItems = voiceSeq.editedMediaItems.filter { it.mediaItem.localConfiguration?.uri?.scheme == "file" }
-        assertEquals(1, voiceItems.size, "one note after a gap: ${voiceSeq.editedMediaItems.size} items")
-        assertEquals(2, voiceSeq.editedMediaItems.size)
+        assertEquals(1, voiceItems.size, "one note between gaps: ${voiceSeq.editedMediaItems.size} items")
+        assertEquals(3, voiceSeq.editedMediaItems.size)
+        assertTrue(voiceSeq.editedMediaItems.last().mediaItem.localConfiguration?.uri?.scheme != "file", "the sequence ends with a gap")
+        // The scene is longer than the file: the note is used whole (no clipping past its end, which stalled the Pixel with 7002).
         val clipEnd = voiceItems.single().mediaItem.clippingConfiguration.endPositionMs
-        assertTrue(clipEnd in 1..8_000, "clipped to its scene: $clipEnd")
+        assertEquals(C.TIME_END_OF_SOURCE, clipEnd, "a note shorter than its scene is not clipped")
         assertEquals(0, built.voicesDropped)
-        // Every other photo and the clip have no file → skipped and counted; cards, maps and m2 remain.
-        assertEquals(plan.scenes.count { it is VideoPlan.Photo || it is VideoPlan.VideoClip } - 1, built.skipped.size)
+        // Every other photo has no file → skipped and counted; cards, maps, m2 and the clip remain.
+        assertEquals(plan.scenes.count { it is VideoPlan.Photo || it is VideoPlan.VideoClip } - 2, built.skipped.size)
+        // The clip's sound travels as its own audio sequence for the audio-only pass (review B1 of the 7002 fix),
+        // while the silent video of pass 1 carries no audio at all.
+        assertEquals(3, built.audioSequences.size, "voices, clip audio, music")
+        val clipAudio = built.audioSequences[1]
+        assertTrue(clipAudio.editedMediaItems.any { it.mediaItem.localConfiguration?.uri?.toString()?.endsWith("clip.mp4") == true && it.removeVideo }, "the clip without its video")
+        assertTrue(clipAudio.editedMediaItems.last().mediaItem.localConfiguration?.uri?.scheme != "file", "padded to the end of the video")
+        assertTrue(built.videoOnly.sequences.single().editedMediaItems.all { it.removeAudio }, "pass 1 is silent")
         assertEquals(plan.scenes.size - built.skipped.size, seqs.first().editedMediaItems.size)
         assertTrue(work.listFiles()!!.any { it.name.startsWith("map_") && it.extension == "jpg" }, "the base map is a still")
         audioFile.delete(); music.delete()
@@ -110,6 +136,12 @@ class VideoEngineTest {
         val built = MiniVideoComposer(ctx, work, 216, 384, options = MiniVideoComposer.Options()).build(plan, inp, emptyMap(), emptyMap(), mapOf("s1" to MiniVideoComposer.SegmentMedia(pts, null), "s2" to MiniVideoComposer.SegmentMedia(pts, null)))
         assertEquals(1, built.composition.sequences.size)
         assertTrue(!built.hasAudio)
+        assertTrue(built.audioSequences.isEmpty(), "subtitles mode renders in one pass")
+        // Subtitles mode but a clip with sound in the plan: audio exists, so the worker must take the audio pass (review B1).
+        val withClip = Planner.plan(inp, PlanParams(120, includeVideos = true))
+        assertTrue(withClip.scenes.any { it is VideoPlan.VideoClip && it.keep_audio })
+        val b2 = MiniVideoComposer(ctx, File(ctx.cacheDir, "engine-test-2b").apply { mkdirs() }, 216, 384, options = MiniVideoComposer.Options()).build(withClip, inp, clipWithFile("clip"), emptyMap(), mapOf("s1" to MiniVideoComposer.SegmentMedia(pts, null), "s2" to MiniVideoComposer.SegmentMedia(pts, null)))
+        assertTrue(b2.hasAudio && b2.audioSequences.size == 1, "clip audio alone: ${b2.audioSequences.size}")
         assertTrue(built.composition.sequences.first().editedMediaItems.none { it.effects.videoEffects.any { e -> e is androidx.media3.effect.OverlayEffect } }, "static maps without animateMap")
     }
 
