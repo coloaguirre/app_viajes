@@ -41,6 +41,12 @@ object DataModule {
     @Provides fun provideVoiceNoteDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.VoiceNoteDao = db.voiceNoteDao()
 
     @Provides fun provideTextNoteDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.TextNoteDao = db.textNoteDao()
+
+    @Provides fun providePlaceDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.PlaceDao = db.placeDao()
+
+    @Provides fun provideEnrichmentDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.EnrichmentDao = db.enrichmentDao()
+
+    @Provides fun provideSegmentPlaceDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.SegmentPlaceDao = db.segmentPlaceDao()
 }
 
 @Module

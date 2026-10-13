@@ -231,6 +231,9 @@ class TrackingRepository @Inject constructor(
         mediaToInsert: List<com.bitacoraviaje.core.model.MediaItem> = emptyList(),
         voiceNotesToInsert: List<com.bitacoraviaje.core.model.VoiceNote> = emptyList(),
         textNotesToInsert: List<com.bitacoraviaje.core.model.TextNote> = emptyList(),
+        placesToInsert: List<com.bitacoraviaje.core.model.Place> = emptyList(),
+        enrichmentsToInsert: List<com.bitacoraviaje.core.model.Enrichment> = emptyList(),
+        segmentPlacesToInsert: List<com.bitacoraviaje.core.model.SegmentPlace> = emptyList(),
     ) = db.withTransaction {
         if (replace) trips.delete(trip.id)
         trips.insert(trip.toEntity())
@@ -243,6 +246,10 @@ class TrackingRepository @Inject constructor(
         if (mediaToInsert.isNotEmpty()) db.mediaDao().upsertAll(mediaToInsert.map { it.toEntity() })
         for (v in voiceNotesToInsert) db.voiceNoteDao().insert(v.toEntity())
         for (n in textNotesToInsert) db.textNoteDao().insert(n.toEntity())
+        // Places are shared across trips (same id = same place): upsert, never replace (Phase 4).
+        if (placesToInsert.isNotEmpty()) db.placeDao().upsertAll(placesToInsert.map { it.toEntity() })
+        if (enrichmentsToInsert.isNotEmpty()) db.enrichmentDao().upsertAll(enrichmentsToInsert.map { it.toEntity() })
+        if (segmentPlacesToInsert.isNotEmpty()) db.segmentPlaceDao().upsertAll(segmentPlacesToInsert.map { it.toEntity() })
     }
 
     suspend fun lastValidPoint(segmentId: String): TrackPoint? = points.getLastValid(segmentId)?.toDomain()
@@ -264,6 +271,8 @@ class TrackingRepository @Inject constructor(
     }
 
     suspend fun stopsOf(segmentId: String): List<Stop> = stops.getBySegment(segmentId).map { it.toDomain() }
+
+    suspend fun setStopPlace(stopId: String, placeId: String?) = stops.setPlace(stopId, placeId)
 
     suspend fun pausesOf(segmentId: String): List<SegmentPause> = segments.getPauses(segmentId).map { it.toDomain() }
 

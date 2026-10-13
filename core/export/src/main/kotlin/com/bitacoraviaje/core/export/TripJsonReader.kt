@@ -2,7 +2,11 @@ package com.bitacoraviaje.core.export
 
 import com.bitacoraviaje.core.model.BoundingBox
 import com.bitacoraviaje.core.model.LinkMethod
+import com.bitacoraviaje.core.model.Enrichment
 import com.bitacoraviaje.core.model.MediaItem
+import com.bitacoraviaje.core.model.Place
+import com.bitacoraviaje.core.model.PlaceSource
+import com.bitacoraviaje.core.model.SegmentPlace
 import com.bitacoraviaje.core.model.MediaKind
 import com.bitacoraviaje.core.model.MediaSource
 import com.bitacoraviaje.core.model.PauseKind
@@ -95,9 +99,29 @@ object TripJsonReader {
             val text = s.text_notes.map { n -> TextNote(id(n.id), sid, n.time_utc_ms, n.lat, n.lon, enumOr(n.kind, TextNoteKind.NOTE), n.text) }
             SegmentExport(segment, points, pauses, stops, media, voice, text)
         }
+        // Places keep their ids on a copy too: `wd-Q…` is the same place in every trip (validated like every id).
+        val segIds = segments.map { it.segment.id }.toSet()
+        val places = doc.places.map { p ->
+            Place(
+                id = SafeId.require(p.id), name = p.name, lat = p.lat, lon = p.lon, kind = p.kind, countryCode = p.country_code, admin1 = p.admin1, admin2 = p.admin2, locality = p.locality,
+                osmType = p.osm_type, osmId = p.osm_id, wikidataId = p.wikidata_id, wikipediaTitle = p.wikipedia_title, wikipediaLang = p.wikipedia_lang,
+                source = p.source?.let { enumOrNull<PlaceSource>(it) } ?: PlaceSource.MANUAL, fetchedUtcMs = null,
+            )
+        }
+        val placeIds = places.map { it.id }.toSet()
+        val segmentPlaces = doc.places.flatMap { p -> p.visits.map { v -> SegmentPlace(id(v.segment_id), SafeId.require(p.id), v.first_seen_utc_ms, v.dwell_ms, v.relevance) } }
+            .filter { it.segmentId in segIds }
+        val enrichments = doc.enrichments.filter { it.place_id in placeIds }.map { e ->
+            val pid = SafeId.require(e.place_id)
+            Enrichment(
+                id = SafeId.require(e.id ?: "$pid-${e.source.lowercase()}"), placeId = pid, lang = e.lang ?: "es", title = e.title, summary = e.text, sourceName = e.source,
+                sourceUrl = e.url ?: "", license = e.license.ifBlank { null }, thumbnailUrl = e.thumbnail_url, llmRewritten = e.llm_rewritten, userApproved = e.user_approved, fetchedUtcMs = 0L,
+            )
+        }
         return TripExport(
             trip = trip, segments = segments, appVersion = doc.app_version, exportedUtcMs = runCatching { java.time.Instant.parse(doc.exported_utc).toEpochMilli() }.getOrDefault(0L),
-            mediaFiles = mediaFiles, audioFiles = audioFiles, attributions = doc.attributions.map { Attribution(it.name, it.license, it.url) },
+            mediaFiles = mediaFiles, audioFiles = audioFiles, places = places, enrichments = enrichments, segmentPlaces = segmentPlaces,
+            attributions = doc.attributions.map { Attribution(it.name, it.license, it.url) },
         )
     }
 

@@ -123,6 +123,7 @@ class TrackingController @Inject constructor(
             // Link photos first, then the backup (review I9): the trip.json must hold the last linked photos.
             com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, it.tripId, it.id)
             com.bitacoraviaje.app.enrichment.EnrichRouteWorker.enqueue(context, it.id) // PLAN 3.6: name from the map when online
+            com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.enqueue(context, it.id) // PLAN 4.1: places and texts when online
         }
         val parentId = done?.parentSegmentId ?: return null
         val parent = repository.getSegment(parentId)?.takeIf { it.status == SegmentStatus.PAUSED } ?: return null

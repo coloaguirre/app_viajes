@@ -22,6 +22,7 @@ class ExportLoader @Inject constructor(
     private val tracking: TrackingRepository,
     private val media: MediaRepository,
     private val notes: NotesRepository,
+    private val places: com.bitacoraviaje.data.repository.PlacesRepository,
 ) {
     suspend fun load(tripId: String, options: ExportOptions, nowUtcMs: Long = System.currentTimeMillis()): TripExport? {
         val trip = tracking.getTrip(tripId) ?: return null
@@ -69,6 +70,9 @@ class ExportLoader @Inject constructor(
             exportedUtcMs = nowUtcMs,
             mediaFiles = mediaFiles,
             audioFiles = audioFiles,
+            places = places.placesOfTrip(tripId),
+            enrichments = places.enrichmentsOfTrip(tripId),
+            segmentPlaces = places.segmentPlacesOfTrip(tripId),
             includeFilteredPoints = options.includeFilteredPoints,
         )
     }

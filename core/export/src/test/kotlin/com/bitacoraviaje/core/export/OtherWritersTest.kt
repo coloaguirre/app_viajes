@@ -90,8 +90,10 @@ class OtherWritersTest {
         assertEquals(1 + 2 + 3, notes.size)
         assertEquals("voz", notes[1][2])
         val places = parseCsv(Fixture.render(PlacesCsvWriter()))
-        assertEquals(2, places.size)
+        assertEquals(1 + 1 + 2 + 1, places.size, "header, one stop, the Wikipedia place with two texts, the Overpass place without text")
         assertEquals("5", places[1][10])
+        assertEquals(listOf("lugar", "Wikipedia", "CC BY-SA 4.0"), listOf(places[2][2], places[2][14], places[2][16]))
+        assertEquals("OVERPASS", places[4][14])
     }
 
     @Test
@@ -108,6 +110,8 @@ class OtherWritersTest {
         assertTrue(md.contains("## 2025-10-09") && md.contains("## 2025-10-10"))
         assertTrue(md.contains("### Caminata inicial · a pie · 3.5 km · 50 min"))
         assertTrue(md.contains("![IMG_0001.jpg](media/fotos/2025-10-09/IMG_0001.jpg)"))
+        assertTrue(md.contains("#### Lugares") && md.contains("- **Mirador ${Fixture.TRICKY}**") && md.contains("_Wikipedia (CC BY-SA 4.0)_ <https://es.wikipedia.org/wiki/Mirador>"), "places with source and license")
+        assertTrue(md.contains("- Texto: Wikipedia — Mirador — CC BY-SA 4.0 — https://es.wikipedia.org/wiki/Mirador") && md.contains("- Datos: Wikidata — CC0"), "attributions")
         assertTrue(md.contains("Cambio de medio: en bici"))
     }
 

@@ -153,3 +153,28 @@ fun Stop.toEntity() = StopEntity(
     id = id, segmentId = segmentId, startUtcMs = startUtcMs, endUtcMs = endUtcMs,
     lat = lat, lon = lon, radiusM = radiusM, placeId = placeId, userLabel = userLabel,
 )
+
+fun com.bitacoraviaje.data.db.entity.PlaceEntity.toDomain() = com.bitacoraviaje.core.model.Place(
+    id = id, name = name, lat = lat, lon = lon, kind = kind, countryCode = countryCode, admin1 = admin1, admin2 = admin2, locality = locality,
+    osmType = osmType, osmId = osmId, wikidataId = wikidataId, wikipediaTitle = wikipediaTitle, wikipediaLang = wikipediaLang,
+    source = com.bitacoraviaje.core.model.PlaceSource.valueOf(source), fetchedUtcMs = fetchedUtcMs,
+)
+
+fun com.bitacoraviaje.core.model.Place.toEntity() = com.bitacoraviaje.data.db.entity.PlaceEntity(
+    id = id, name = name, lat = lat, lon = lon, kind = kind, countryCode = countryCode, admin1 = admin1, admin2 = admin2, locality = locality,
+    osmType = osmType, osmId = osmId, wikidataId = wikidataId, wikipediaTitle = wikipediaTitle, wikipediaLang = wikipediaLang, source = source.name, fetchedUtcMs = fetchedUtcMs,
+)
+
+fun com.bitacoraviaje.data.db.entity.EnrichmentEntity.toDomain() = com.bitacoraviaje.core.model.Enrichment(
+    id = id, placeId = placeId, lang = lang, title = title, summary = summary, sourceName = sourceName, sourceUrl = sourceUrl, license = license,
+    thumbnailUrl = thumbnailUrl, llmRewritten = llmRewritten, userApproved = userApproved, fetchedUtcMs = fetchedUtcMs,
+)
+
+fun com.bitacoraviaje.core.model.Enrichment.toEntity() = com.bitacoraviaje.data.db.entity.EnrichmentEntity(
+    id = id, placeId = placeId, lang = lang, title = title, summary = summary, sourceName = sourceName, sourceUrl = sourceUrl, license = license,
+    thumbnailUrl = thumbnailUrl, llmRewritten = llmRewritten, userApproved = userApproved, fetchedUtcMs = fetchedUtcMs,
+)
+
+fun com.bitacoraviaje.data.db.entity.SegmentPlaceEntity.toDomain() = com.bitacoraviaje.core.model.SegmentPlace(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance)
+
+fun com.bitacoraviaje.core.model.SegmentPlace.toEntity() = com.bitacoraviaje.data.db.entity.SegmentPlaceEntity(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance)

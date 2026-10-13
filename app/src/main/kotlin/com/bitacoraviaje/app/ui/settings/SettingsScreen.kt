@@ -142,6 +142,16 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             Text(stringResource(R.string.settings_osm_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
             UrlField(stringResource(R.string.settings_nominatim), settings.nominatimUrl, viewModel::setNominatimUrl, "settings_nominatim")
             UrlField(stringResource(R.string.settings_overpass), settings.overpassUrl, viewModel::setOverpassUrl, "settings_overpass")
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_enrich_places)) },
+                supportingContent = { Text(stringResource(R.string.settings_enrich_places_desc)) },
+                trailingContent = { androidx.compose.material3.Switch(checked = settings.enrichPlaces, onCheckedChange = viewModel::setEnrichPlaces, modifier = Modifier.testTag("settings_enrich_places")) },
+            )
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_round_coords)) },
+                supportingContent = { Text(stringResource(R.string.settings_round_coords_desc)) },
+                trailingContent = { androidx.compose.material3.Switch(checked = settings.roundEnrichmentCoords, onCheckedChange = viewModel::setRoundEnrichmentCoords, enabled = settings.enrichPlaces, modifier = Modifier.testTag("settings_round_coords")) },
+            )
             HorizontalDivider()
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_about)) },

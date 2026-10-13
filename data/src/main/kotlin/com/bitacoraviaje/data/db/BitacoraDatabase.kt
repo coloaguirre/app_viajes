@@ -5,6 +5,9 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bitacoraviaje.data.db.dao.CameraClockOffsetDao
+import com.bitacoraviaje.data.db.dao.EnrichmentDao
+import com.bitacoraviaje.data.db.dao.PlaceDao
+import com.bitacoraviaje.data.db.dao.SegmentPlaceDao
 import com.bitacoraviaje.data.db.dao.MediaDao
 import com.bitacoraviaje.data.db.dao.SegmentDao
 import com.bitacoraviaje.data.db.dao.StopDao
@@ -13,6 +16,9 @@ import com.bitacoraviaje.data.db.dao.VoiceNoteDao
 import com.bitacoraviaje.data.db.dao.TrackPointDao
 import com.bitacoraviaje.data.db.dao.TripDao
 import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
+import com.bitacoraviaje.data.db.entity.EnrichmentEntity
+import com.bitacoraviaje.data.db.entity.PlaceEntity
+import com.bitacoraviaje.data.db.entity.SegmentPlaceEntity
 import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
@@ -31,9 +37,10 @@ import com.bitacoraviaje.data.db.entity.TripEntity
  *  4 — items 2.4/2.5: voice_note and text_note.
  *  5 — item 2.7: camera_clock_offset (per-camera clock fix that survives rescans).
  *  6 — item 3.6: segment.auto_name; camera_clock_offset gets its FK to trip; voice_note.media_item_id indexed.
+ *  7 — item 4.1: place, enrichment and segment_place (internet enrichment cache, DISENO §11).
  */
 @Database(
-    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class],
+    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class, PlaceEntity::class, EnrichmentEntity::class, SegmentPlaceEntity::class],
     version = BitacoraDatabase.VERSION,
     exportSchema = true,
 )
@@ -46,9 +53,12 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun voiceNoteDao(): VoiceNoteDao
     abstract fun textNoteDao(): TextNoteDao
     abstract fun cameraClockOffsetDao(): CameraClockOffsetDao
+    abstract fun placeDao(): PlaceDao
+    abstract fun enrichmentDao(): EnrichmentDao
+    abstract fun segmentPlaceDao(): SegmentPlaceDao
 
     companion object {
-        const val VERSION = 6
+        const val VERSION = 7
         const val NAME = "bitacora.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -166,6 +176,36 @@ abstract class BitacoraDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS place (
+                        id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, kind TEXT,
+                        country_code TEXT, admin1 TEXT, admin2 TEXT, locality TEXT, osm_type TEXT, osm_id INTEGER,
+                        wikidata_id TEXT, wikipedia_title TEXT, wikipedia_lang TEXT, source TEXT NOT NULL, fetched_utc_ms INTEGER
+                    )""",
+                )
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS enrichment (
+                        id TEXT NOT NULL PRIMARY KEY, place_id TEXT NOT NULL, lang TEXT NOT NULL, title TEXT, summary TEXT NOT NULL,
+                        source_name TEXT NOT NULL, source_url TEXT NOT NULL, license TEXT, thumbnail_url TEXT,
+                        llm_rewritten INTEGER NOT NULL DEFAULT 0, user_approved INTEGER NOT NULL DEFAULT 0, fetched_utc_ms INTEGER NOT NULL,
+                        FOREIGN KEY(place_id) REFERENCES place(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )""",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_enrichment_place ON enrichment (place_id)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS segment_place (
+                        segment_id TEXT NOT NULL, place_id TEXT NOT NULL, first_seen_utc_ms INTEGER NOT NULL, dwell_ms INTEGER, relevance REAL,
+                        PRIMARY KEY(segment_id, place_id),
+                        FOREIGN KEY(segment_id) REFERENCES segment(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(place_id) REFERENCES place(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )""",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_segment_place_place ON segment_place (place_id)")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
     }
 }

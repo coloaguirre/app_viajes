@@ -334,11 +334,12 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: captura de My Maps y del HTML en `docs/notes/evidencia/fase-3/`.
 
 ### Fase 4 — Enriquecimiento, video de escritorio y minivideo  (est: 13 días)
-- [ ] 4.1 Clientes Nominatim, Wikipedia (detrás de abstracción por la
+- [x] 4.1 Clientes Nominatim, Wikipedia (detrás de abstracción por la
       transición de su API), Wikidata y Overpass; caché; ranking;
       `EnrichWorker`; redondeo opcional de coordenadas.  (est: 2.5)
       Aceptación: tests con respuestas grabadas; etapa de ejemplo
       produce ≤ 5 lugares rankeados con atribución.
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.1-lugares.md`.
 - [ ] 4.2 Pantalla de lugares con aprobación/descarte y atribuciones.  (est: 1)
       Aceptación: prueba de Compose; capturas.
 - [ ] 4.3 Reescritura opcional con modelo de lenguaje (clave del usuario

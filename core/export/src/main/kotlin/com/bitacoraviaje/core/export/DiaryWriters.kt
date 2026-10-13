@@ -75,6 +75,16 @@ class MarkdownWriter(override val path: String = "bitacora.md") : TripWriter {
                     w.write("\n")
                 }
                 w.write("\n")
+                val places = trip.placesOf(se.segment.id)
+                if (places.isNotEmpty()) {
+                    w.write("#### Lugares\n\n")
+                    for ((p, _) in places) {
+                        w.write("- **${p.name}**")
+                        trip.enrichmentsOf(p.id).forEach { e -> w.write("\n  ${e.summary} — _${e.sourceName}${e.license?.let { l -> " ($l)" } ?: ""}_${if (e.sourceUrl.isNotBlank()) " <${e.sourceUrl}>" else ""}") }
+                        w.write("\n")
+                    }
+                    w.write("\n")
+                }
             }
         }
         w.write("---\n\n")
@@ -109,6 +119,7 @@ body{margin:0;font-family:system-ui,sans-serif;display:grid;grid-template-column
 h1{font-size:1.3rem;margin:0 0 8px}h2{font-size:1.05rem;margin:18px 0 6px;color:#1f3864}h3{font-size:.95rem;margin:12px 0 4px}
 .ev{padding:4px 0;border-bottom:1px solid #eee;cursor:pointer}.ev time{color:#666;font-variant-numeric:tabular-nums;margin-right:6px}
 .ev img{display:block;max-width:100%;margin-top:4px;border-radius:4px}
+.ev.place{background:#f4f7fb;border-left:3px solid #1f3864;padding-left:8px}.ev.place p{margin:4px 0;font-size:.9rem}.ev.place small a{color:#555}
 footer{font-size:.75rem;color:#666;margin-top:24px}
 @media (max-width:800px){body{grid-template-columns:1fr;grid-template-rows:50vh 1fr}#map{height:50vh}}
 </style>
@@ -134,12 +145,14 @@ footer{font-size:.75rem;color:#666;margin-top:24px}
     s.voice_notes.forEach(v=>events.push({t:v.started,lat:v.lat,lon:v.lon,label:v.transcript||'Nota de voz',kind:'voice',file:v.file}));
     s.text_notes.forEach(n=>events.push({t:n.time,lat:n.lat,lon:n.lon,label:n.text||(n.kind==='HIGHLIGHT'?'Momento destacado':n.kind==='TRANSPORT_CHANGE'?'Cambio de medio: '+(n.text||''):'Lugar marcado'),kind:'note'}));
     s.stops.forEach(st=>events.push({t:st.start,lat:st.lat,lon:st.lon,label:(st.user_label||'Parada')+' · '+Math.round((st.end_utc_ms-st.start_utc_ms)/60000)+' min',kind:'stop'}));
+    (trip.places||[]).filter(p=>(p.visits||[]).some(v=>v.segment_id===s.id)).forEach(p=>events.push({t:p.visits.find(v=>v.segment_id===s.id).first_seen,lat:p.lat,lon:p.lon,label:p.name,kind:'place',texts:(trip.enrichments||[]).filter(e=>e.place_id===p.id)}));
     events.sort((a,b)=>a.t<b.t?-1:1);
     events.forEach(e=>{
       const d=document.createElement('div');d.className='ev';
       d.innerHTML='<time>'+fmt(e.t)+'</time>'+e.label.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
       if(e.kind==='photo'&&e.file&&!/\.(mp4|mov|3gp|webm)$/i.test(e.file)){const img=document.createElement('img');img.loading='lazy';img.src=e.file;d.appendChild(img);}
       if(e.kind==='voice'&&e.file){const a=document.createElement('audio');a.controls=true;a.src=e.file;a.style.width='100%';d.appendChild(a);}
+      if(e.kind==='place'){d.classList.add('place');(e.texts||[]).forEach(t=>{const q=document.createElement('p');q.textContent=t.text;const src=document.createElement('small');const a=document.createElement('a');a.href=t.url||'#';a.target='_blank';a.rel='noopener';a.textContent=t.source+(t.license?' ('+t.license+')':'');src.appendChild(a);q.appendChild(document.createElement('br'));q.appendChild(src);d.appendChild(q);});}
       side.appendChild(d);
       if(e.lat!=null&&e.lon!=null){const mk=L.circleMarker([e.lat,e.lon],{radius:6,color:e.kind==='photo'?'#1f8f64':e.kind==='voice'?'#8f1fa4':'#ff7f00',fillOpacity:.9}).addTo(map).bindPopup(e.label);d.onclick=()=>{map.setView([e.lat,e.lon],16);mk.openPopup();};bounds.push([e.lat,e.lon]);}
     });

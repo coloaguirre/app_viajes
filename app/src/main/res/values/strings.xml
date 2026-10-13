@@ -151,8 +151,12 @@
     <string name="settings_backups_desc">Un respaldo por viaje (trip.json comprimido). Se incluyen en la copia de seguridad de Android; al restaurar un teléfono aparecen acá y se recuperan con "Restaurar". El resultado se muestra en Mis viajes.</string>
     <string name="settings_backup_size">%1$d KB</string>
     <string name="settings_backup_restore">Restaurar</string>
-    <string name="settings_osm">Servicios de mapa (OpenStreetMap)</string>
-    <string name="settings_osm_desc">Para nombrar rutas la app envía a Nominatim 8 puntos del recorrido, y para senderos envía a Overpass el recorrido simplificado (precisión de 10 m), sin los primeros y últimos 200 m. Si las instancias públicas están saturadas, podés indicar otras.</string>
+    <string name="settings_osm">Servicios de internet (OpenStreetMap y Wikipedia)</string>
+    <string name="settings_osm_desc">Para nombrar rutas la app envía a Nominatim 8 puntos del recorrido, y para senderos envía a Overpass el recorrido simplificado (precisión de 10 m), sin los primeros y últimos 200 m. Para buscar lugares envía además las paradas y 10 muestras del recorrido a Nominatim, Wikipedia y Overpass. Si las instancias públicas están saturadas, podés indicar otras.</string>
+    <string name="settings_enrich_places">Buscar lugares en internet</string>
+    <string name="settings_enrich_places_desc">Al terminar una etapa, busca información de las paradas y localidades en Wikipedia (CC BY-SA), Wikidata (CC0) y OpenStreetMap (ODbL). Siempre se cita la fuente.</string>
+    <string name="settings_round_coords">Redondear coordenadas a ~1 km</string>
+    <string name="settings_round_coords_desc">Las coordenadas enviadas para buscar lugares salen con menos precisión. Se pierden los puntos de interés cercanos.</string>
     <string name="settings_nominatim">Instancia de Nominatim</string>
     <string name="settings_overpass">Instancia de Overpass</string>
     <string name="settings_apply">Aplicar</string>

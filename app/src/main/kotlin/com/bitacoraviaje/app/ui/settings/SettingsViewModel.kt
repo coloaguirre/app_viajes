@@ -75,6 +75,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setOverpassUrl(url: String) = viewModelScope.launch { prefs.setOverpassUrl(url) }
 
+    fun setEnrichPlaces(value: Boolean) = viewModelScope.launch { prefs.setEnrichPlaces(value) }
+
+    fun setRoundEnrichmentCoords(value: Boolean) = viewModelScope.launch { prefs.setRoundEnrichmentCoords(value) }
+
     fun setUnits(units: Units) = viewModelScope.launch { prefs.setUnits(units) }
 
     fun setRecordingMode(mode: RecordingMode) = viewModelScope.launch { prefs.setRecordingMode(mode) }

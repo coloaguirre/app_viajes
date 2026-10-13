@@ -108,8 +108,30 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 6 to 7 adds place, enrichment and segment_place with cascading keys`() {
+        helper.createDatabase(DB_NAME, 6).use { v6 ->
+            v6.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v6.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'FINISHED')")
+        }
+        val v7 = helper.runMigrationsAndValidate(DB_NAME, 7, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v7.execSQL("INSERT INTO place (id,name,lat,lon,kind,source) VALUES ('wd-Q1','Pueblo',-49.3,-72.9,'town','NOMINATIM')")
+        v7.execSQL("INSERT INTO enrichment (id,place_id,lang,summary,source_name,source_url,fetched_utc_ms) VALUES ('e1','wd-Q1','es','Texto','Wikipedia','https://es.wikipedia.org/wiki/X',5)")
+        v7.execSQL("INSERT INTO segment_place (segment_id,place_id,first_seen_utc_ms,relevance) VALUES ('s','wd-Q1',2,1.5)")
+        v7.query("SELECT llm_rewritten, user_approved FROM enrichment WHERE id='e1'").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)); assertEquals(0, c.getInt(1)) }
+        v7.query("PRAGMA foreign_key_list(segment_place)").use { c ->
+            val parents = generateSequence { if (c.moveToNext()) c.getString(c.getColumnIndexOrThrow("table")) else null }.toSet()
+            assertEquals(setOf("segment", "place"), parents)
+        }
+        v7.query("PRAGMA index_list(enrichment)").use { c ->
+            val names = generateSequence { if (c.moveToNext()) c.getString(c.getColumnIndexOrThrow("name")) else null }.toList()
+            assertTrue("idx_enrichment_place" in names, "enrichment.place_id indexed: $names")
+        }
+        v7.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(6, BitacoraDatabase.VERSION)
+        assertEquals(7, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

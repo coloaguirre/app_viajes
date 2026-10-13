@@ -80,10 +80,15 @@ class NotesCsvWriter(override val path: String = "tablas/notas.csv") : TripWrite
 class PlacesCsvWriter(override val path: String = "tablas/lugares.csv") : TripWriter {
     override fun write(trip: TripExport, out: OutputStream) {
         val (c, w) = out.csv()
-        c.row("id", "segment_id", "tipo", "nombre", "lat", "lon", "start_utc", "start_local", "end_utc", "end_local", "minutos", "radius_m")
+        c.row("id", "segment_id", "tipo", "nombre", "lat", "lon", "start_utc", "start_local", "end_utc", "end_local", "minutos", "radius_m", "kind", "wikidata_id", "fuente", "resumen", "licencia", "url")
         trip.segments.forEach { se ->
             val z = se.segment.tzId
-            se.stops.forEach { st -> c.row(st.id, se.segment.id, "parada", st.userLabel, st.lat, st.lon, Iso.utc(st.startUtcMs), Iso.local(st.startUtcMs, z), Iso.utc(st.endUtcMs), Iso.local(st.endUtcMs, z), (st.endUtcMs - st.startUtcMs) / 60_000, st.radiusM) }
+            se.stops.forEach { st -> c.row(st.id, se.segment.id, "parada", st.userLabel ?: trip.places.firstOrNull { it.id == st.placeId }?.name, st.lat, st.lon, Iso.utc(st.startUtcMs), Iso.local(st.startUtcMs, z), Iso.utc(st.endUtcMs), Iso.local(st.endUtcMs, z), (st.endUtcMs - st.startUtcMs) / 60_000, st.radiusM, null, null, null, null, null, null) }
+            // DISENO §11: one row per place and text, with its license.
+            trip.placesOf(se.segment.id).forEach { (p, sp) ->
+                val texts = trip.enrichmentsOf(p.id).ifEmpty { listOf(null) }
+                texts.forEach { e -> c.row(p.id, se.segment.id, "lugar", p.name, p.lat, p.lon, Iso.utc(sp.firstSeenUtcMs), Iso.local(sp.firstSeenUtcMs, z), null, null, sp.dwellMs?.let { it / 60_000 }, null, p.kind, p.wikidataId, e?.sourceName ?: p.source.name, e?.summary, e?.license, e?.sourceUrl) }
+            }
         }
         w.flush()
     }

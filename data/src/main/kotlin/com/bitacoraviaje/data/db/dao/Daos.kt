@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.Upsert
 import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
 import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.TextNoteEntity
@@ -240,6 +241,10 @@ interface StopDao {
     @Query("SELECT * FROM stop WHERE segment_id = :segmentId ORDER BY start_utc_ms")
     fun observeBySegment(segmentId: String): Flow<List<StopEntity>>
 
+    /** Phase 4: the place Nominatim named for this stop. */
+    @Query("UPDATE stop SET place_id = :placeId WHERE id = :stopId")
+    suspend fun setPlace(stopId: String, placeId: String?)
+
     /** Stops are recomputed when a segment closes; replace the previous detection atomically. */
     @Query("DELETE FROM stop WHERE segment_id = :segmentId")
     suspend fun deleteBySegment(segmentId: String)
@@ -258,4 +263,82 @@ interface CameraClockOffsetDao {
 
     @Query("SELECT * FROM camera_clock_offset WHERE trip_id = :tripId")
     suspend fun getByTrip(tripId: String): List<CameraClockOffsetEntity>
+}
+
+// ---- Phase 4: places ----
+
+@Dao
+interface PlaceDao {
+    /**
+     * Places are keyed by source id; a re-run refreshes the row (newer fetch wins).
+     * `@Upsert` (INSERT ... ON CONFLICT DO UPDATE), never REPLACE: REPLACE deletes the old
+     * row first and the cascade would wipe the place's enrichments and links.
+     */
+    @Upsert
+    suspend fun upsertAll(places: List<com.bitacoraviaje.data.db.entity.PlaceEntity>)
+
+    @Query("SELECT * FROM place WHERE id = :id")
+    suspend fun getById(id: String): com.bitacoraviaje.data.db.entity.PlaceEntity?
+
+    @Query("SELECT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id WHERE sp.segment_id = :segmentId ORDER BY sp.relevance DESC, sp.first_seen_utc_ms")
+    suspend fun getBySegment(segmentId: String): List<com.bitacoraviaje.data.db.entity.PlaceEntity>
+
+    @Query("SELECT DISTINCT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId")
+    suspend fun getByTrip(tripId: String): List<com.bitacoraviaje.data.db.entity.PlaceEntity>
+
+    @Query("SELECT DISTINCT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId")
+    fun observeByTrip(tripId: String): Flow<List<com.bitacoraviaje.data.db.entity.PlaceEntity>>
+
+    /** Places no segment references any more (after a trip is deleted) are garbage. */
+    @Query("DELETE FROM place WHERE id NOT IN (SELECT place_id FROM segment_place) AND id NOT IN (SELECT place_id FROM stop WHERE place_id IS NOT NULL)")
+    suspend fun deleteOrphans(): Int
+}
+
+@Dao
+interface EnrichmentDao {
+    @Upsert
+    suspend fun upsertAll(rows: List<com.bitacoraviaje.data.db.entity.EnrichmentEntity>)
+
+    @Query("SELECT * FROM enrichment WHERE place_id = :placeId ORDER BY source_name")
+    suspend fun getByPlace(placeId: String): List<com.bitacoraviaje.data.db.entity.EnrichmentEntity>
+
+    @Query("SELECT e.* FROM enrichment e WHERE e.place_id IN (SELECT sp.place_id FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId)")
+    suspend fun getByTrip(tripId: String): List<com.bitacoraviaje.data.db.entity.EnrichmentEntity>
+
+    @Query("SELECT e.* FROM enrichment e WHERE e.place_id IN (SELECT sp.place_id FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId)")
+    fun observeByTrip(tripId: String): Flow<List<com.bitacoraviaje.data.db.entity.EnrichmentEntity>>
+
+    @Query("UPDATE enrichment SET user_approved = :approved WHERE id = :id")
+    suspend fun setApproved(id: String, approved: Boolean)
+
+    /** User edit keeps the source: only the text changes (DISENO §11.4). */
+    @Query("UPDATE enrichment SET summary = :summary WHERE id = :id")
+    suspend fun setSummary(id: String, summary: String)
+
+    @Query("DELETE FROM enrichment WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
+interface SegmentPlaceDao {
+    @Upsert
+    suspend fun upsertAll(rows: List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>)
+
+    @Query("SELECT * FROM segment_place WHERE segment_id = :segmentId ORDER BY relevance DESC")
+    suspend fun getBySegment(segmentId: String): List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>
+
+    @Query("SELECT sp.* FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId ORDER BY sp.relevance DESC")
+    suspend fun getByTrip(tripId: String): List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>
+
+    @Query("SELECT sp.* FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId ORDER BY sp.relevance DESC")
+    fun observeByTrip(tripId: String): Flow<List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>>
+
+    @Query("SELECT COUNT(*) FROM segment_place WHERE segment_id = :segmentId")
+    suspend fun countBySegment(segmentId: String): Int
+
+    @Query("DELETE FROM segment_place WHERE segment_id = :segmentId")
+    suspend fun deleteBySegment(segmentId: String)
+
+    @Query("DELETE FROM segment_place WHERE segment_id = :segmentId AND place_id = :placeId")
+    suspend fun delete(segmentId: String, placeId: String)
 }
