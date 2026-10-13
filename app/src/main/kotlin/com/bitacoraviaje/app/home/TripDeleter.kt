@@ -51,6 +51,9 @@ class TripDeleter @Inject constructor(
             null
         }
         if (written == null || !written.isFile || written.length() == 0L) return Outcome.BACKUP_FAILED
+        // The transaction re-checks the open segment: a recording that started while the backup was being
+        // written refuses the delete, and nothing of the live trip has been moved yet (review N2).
+        if (!repository.deleteTrip(tripId)) return Outcome.IN_USE
         val audio = audioDir(context, tripId)
         if (audio.isDirectory) {
             val kept = audioTrashDir(context, tripId)
@@ -62,7 +65,6 @@ class TripDeleter @Inject constructor(
                 audio.deleteRecursively()
             }
         }
-        if (!repository.deleteTrip(tripId)) return Outcome.IN_USE
         runCatching { videoPlans.clear(tripId) }
         runCatching { ExportWorker.stagingDir(context, tripId).deleteRecursively() }
         Log.i(TAG, "trip deleted id=$tripId backup=${written.name}")
@@ -73,6 +75,27 @@ class TripDeleter @Inject constructor(
         const val TAG = "Bitacora"
         fun audioDir(context: Context, tripId: String) = File(context.filesDir, "audio/${com.bitacoraviaje.core.export.SafeId.require(tripId, "trip id")}")
         fun audioTrashDir(context: Context, tripId: String) = File(BackupFiles.dir(context), "audio/${com.bitacoraviaje.core.export.SafeId.require(tripId, "trip id")}")
+
+        /**
+         * Importing a deleted trip's backup brings its recordings back from the kept folder: every
+         * [audioPaths] entry (relative to filesDir) that is missing is copied from `backup/audio/<id>/<name>`.
+         * Returns how many were restored.
+         */
+        fun restoreKeptAudio(context: Context, tripId: String, audioPaths: Collection<String>): Int {
+            val kept = runCatching { audioTrashDir(context, tripId) }.getOrNull() ?: return 0
+            if (!kept.isDirectory) return 0
+            var n = 0
+            for (rel in audioPaths) {
+                val target = File(context.filesDir, rel)
+                if (target.isFile) continue
+                val src = File(kept, target.name)
+                if (!src.isFile) continue
+                target.parentFile?.mkdirs()
+                src.copyTo(target, overwrite = true)
+                n++
+            }
+            return n
+        }
     }
 }
 

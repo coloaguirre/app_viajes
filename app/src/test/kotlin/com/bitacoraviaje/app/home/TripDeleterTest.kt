@@ -56,14 +56,15 @@ class TripDeleterTest {
     @AfterTest
     fun tearDown() = db.close()
 
-    private suspend fun tripWithVoiceNote(finish: Boolean): String {
+    /** [finish] closes the segment; [closeTrip] also closes the trip (false leaves an ACTIVE trip with no open segment, like between two days). */
+    private suspend fun tripWithVoiceNote(finish: Boolean, closeTrip: Boolean = true): String {
         val s = tracking.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Borrar")
         tracking.insertPoints((0 until 5).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = t0 + i * 1000L, lat = -34.6 + i * 1e-4, lon = -58.4) })
         val audio = File(TripDeleter.audioDir(context, s.tripId), "v1.m4a").also { it.parentFile?.mkdirs(); it.writeBytes(ByteArray(16) { 7 }) }
         notes.addVoiceNote(VoiceNote("v1", s.id, t0 + 2_000, 3_000, -34.6, -58.4, 5f, "audio/${s.tripId}/v1.m4a"))
         assertTrue(audio.isFile)
         now = t0 + 10_000
-        if (finish) tracking.finishTrip(s.tripId)
+        if (finish && closeTrip) tracking.finishTrip(s.tripId) else if (finish) tracking.finishSegment(s.id)
         return s.tripId
     }
 
@@ -100,5 +101,32 @@ class TripDeleterTest {
         assertTrue(kept.isFile, "the recording is kept, not deleted")
         assertEquals(16, kept.length().toInt())
         assertEquals(TripDeleter.Outcome.NOT_FOUND, deleter.delete(id), "a second run is harmless")
+    }
+
+    @Test
+    fun `a recording that starts while the backup is written refuses the delete and leaves the audio in place`() = runTest {
+        val id = tripWithVoiceNote(finish = true, closeTrip = false)
+        val outcome = deleter.delete(id) { tripId ->
+            // The segment opens between the backup and the transaction (review N2); getActive() finds the same trip.
+            tracking.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC")
+            BackupFiles.write(context, ExportLoader(tracking, MediaRepository(db), notes, PlacesRepository(db)), tripId)
+        }
+        assertEquals(TripDeleter.Outcome.IN_USE, outcome)
+        assertEquals(id, tracking.getOpenSegment()?.tripId)
+        assertNotNull(tracking.getTrip(id))
+        assertTrue(File(TripDeleter.audioDir(context, id), "v1.m4a").isFile, "the live trip keeps its recordings")
+        assertFalse(TripDeleter.audioTrashDir(context, id).exists())
+    }
+
+    @Test
+    fun `importing a deleted trip's backup restores the kept recordings`() = runTest {
+        val id = tripWithVoiceNote(finish = true)
+        assertEquals(TripDeleter.Outcome.DELETED, deleter.delete(id))
+        val rel = "audio/$id/v1.m4a"
+        assertFalse(File(context.filesDir, rel).exists())
+        assertEquals(1, TripDeleter.restoreKeptAudio(context, id, listOf(rel, "audio/$id/missing.m4a")))
+        assertEquals(16, File(context.filesDir, rel).length().toInt())
+        assertEquals(0, TripDeleter.restoreKeptAudio(context, id, listOf(rel)), "already there: nothing to do")
+        assertEquals(0, TripDeleter.restoreKeptAudio(context, "other-trip", listOf(rel)))
     }
 }

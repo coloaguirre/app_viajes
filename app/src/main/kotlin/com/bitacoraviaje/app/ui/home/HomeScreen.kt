@@ -62,8 +62,13 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
                 HomeEvent.PermissionDenied -> launch { snackbar.showSnackbar(denied) }
                 // Each snackbar in its own coroutine: a 10 s "Deshacer" must not hold back the next event (review M5).
                 is HomeEvent.TripDeleted -> launch {
-                    val r = snackbar.showSnackbar(resources.getString(R.string.trip_deleted, e.title), actionLabel = resources.getString(R.string.trip_delete_undo), duration = androidx.compose.material3.SnackbarDuration.Long)
-                    if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.undoDelete(e.tripId) else viewModel.commitDelete(e.tripId)
+                    // Navigating away cancels showSnackbar: the user confirmed the deletion, so it is committed in `finally` (review N1).
+                    var r: androidx.compose.material3.SnackbarResult? = null
+                    try {
+                        r = snackbar.showSnackbar(resources.getString(R.string.trip_deleted, e.title), actionLabel = resources.getString(R.string.trip_delete_undo), duration = androidx.compose.material3.SnackbarDuration.Long)
+                    } finally {
+                        if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.undoDelete(e.tripId) else viewModel.commitDelete(e.tripId)
+                    }
                 }
                 HomeEvent.TripInUse -> launch { snackbar.showSnackbar(resources.getString(R.string.trip_delete_in_use)) }
                 is HomeEvent.TripDeleteFailed -> launch { snackbar.showSnackbar(resources.getString(R.string.trip_delete_failed, e.title), duration = androidx.compose.material3.SnackbarDuration.Long) }

@@ -112,19 +112,25 @@ class HomeViewModel @Inject constructor(
         com.bitacoraviaje.app.home.DeleteTripWorker.enqueue(appContext, tripId)
     }
 
+    /** Jobs already handled by this view model: finished WorkInfos keep being emitted (no global prune: other screens show their own jobs, review N3). */
+    private val handledJobs = HashSet<java.util.UUID>()
+
     /** Outcome of every delete job: a success unhides nothing (the row is gone), a failure brings the trip back with a message. */
     private val deleteOutcomes = workManager.getWorkInfosByTagFlow(com.bitacoraviaje.app.home.DeleteTripWorker.TAG_WORK)
         .onEach { infos ->
-            infos.filter { it.state.isFinished }.forEach { info ->
+            infos.filter { it.state.isFinished && handledJobs.add(it.id) }.forEach { info ->
                 val id = info.outputData.getString(com.bitacoraviaje.app.home.DeleteTripWorker.KEY_TRIP_ID) ?: return@forEach
-                if (id !in pendingDelete.value) return@forEach
+                val wasPending = id in pendingDelete.value
                 pendingDelete.value -= id
-                if (info.state == androidx.work.WorkInfo.State.FAILED) {
+                // A failure is reported even when this view model never saw the request (process death in between, review N4),
+                // as long as the trip is still there to be reported about.
+                if (info.state == androidx.work.WorkInfo.State.FAILED && (wasPending || repository.tripExists(id))) {
                     val outcome = info.outputData.getString(com.bitacoraviaje.app.home.DeleteTripWorker.KEY_OUTCOME)
-                    val title = titles[id] ?: repository.getTrip(id)?.title ?: ""
+                    val title = titles.remove(id) ?: repository.getTrip(id)?.title ?: ""
                     _events.send(if (outcome == com.bitacoraviaje.app.home.TripDeleter.Outcome.IN_USE.name) HomeEvent.TripInUse else HomeEvent.TripDeleteFailed(title))
+                } else {
+                    titles.remove(id)
                 }
-                workManager.pruneWork()
             }
         }
         .launchIn(viewModelScope)

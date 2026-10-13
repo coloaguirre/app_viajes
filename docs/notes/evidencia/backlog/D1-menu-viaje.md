@@ -41,7 +41,8 @@ pantalla inicial tenga un menú con archivar, borrar y acciones afines.
 - `TripDeleterTest` (Robolectric, Room en memoria, respaldo real): etapa grabando → `IN_USE` sin
   tocar nada; respaldo nulo / excepción / archivo vacío → `BACKUP_FAILED`, el viaje y sus audios
   siguen; respaldo escrito → filas borradas, `.json.gz` presente y los `.m4a` movidos a
-  `backup/audio/<id>/`; segunda corrida → `NOT_FOUND`.
+  `backup/audio/<id>/`; segunda corrida → `NOT_FOUND`; grabación que arranca durante el respaldo →
+  `IN_USE` con los audios en su lugar; `restoreKeptAudio` recupera los `.m4a` al importar.
 - `BackupRulesTest`: `backup/audio/` excluido del respaldo en la nube.
 - `ScreensComposeTest`: dos tests del menú (ítems deshabilitados mientras se graba; renombrar,
   archivar, borrar con confirmación, desarchivar y la sección plegada).
@@ -64,15 +65,18 @@ pantalla inicial tenga un menú con archivar, borrar y acciones afines.
    escrito y los dos `.m4a` del viaje están en `files/backup/audio/<id>/` (ya no en `files/audio/`).
 
 ## Revisión de código
-Primera pasada (code-reviewer, 2026-10-13): 1 bloqueante (si fallaba el respaldo se borraba igual),
-6 importantes (reloj del Deshacer distinto al del snackbar, slot único de pendientes, audios
-borrados sin respaldo, `runBlocking` en `onCleared`, archivar un viaje en curso, sin test del
-borrado) y 8 menores. Todo lo anterior se corrigió en el segundo commit de la rama (worker con
-respaldo obligatorio, papelera de audios, cola de pendientes, commit desde el snackbar, foco en el
-diálogo de renombrar, íconos de la sección archivados, título vacío rechazado). El informe
-completo queda en el PR.
-
-## Arreglo colateral
-Al abrir el detalle de un viaje con dos fotos del mismo milisegundo a más de 100 m la línea de
-tiempo crasheaba (`Key "<segmento>-Moment-<t>" was already used`). Las claves de los eventos ahora
-incluyen el id del medio/nota/parada (`TripDetailViewModel.eventKey`).
+Dos pasadas del code-reviewer (2026-10-13), informes completos en el PR.
+- Primera: 1 bloqueante (si fallaba el respaldo se borraba igual), 6 importantes (reloj del
+  Deshacer distinto al del snackbar, slot único de pendientes, audios borrados sin respaldo,
+  `runBlocking` en `onCleared`, archivar un viaje en curso, sin test del borrado) y 8 menores.
+- Segunda (sobre el arreglo): bloqueante y 4 importantes resueltos; 3 hallazgos nuevos
+  importantes, corregidos en el tercer commit: el commit del borrado se dispara también si el
+  usuario navega mientras el snackbar está abierto (`finally`); los audios se mueven recién
+  después de la transacción que borra (una grabación que arranca durante el respaldo rechaza el
+  borrado y no toca nada; test con la etapa abierta dentro del respaldo); sin `pruneWork()` global
+  (borraba los resultados de exportación/video de otras pantallas). Además: importar el respaldo
+  de un viaje borrado recupera sus grabaciones desde `backup/audio/<id>/` (test).
+- Quedan declarados y aceptados: `archived` no viaja en el `trip.json`; las regiones de mapa sin
+  red no se borran con el viaje; la papelera de audios no tiene tope ni pantalla propia; si el
+  proceso muere antes de encolar el trabajo, el viaje sigue ahí (nunca se pierde); no hay test
+  unitario del `HomeViewModel` (el borrado en sí está cubierto por `TripDeleterTest`).

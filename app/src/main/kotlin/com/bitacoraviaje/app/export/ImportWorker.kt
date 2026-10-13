@@ -117,6 +117,7 @@ class ImportWorker @AssistedInject constructor(
         if (exists && conflict == ImportConflict.ASK) return null
         val withFiles = attachFiles(parsed, files, warnings)
         persist(withFiles, replace = exists && conflict == ImportConflict.REPLACE)
+        restoreKeptAudio(withFiles)
         return withFiles.trip.id
     }
 
@@ -165,7 +166,14 @@ class ImportWorker @AssistedInject constructor(
             },
         )
         persist(withFiles, replace = exists && conflict == ImportConflict.REPLACE)
+        restoreKeptAudio(withFiles)
         return withFiles.trip.id
+    }
+
+    /** Backlog D1: a deleted trip's recordings wait under files/backup/audio/<id>/; restoring its backup brings them back. */
+    private fun restoreKeptAudio(t: TripExport) {
+        val n = com.bitacoraviaje.app.home.TripDeleter.restoreKeptAudio(appContext, t.trip.id, t.allVoiceNotes.map { it.audioPath })
+        if (n > 0) Log.i(TAG, "restored $n kept recordings for trip=${t.trip.id}")
     }
 
     private fun attachFiles(t: TripExport, files: Map<String, String>, warnings: MutableList<String>): TripExport {
