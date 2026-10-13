@@ -110,6 +110,7 @@
     <string name="voice_status_done">Transcripta</string>
     <string name="voice_status_failed">Transcripción fallida</string>
     <string name="voice_retry">Reintentar transcripción</string>
+    <string name="voice_retranscribe">Volver a transcribir</string>
     <string name="voice_transcript_label">Texto de la nota (editable)</string>
     <string name="voice_save">Guardar corrección</string>
     <string name="voice_no_position">Esta nota no tiene ubicación.</string>

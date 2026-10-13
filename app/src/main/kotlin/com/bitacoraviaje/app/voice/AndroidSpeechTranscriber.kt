@@ -179,6 +179,7 @@ class AndroidSpeechTranscriber @Inject constructor(@ApplicationContext private v
             val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             val collected = StringBuilder()
             var lastPartial: String? = null
+            var segments = 0
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) = Unit
                 override fun onBeginningOfSpeech() = Unit
@@ -195,15 +196,37 @@ class AndroidSpeechTranscriber @Inject constructor(@ApplicationContext private v
                     if (cont.isActive) cont.resumeWithException(TranscriptionException("speech recognizer error $error"))
                 }
 
+                // Segmented session (API 33, file source): one final result per utterance arrives
+                // here; without it the engine still finalizes each utterance internally but the
+                // single onResults at the end comes back empty (Pixel 8 Pro, 2026-10-13: three
+                // "handleFinalResult" in the engine log, count=0 in onResults).
+                override fun onSegmentResults(segmentResults: Bundle) {
+                    val text = segmentResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
+                    segments += 1
+                    if (text.isNotBlank()) {
+                        if (collected.isNotEmpty()) collected.append(' ')
+                        collected.append(text)
+                    }
+                    lastPartial = null
+                }
+
+                override fun onEndOfSegmentedSession() = finish(fromSegments = true)
+
                 override fun onResults(results: Bundle?) {
-                    val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    Log.i(TAG, "speech results count=${texts?.size ?: 0} partial=${lastPartial != null}")
-                    texts?.firstOrNull()?.let { collected.append(it) }
+                    results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim()?.takeIf { it.isNotBlank() }?.let {
+                        if (collected.isNotEmpty()) collected.append(' ')
+                        collected.append(it)
+                    }
+                    finish(fromSegments = false)
+                }
+
+                private fun finish(fromSegments: Boolean) {
                     if (collected.isBlank()) lastPartial?.let { collected.append(it) }
+                    Log.i(TAG, "speech done segments=$segments segmented=$fromSegments chars=${collected.length}")
                     recognizer.destroy()
                     if (!cont.isActive) return
                     val text = collected.toString().trim()
-                    // An empty result is not a transcription: the note must stay retryable (Pixel 8 Pro, 2026-10-13).
+                    // An empty result is not a transcription: the note must stay retryable.
                     if (text.isBlank()) cont.resumeWithException(TranscriptionException("recognizer returned no text")) else cont.resume(TranscriptResult(text, emptyList(), languageTag))
                 }
             })
@@ -213,6 +236,7 @@ class AndroidSpeechTranscriber @Inject constructor(@ApplicationContext private v
                 putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 if (Build.VERSION.SDK_INT >= 33) {
+                    putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_AUDIO_SOURCE)
                     putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, readFd)
                     putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
                     putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
