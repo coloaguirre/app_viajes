@@ -33,7 +33,9 @@ class EnrichRouteWorker @AssistedInject constructor(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             Log.w(TAG, "route naming failed segment=$segmentId attempt=$runAttemptCount: ${e.javaClass.simpleName} ${e.message}")
-            if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
+            // Only transient failures are retried; a parse problem will not fix itself (review M10).
+            val transient = e is java.io.IOException
+            if (transient && runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
     }
 

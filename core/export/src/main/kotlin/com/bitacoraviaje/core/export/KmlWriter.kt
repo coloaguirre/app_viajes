@@ -43,10 +43,11 @@ class KmlWriter(
         x.close()
         x.close()
         x.close()
+        // My Maps imports at most MY_MAPS_MAX_LAYERS folders: beyond that, remaining segments share the last folder.
         trip.segments.forEachIndexed { i, se ->
             val s = se.segment
             val z = s.tzId
-            x.open("Folder")
+            if (i < MY_MAPS_MAX_LAYERS) x.open("Folder")
             x.leaf("name", "${Iso.localDate(s.startedUtcMs, z)} · ${s.title ?: s.type.name.lowercase()}")
             val pts = se.points.filter { !it.isFilteredOut }
             if (pts.size >= 2) {
@@ -89,7 +90,7 @@ class KmlWriter(
                 val lo = n.lon ?: continue
                 placemark(n.text ?: n.kind.name.lowercase().replaceFirstChar { it.uppercase() }, la, lo, "<p>${Iso.localTime(n.timeUtcMs, z)}</p>")
             }
-            x.close()
+            if (i < MY_MAPS_MAX_LAYERS - 1 || i == trip.segments.lastIndex) x.close()
         }
         x.close()
         x.close()

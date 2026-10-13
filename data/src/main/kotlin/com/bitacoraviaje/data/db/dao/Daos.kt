@@ -53,6 +53,9 @@ interface SegmentDao {
     @Query("SELECT * FROM segment WHERE id = :id")
     suspend fun getById(id: String): SegmentEntity?
 
+    @Query("UPDATE segment SET auto_name = :autoName WHERE id = :id")
+    suspend fun setAutoName(id: String, autoName: String?)
+
     @Query("SELECT * FROM segment WHERE trip_id = :tripId ORDER BY started_utc_ms")
     fun observeByTrip(tripId: String): Flow<List<SegmentEntity>>
 

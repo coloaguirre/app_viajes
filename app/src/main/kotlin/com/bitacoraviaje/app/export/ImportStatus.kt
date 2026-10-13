@@ -10,6 +10,7 @@ data class ImportStatus(
     val error: String? = null,
     /** Name of the file whose trip already exists: the UI must ask replace / copy. */
     val conflictFile: String? = null,
+    val conflictUri: String? = null,
 ) {
     val idle: Boolean get() = !running && tripId == null && error == null && conflictFile == null
 
@@ -19,7 +20,7 @@ data class ImportStatus(
             return when (info.state) {
                 WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED -> ImportStatus(running = true)
                 WorkInfo.State.SUCCEEDED -> ImportStatus(tripId = info.outputData.getString(ImportWorker.KEY_TRIP_ID), warnings = info.outputData.getString(ImportWorker.KEY_WARNINGS).orEmpty().lines().filter { it.isNotBlank() })
-                WorkInfo.State.FAILED -> ImportStatus(error = info.outputData.getString(ImportWorker.KEY_ERROR), conflictFile = info.outputData.getString(ImportWorker.KEY_CONFLICT))
+                WorkInfo.State.FAILED -> ImportStatus(error = info.outputData.getString(ImportWorker.KEY_ERROR), conflictFile = info.outputData.getString(ImportWorker.KEY_CONFLICT), conflictUri = info.outputData.getString(ImportWorker.KEY_CONFLICT_URI))
                 WorkInfo.State.CANCELLED -> ImportStatus()
             }
         }

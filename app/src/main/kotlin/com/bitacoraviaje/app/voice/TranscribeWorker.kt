@@ -20,8 +20,8 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
 
 /**
- * `transcribe-<noteId>`, KEEP (DISENO §8.3). Engine order: whisper-local (Phase 3) →
- * android-speech → cloud (only if enabled) → stub (FAILED, user can retry).
+ * `transcribe-<noteId>`, KEEP (DISENO §8.3). Engine order follows the user's preference
+ * (see [engineOrder]); default "auto" = system on-device recognizer → whisper → stub.
  */
 @HiltWorker
 class TranscribeWorker @AssistedInject constructor(

@@ -27,7 +27,7 @@ import java.io.ByteArrayOutputStream
 object Fixture {
     const val TZ = "America/Argentina/Buenos_Aires"
     const val T0 = 1_760_000_000_000L // 2025-10-09T08:53:20Z
-    const val TRICKY = "Café \"La Ñata\" & <amigos> · 'noche' 🙂"
+    const val TRICKY = "Café \"La Ñata\" & <amigos> · 'noche' 🙂 </script><script>alert(1)</script>"
 
     fun walk(segmentId: String, start: Long, n: Int, stepS: Int = 10, filteredEvery: Int = 0): List<TrackPoint> = (0 until n).map { i ->
         TrackPoint(

@@ -36,10 +36,11 @@ class WhisperContext private constructor(private var ptr: Long) : Closeable {
         WhisperResult(segments, WhisperLib.detectedLanguage(ptr).ifBlank { null })
     }
 
+    /** Serialised with [transcribe] on the same single thread: no free while a decode runs (review M14). */
     override fun close() {
         val p = ptr
         ptr = 0
-        if (p != 0L) WhisperLib.freeContext(p)
+        if (p != 0L) kotlinx.coroutines.runBlocking(dispatcher) { WhisperLib.freeContext(p) }
         dispatcher.close()
     }
 

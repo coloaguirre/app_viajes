@@ -76,12 +76,12 @@ class BackupRulesTest {
             tracking.finishSegment(s.id)
             val f = assertNotNull(BackupFiles.write(ctx, ExportLoader(tracking, MediaRepository(db), NotesRepository(db)), s.tripId))
             assertTrue(f.isFile && f.parentFile!!.name == "backup")
-            val back = TripJsonReader.read(f.readText())
+            val back = TripJsonReader.read(java.util.zip.GZIPInputStream(f.inputStream()).readBytes().toString(Charsets.UTF_8))
             assertEquals("Respaldo", back.trip.title)
             assertEquals(10, back.segments.single().points.size)
             // Second write replaces atomically (no .tmp left behind).
             assertNotNull(BackupFiles.write(ctx, ExportLoader(tracking, MediaRepository(db), NotesRepository(db)), s.tripId))
-            assertEquals(listOf("${s.tripId}.json"), f.parentFile!!.list()!!.toList())
+            assertEquals(listOf("${s.tripId}.json.gz"), f.parentFile!!.list()!!.toList())
         } finally {
             db.close()
         }

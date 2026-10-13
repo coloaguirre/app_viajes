@@ -11,7 +11,12 @@ import java.io.OutputStreamWriter
  * inside `trkpt`: ele, time, extensions. Validated against the official XSD in tests.
  */
 class GpxWriter(private val segmentIndices: List<Int>? = null, override val path: String = "tracks/viaje-completo.gpx") : TripWriter {
+    /** `<trkpt>` elements emitted by the last [write]: the reconciliation counts what was really written (review M1). */
+    @Volatile var pointsWritten: Int = 0
+        private set
+
     override fun write(trip: TripExport, out: OutputStream) {
+        var emitted = 0
         val w = OutputStreamWriter(out, Charsets.UTF_8)
         val x = XmlOut(w)
         val segs = trip.segments.filterIndexed { i, _ -> segmentIndices == null || i in segmentIndices }
@@ -91,6 +96,7 @@ class GpxWriter(private val segmentIndices: List<Int>? = null, override val path
                     open = true
                 }
                 x.open("trkpt", "lat" to Num.coord(p.lat), "lon" to Num.coord(p.lon))
+                emitted++
                 p.altM?.let { x.leaf("ele", Num.ele(it)) }
                 x.leaf("time", Iso.utc(p.timeUtcMs))
                 p.hAccuracyM?.let { x.leaf("hdop", Num.f1(it.toDouble() / HDOP_SCALE_M)) }
@@ -108,6 +114,7 @@ class GpxWriter(private val segmentIndices: List<Int>? = null, override val path
         }
         x.close()
         w.flush()
+        pointsWritten = emitted
     }
 
     private fun gpxType(se: SegmentExport): String = when (se.segment.transport) {

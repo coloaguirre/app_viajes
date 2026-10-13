@@ -59,14 +59,14 @@ class ImportWorker @AssistedInject constructor(
         try {
             val kind = when {
                 name.endsWith(".gpx", true) -> "gpx"
-                name.endsWith(".json", true) -> "json"
+                name.endsWith(".json", true) || name.endsWith(".json.gz", true) -> "json"
                 else -> "zip"
             }
             val warnings = ArrayList<String>()
             val tripId = when (kind) {
                 "gpx" -> importGpx(uri, name, warnings)
-                "json" -> importJson(open(uri).use { it.readBytes().toString(Charsets.UTF_8) }, conflict, emptyMap(), warnings) ?: return@withContext conflictResult(name)
-                else -> importZip(uri, conflict, warnings) ?: return@withContext conflictResult(name)
+                "json" -> importJson(open(uri).use { raw -> readCapped(if (name.endsWith(".gz", true)) java.util.zip.GZIPInputStream(raw) else raw) }, conflict, emptyMap(), warnings) ?: return@withContext conflictResult(name, uri)
+                else -> importZip(uri, conflict, warnings) ?: return@withContext conflictResult(name, uri)
             }
             Log.i(TAG, "import done kind=$kind trip=$tripId warnings=${warnings.size}")
             Result.success(workDataOf(KEY_TRIP_ID to tripId, KEY_WARNINGS to warnings.joinToString("\n")))
@@ -79,7 +79,20 @@ class ImportWorker @AssistedInject constructor(
         }
     }
 
-    private fun conflictResult(name: String) = Result.failure(workDataOf(KEY_CONFLICT to name))
+    private fun conflictResult(name: String, uri: Uri) = Result.failure(workDataOf(KEY_CONFLICT to name, KEY_CONFLICT_URI to uri.toString()))
+
+    /** trip.json is text: anything beyond [MAX_JSON_BYTES] is not a trip, it is a problem (review M7). */
+    private fun readCapped(ins: InputStream): String {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(1 shl 16)
+        while (true) {
+            val n = ins.read(buf)
+            if (n < 0) break
+            out.write(buf, 0, n)
+            if (out.size() > MAX_JSON_BYTES) throw ImportException("trip.json demasiado grande (más de ${MAX_JSON_BYTES / 1_048_576} MB)")
+        }
+        return out.toString(Charsets.UTF_8.name())
+    }
 
     private fun open(uri: Uri): InputStream = appContext.contentResolver.openInputStream(uri) ?: throw ImportException("No se pudo abrir el archivo")
 
@@ -114,7 +127,7 @@ class ImportWorker @AssistedInject constructor(
     private suspend fun importZip(uri: Uri, conflict: ImportConflict, warnings: MutableList<String>): String? {
         var json: String? = null
         ZipInputStream(open(uri)).use { z ->
-            generateSequence { z.nextEntry }.forEach { e -> if (e.name.substringAfter('/') == "trip.json" || e.name == "trip.json") json = z.readBytes().toString(Charsets.UTF_8) }
+            generateSequence { z.nextEntry }.forEach { e -> if (e.name.substringAfter('/') == "trip.json" || e.name == "trip.json") json = readCapped(z) }
         }
         val text = json ?: throw ImportException("El ZIP no contiene trip.json")
         val parsed = TripJsonReader.read(text, regenerateIds = conflict == ImportConflict.COPY)
@@ -191,10 +204,10 @@ class ImportWorker @AssistedInject constructor(
             pausesToInsert = t.segments.flatMap { it.pauses },
             stopsToInsert = t.segments.flatMap { it.stops },
             replace = replace,
+            mediaToInsert = t.allMedia,
+            voiceNotesToInsert = t.allVoiceNotes,
+            textNotesToInsert = t.allTextNotes,
         )
-        media.upsertAll(t.allMedia)
-        notes.addVoiceNotes(t.allVoiceNotes)
-        notes.addTextNotes(t.allTextNotes)
     }
 
     companion object {
@@ -206,11 +219,14 @@ class ImportWorker @AssistedInject constructor(
         const val KEY_WARNINGS = "warnings"
         const val KEY_ERROR = "error"
         const val KEY_CONFLICT = "conflict"
+        const val KEY_CONFLICT_URI = "conflict_uri"
+        const val MAX_JSON_BYTES = 256L * 1024 * 1024
 
         fun enqueue(context: Context, uri: Uri, conflict: ImportConflict = ImportConflict.ASK) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             val req = OneTimeWorkRequestBuilder<ImportWorker>().setInputData(Data.Builder().putString(KEY_URI, uri.toString()).putString(KEY_CONFLICT_POLICY, conflict.name).build()).build()
-            WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, req)
+            // APPEND_OR_REPLACE: a second file queues behind a running import instead of cancelling it mid-write (review I1).
+            WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, req)
         }
     }
 }

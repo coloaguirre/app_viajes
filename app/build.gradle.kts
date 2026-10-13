@@ -49,6 +49,11 @@ android {
         buildConfig = true
     }
 
+    sourceSets {
+        // Sample trips (GPX) are shared fixtures with core/geo and the emulator replay.
+        getByName("test").resources.srcDir(rootProject.file("tools/sample-trips"))
+    }
+
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }

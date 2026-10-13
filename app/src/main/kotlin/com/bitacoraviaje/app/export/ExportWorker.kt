@@ -79,11 +79,18 @@ class ExportWorker @AssistedInject constructor(
         runCatching { setForeground(foregroundInfo(0, 1)) }.onFailure { Log.w(TAG, "foreground not allowed: ${it.message}") }
         val trip = loader.load(tripId, options) ?: return@withContext Result.failure(workDataOf(KEY_ERROR to "viaje inexistente"))
         val staging = stagingDir(appContext, tripId)
+        // Staging + ZIP need roughly twice the media size; refuse early with a clear message (review I3, skill trip-export).
+        val needed = estimateBytes(trip) * 2 + 20L * 1024 * 1024
+        val free = android.os.StatFs(appContext.noBackupFilesDir.path).availableBytes
+        if (free < needed) return@withContext Result.failure(workDataOf(KEY_ERROR to appContext.getString(com.bitacoraviaje.app.R.string.export_no_space, needed / 1_048_576, free / 1_048_576)))
         val staged = StagedExport(staging, thumbnails(trip), options.includeMedia, options.includeAudio)
+        var createdUri: Uri? = null
         return@withContext try {
             val report = staged.run(trip, fileSource(trip)) { done, total -> publish(done, total) }
             val (uri, label) = openDestination(destination, targetUri, report.folder)
-            val out = uri?.let { appContext.contentResolver.openOutputStream(it, "w") } ?: fileOutput(label!!)
+            createdUri = if (destination == ExportDestination.DOWNLOADS) uri else null
+            // "wt": truncate. Some document providers keep the old tail with plain "w" and a retry would leave a corrupt ZIP (review I2).
+            val out = uri?.let { appContext.contentResolver.openOutputStream(it, "wt") } ?: fileOutput(label!!)
             out.use { staged.zipTo(report, it) }
             if (destination == ExportDestination.DOWNLOADS && uri != null && Build.VERSION.SDK_INT >= 29) {
                 appContext.contentResolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
@@ -99,10 +106,14 @@ class ExportWorker @AssistedInject constructor(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             Log.w(TAG, "export failed trip=$tripId attempt=$runAttemptCount: ${e.javaClass.simpleName} ${e.message}")
-            // Staging is kept: the retry resumes from the manifest.
+            // A pending Downloads row of this attempt must not linger (review I2); staging is kept so the retry resumes.
+            createdUri?.let { runCatching { appContext.contentResolver.delete(it, null, null) } }
             if (runAttemptCount < 3) Result.retry() else Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
         }
     }
+
+    private fun estimateBytes(trip: TripExport): Long =
+        trip.allMedia.filter { it.id in trip.mediaFiles }.sumOf { it.sizeBytes ?: 0L } + trip.allVoiceNotes.filter { it.id in trip.audioFiles }.sumOf { File(appContext.filesDir, it.audioPath).length() }
 
     private fun fileSource(trip: TripExport): FileSource {
         val byMediaPath = trip.allMedia.associateBy({ trip.mediaFiles[it.id] }, { it.contentUri })
@@ -200,7 +211,8 @@ class ExportWorker @AssistedInject constructor(
 
         fun workName(tripId: String) = "export-$tripId"
 
-        fun stagingDir(context: Context, tripId: String): File = File(context.cacheDir, "export/staging/$tripId")
+        /** Under noBackupFilesDir, not cache: the system may wipe the cache mid-export and break the resume (review I3). */
+        fun stagingDir(context: Context, tripId: String): File = File(context.noBackupFilesDir, "export/staging/${com.bitacoraviaje.core.export.SafeId.require(tripId, "trip id")}")
 
         fun enqueue(context: Context, tripId: String, options: ExportOptions, destination: ExportDestination, targetUri: Uri? = null) {
             val data = Data.Builder()

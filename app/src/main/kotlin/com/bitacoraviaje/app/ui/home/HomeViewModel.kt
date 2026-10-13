@@ -1,5 +1,6 @@
 package com.bitacoraviaje.app.ui.home
 
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bitacoraviaje.app.tracking.TrackingController
@@ -40,19 +41,16 @@ class HomeViewModel @Inject constructor(
     /** Import job (PLAN 3.3) as the Home dialog sees it. */
     val importStatus: StateFlow<com.bitacoraviaje.app.export.ImportStatus> = androidx.work.WorkManager.getInstance(appContext)
         .getWorkInfosForUniqueWorkFlow(com.bitacoraviaje.app.export.ImportWorker.WORK_NAME)
-        .map { infos -> com.bitacoraviaje.app.export.ImportStatus.from(infos.firstOrNull()) }
+        .map { infos -> com.bitacoraviaje.app.export.ImportStatus.from(infos.firstOrNull { !it.state.isFinished } ?: infos.firstOrNull()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.bitacoraviaje.app.export.ImportStatus())
 
-    private var lastImportUri: android.net.Uri? = null
-
     fun importFrom(uri: android.net.Uri, conflict: com.bitacoraviaje.app.export.ImportConflict = com.bitacoraviaje.app.export.ImportConflict.ASK) {
-        lastImportUri = uri
         com.bitacoraviaje.app.export.ImportWorker.enqueue(appContext, uri, conflict)
     }
 
-    /** Answer to the "trip already exists" question: re-run on the same file with the chosen policy. */
+    /** Answer to the "trip already exists" question: the uri travels in the failed work's output, so it survives process death (review M5). */
     fun resolveImportConflict(conflict: com.bitacoraviaje.app.export.ImportConflict) {
-        lastImportUri?.let { importFrom(it, conflict) }
+        importStatus.value.conflictUri?.let { importFrom(it.toUri(), conflict) }
     }
 
     fun dismissImport() = androidx.work.WorkManager.getInstance(appContext).pruneWork()

@@ -52,6 +52,22 @@ class ImportTest {
     }
 
     @Test
+    fun `ids that would escape a directory are rejected even when regenerating`() {
+        val json = Fixture.render(TripJsonWriter(), Fixture.trip()).replace("\"id\": \"trip-1\"", "\"id\": \"../..\"")
+        assertTrue(json.contains("../.."))
+        assertFailsWith<ImportException> { TripJsonReader.read(json) }
+        assertFailsWith<ImportException> { TripJsonReader.read(json, regenerateIds = true) }
+        assertFailsWith<ImportException> { SafeId.require("a/b") }
+        assertEquals("ok_1.x-Y", SafeId.require("ok_1.x-Y"))
+    }
+
+    @Test
+    fun `gpx with a doctype is rejected`() {
+        val gpx = "<?xml version=\"1.0\"?><!DOCTYPE gpx [<!ENTITY x \"y\">]><gpx version=\"1.1\" creator=\"x\" xmlns=\"http://www.topografix.com/GPX/1/1\"><trk><trkseg><trkpt lat=\"-34.6\" lon=\"-58.4\"/><trkpt lat=\"-34.61\" lon=\"-58.4\"/></trkseg></trk></gpx>"
+        assertFailsWith<ImportException> { GpxReader.read(ByteArrayInputStream(gpx.toByteArray()), "x.gpx", "UTC") }
+    }
+
+    @Test
     fun `gpx round trip keeps tracks, segments as pauses, points and waypoints`() {
         val original = Fixture.trip()
         val gpx = Fixture.render(GpxWriter(), original)

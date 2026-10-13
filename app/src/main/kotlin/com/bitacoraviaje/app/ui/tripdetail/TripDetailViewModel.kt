@@ -66,7 +66,7 @@ class TripDetailViewModel @Inject constructor(
 
     /** Export job of this trip as the UI sees it (PLAN 3.2). */
     val export: StateFlow<ExportStatus> = androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(ExportWorker.workName(tripId))
-        .map { infos -> ExportStatus.from(infos.firstOrNull()) }
+        .map { infos -> ExportStatus.from(infos.firstOrNull { !it.state.isFinished } ?: infos.firstOrNull()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportStatus())
 
     fun startExport(options: ExportOptions, destination: ExportDestination, targetUri: android.net.Uri? = null) {

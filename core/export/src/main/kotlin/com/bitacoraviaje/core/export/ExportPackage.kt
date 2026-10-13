@@ -82,7 +82,7 @@ class ExportPackage(
             folder = folder,
             entries = entries + "LEEME.txt",
             pointsInDb = trip.segments.sumOf { se -> se.points.count { trip.includeFilteredPoints || !it.isFilteredOut } },
-            pointsWritten = trip.segments.sumOf { se -> se.points.count { trip.includeFilteredPoints || !it.isFilteredOut } },
+            pointsWritten = writers.filterIsInstance<GpxWriter>().firstOrNull { it.path == "tracks/viaje-completo.gpx" }?.pointsWritten ?: 0,
             mediaInDb = trip.allMedia.size,
             mediaWritten = mediaPaths.size - mediaMissing.size,
             mediaMissing = mediaMissing,

@@ -40,7 +40,7 @@ internal object Diary {
     }
 
     /** One line of plain text per event, without media links (callers add those). */
-    fun line(e: TimelineEvent, trip: TripExport): String = when (e) {
+    fun line(e: TimelineEvent): String = when (e) {
         is TimelineEvent.SegmentStart -> "Inicio"
         is TimelineEvent.SegmentEnd -> "Fin"
         is TimelineEvent.Pause -> when (e.kind) { PauseKind.AUTO_REST -> "Reposo automático"; PauseKind.NESTED -> "Pausa por excursión"; PauseKind.USER -> "Pausa" }
@@ -54,7 +54,7 @@ internal object Diary {
         is TimelineEvent.TransportChange -> "Cambio de medio: ${transport(e.transport)}"
         is TimelineEvent.DayChange -> "Nuevo día: ${e.localDate}"
         is TimelineEvent.Summary -> "Recorriste ${km(e.distanceM)} en ${dur(e.durationMs)}"
-    }.also { trip.hashCode() }
+    }
 }
 
 class MarkdownWriter(override val path: String = "bitacora.md") : TripWriter {
@@ -69,8 +69,8 @@ class MarkdownWriter(override val path: String = "bitacora.md") : TripWriter {
                 w.write("### ${Diary.segmentTitle(se)}\n\n")
                 for (e in events) {
                     val t = Iso.localTime(e.timeUtcMs, z)
-                    w.write("- **$t** ${Diary.line(e, trip)}")
-                    if (e is TimelineEvent.Moment) e.media.forEach { m -> trip.mediaFiles[m.id]?.let { w.write("\n  ![${m.displayName ?: ""}]($it)") } }
+                    w.write("- **$t** ${Diary.line(e)}")
+                    if (e is TimelineEvent.Moment) e.media.forEach { m -> trip.mediaFiles[m.id]?.let { w.write("\n  ![${(m.displayName ?: "").replace("]", "\\]")}]($it)") } }
                     if (e is TimelineEvent.Voice) trip.audioFiles[e.note.id]?.let { w.write(" ([audio]($it))") }
                     w.write("\n")
                 }

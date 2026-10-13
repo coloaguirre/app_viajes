@@ -96,7 +96,7 @@ class StagedExport(
             folder = folder,
             entries = order + "LEEME.txt",
             pointsInDb = trip.segments.sumOf { se -> se.points.count { trip.includeFilteredPoints || !it.isFilteredOut } },
-            pointsWritten = trip.segments.sumOf { se -> se.points.count { trip.includeFilteredPoints || !it.isFilteredOut } },
+            pointsWritten = countTrkpt(File(stagingDir, "tracks/viaje-completo.gpx")),
             mediaInDb = trip.allMedia.size,
             mediaWritten = mediaPaths.values.count { it in ok },
             mediaMissing = mediaMissing,
@@ -127,6 +127,14 @@ class StagedExport(
 
     fun clear() {
         stagingDir.deleteRecursively()
+    }
+
+    /** Counts `<trkpt` in the staged GPX (also valid for a GPX staged by a previous attempt). */
+    private fun countTrkpt(f: File): Int {
+        if (!f.isFile) return 0
+        var n = 0
+        f.bufferedReader(Charsets.UTF_8).useLines { lines -> lines.forEach { l -> var i = l.indexOf("<trkpt"); while (i >= 0) { n++; i = l.indexOf("<trkpt", i + 6) } } }
+        return n
     }
 
     companion object {

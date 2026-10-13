@@ -14,8 +14,12 @@ import kotlinx.coroutines.flow.first
 /**
  * DISENO §6.8: name a finished segment from the map. Treks ask Overpass for the trail
  * covering ≥ 60 % of the track; everything else samples the track and reverse-geocodes
- * roads and localities ("RN 40, de El Calafate a El Chaltén"). Coordinates sent out are
- * the sampled points only, rounded to ~10 m.
+ * roads and localities ("RN 40, de El Calafate a El Chaltén").
+ *
+ * What leaves the phone (review I6): for treks, the simplified track rounded to ~10 m
+ * (Overpass needs the shape); otherwise 8 samples rounded to ~10 m. The first and last
+ * [TRIM_M] metres are never sent: that is where home usually is. Rounding to ~1 km and
+ * privacy zones are Fase 6 (DISENO §15).
  */
 class RouteNamer @Inject constructor(
     private val tracking: TrackingRepository,
@@ -27,7 +31,9 @@ class RouteNamer @Inject constructor(
 
     suspend fun name(segmentId: String): Outcome? {
         val segment = tracking.getSegment(segmentId) ?: return null
-        val points = tracking.validPoints(segmentId)
+        if (segment.title != null) return Outcome(segment.title, "título del usuario") // nothing to ask (review M12)
+        val all = tracking.validPoints(segmentId)
+        val points = trimEnds(all, TRIM_M)
         if (points.size < MIN_POINTS) return Outcome(null, "sin puntos")
         val settings = prefs.settings.first()
         if (segment.type == SegmentType.TREKKING) {
@@ -60,6 +66,26 @@ class RouteNamer @Inject constructor(
         const val SAMPLES = 8
         const val ZOOM_ROAD = 16
         const val ZOOM_REGION = 10
+        const val TRIM_M = 200.0
+
+        /** Drops the first and last [metres] of the track (home, hotel) before anything is sent out. */
+        fun trimEnds(points: List<TrackPoint>, metres: Double): List<TrackPoint> {
+            if (points.size < 3) return points
+            var start = 0
+            var acc = 0.0
+            while (start < points.size - 1 && acc < metres) {
+                acc += com.bitacoraviaje.core.geo.haversineM(points[start].lat, points[start].lon, points[start + 1].lat, points[start + 1].lon)
+                start++
+            }
+            var end = points.size - 1
+            acc = 0.0
+            while (end > start && acc < metres) {
+                acc += com.bitacoraviaje.core.geo.haversineM(points[end].lat, points[end].lon, points[end - 1].lat, points[end - 1].lon)
+                end--
+            }
+            val trimmed = points.subList(start, end + 1)
+            return if (trimmed.size >= MIN_POINTS) trimmed else points
+        }
 
         /** Equally spaced samples including both ends. */
         fun sample(points: List<TrackPoint>, n: Int): List<TrackPoint> {

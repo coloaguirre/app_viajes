@@ -214,10 +214,7 @@ class TrackingRepository @Inject constructor(
     suspend fun tripExists(tripId: String): Boolean = trips.getById(tripId) != null
 
     /** PLAN 3.6: name derived from the map; never overwrites a user title (that lives in `title`). */
-    suspend fun setAutoName(segmentId: String, autoName: String?) {
-        val s = segments.getById(segmentId)?.toDomain() ?: return
-        segments.update(s.copy(autoName = autoName).toEntity())
-    }
+    suspend fun setAutoName(segmentId: String, autoName: String?) = segments.setAutoName(segmentId, autoName)
 
     /**
      * Imports a whole trip in one transaction (DISENO §12.5). With [replace] an existing
@@ -231,6 +228,9 @@ class TrackingRepository @Inject constructor(
         pausesToInsert: List<SegmentPause>,
         stopsToInsert: List<Stop>,
         replace: Boolean = false,
+        mediaToInsert: List<com.bitacoraviaje.core.model.MediaItem> = emptyList(),
+        voiceNotesToInsert: List<com.bitacoraviaje.core.model.VoiceNote> = emptyList(),
+        textNotesToInsert: List<com.bitacoraviaje.core.model.TextNote> = emptyList(),
     ) = db.withTransaction {
         if (replace) trips.delete(trip.id)
         trips.insert(trip.toEntity())
@@ -239,6 +239,10 @@ class TrackingRepository @Inject constructor(
         for ((sid, pts) in pointsBySegment) pts.chunked(500).forEach { chunk -> points.insertAll(chunk.map { it.copy(id = 0, segmentId = sid).toEntity() }) }
         for (p in pausesToInsert) segments.insertPause(p.toEntity())
         if (stopsToInsert.isNotEmpty()) stops.insertAll(stopsToInsert.map { it.toEntity() })
+        // Media and notes inside the same transaction: a replace never leaves a trip without them (review I1).
+        if (mediaToInsert.isNotEmpty()) db.mediaDao().upsertAll(mediaToInsert.map { it.toEntity() })
+        for (v in voiceNotesToInsert) db.voiceNoteDao().insert(v.toEntity())
+        for (n in textNotesToInsert) db.textNoteDao().insert(n.toEntity())
     }
 
     suspend fun lastValidPoint(segmentId: String): TrackPoint? = points.getLastValid(segmentId)?.toDomain()

@@ -4,7 +4,7 @@
 
 ## Estado actual
 - Fase: **2 mergeada en `dev` (PR #5, 2026-10-13) con 2.8 abierto; Fase 3 iniciada en `feat/fase-3-exportacion`.** Los ítems de campo 1.7 y 2.8 siguen abiertos y cierran sus fases formalmente (1.7 parcial: salida de 46 min en auto, Full).
-- Última actualización: 2026-10-12
+- Última actualización: 2026-10-13
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
@@ -59,6 +59,8 @@
 | 2026-10-13 | Respaldo (3.5): reglas de Auto Backup como listas de inclusión (preferencias, DataStore, `files/backup/`; audio solo en transferencia directa); la base nunca se respalda; `trip.json` automático por viaje al cerrar etapa o viaje, escritura atómica | PLAN 3.5; revisión Fase 0 (`allowBackup`) |
 | 2026-10-13 | Esquema v6: `segment.auto_name` (nombre derivado del mapa; `title` del usuario gana), FK `camera_clock_offset`→`trip` e índice `voice_note.media_item_id` | PLAN 3.6; diferidos del PR #5 |
 | 2026-10-13 | OSM: un cliente OkHttp con User-Agent, caché, 1 pedido/s por host y backoff en 429/503/504; instancias de Nominatim/Overpass configurables; muestras a zoom 16 (a 14 no hay calles); departamento aceptado como lugar en campo abierto | PLAN 3.6; política de uso de Nominatim |
+| 2026-10-13 | Revisión de código Fase 3 (PR #7) aplicada antes del merge: ids de archivos externos validados antes de volverse rutas; importación atómica (medios y notas en la misma transacción) y cola que no cancela una importación en curso; escritura SAF con truncado y limpieza de la fila pendiente de Descargas; parser GPX endurecido (sin DOCTYPE ni entidades); respaldo encadenado después de vincular fotos, comprimido (`.json.gz`) y restaurable desde Ajustes; extremos del recorrido (200 m) nunca se envían a OSM; staging en `noBackupFilesDir` con chequeo de espacio | PR #7 |
+| 2026-10-13 | Diferidos de la revisión del PR #7 con registro: avisos de importación como textos en `core` (pasarlos a códigos + `strings.xml` en Fase 6); documentos del staging no se invalidan si la base cambia entre reintentos; redondeo a ~1 km / zonas de privacidad para OSM (Fase 6, DISENO §15); `libwhisper.so` genérico de arm64 lleva ggml con fp16 (como el ejemplo upstream; afecta solo CPUs sin `fphp`, anteriores a 2017); el respaldo no se refresca tras editar textos (solo al cerrar etapa/viaje); medios se copian al staging antes del ZIP (duplica espacio; el chequeo previo lo cubre) | Revisión PR #7 (M3, M8, M15, M17, I3 parcial) |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas

@@ -68,9 +68,11 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
     val export by viewModel.export.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     var showExport by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
-    var pendingOptions by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(ExportOptions()) }
+    var pendingMedia by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
+    var pendingAudio by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
+    var pendingFiltered by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     val createZip = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        uri?.let { viewModel.startExport(pendingOptions, ExportDestination.SAF, it) }
+        uri?.let { viewModel.startExport(ExportOptions(pendingMedia, pendingAudio, pendingFiltered), ExportDestination.SAF, it) }
     }
     TripDetailScreen(
         state = state,
@@ -88,7 +90,9 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
             onStart = { opts, dest ->
                 when (dest) {
                     ExportDestination.SAF -> {
-                        pendingOptions = opts
+                        pendingMedia = opts.includeMedia
+                        pendingAudio = opts.includeAudio
+                        pendingFiltered = opts.includeFilteredPoints
                         createZip.launch(com.bitacoraviaje.core.export.Names.packageFolder(state.trip?.title ?: "viaje", System.currentTimeMillis(), state.segments.firstOrNull()?.segment?.tzId ?: "UTC") + ".zip")
                     }
                     else -> viewModel.startExport(opts, dest)

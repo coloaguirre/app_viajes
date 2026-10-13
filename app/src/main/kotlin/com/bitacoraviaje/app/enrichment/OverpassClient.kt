@@ -31,9 +31,18 @@ class OverpassClient @Inject constructor(private val http: OsmHttp) {
         /** `around` along the simplified polyline; long tracks are split so the query stays small. */
         fun query(simplified: List<TrackPoint>, aroundM: Int, maxVertices: Int = 150): String {
             val pts = if (simplified.size <= maxVertices) simplified else simplified.filterIndexed { i, _ -> i % ((simplified.size + maxVertices - 1) / maxVertices) == 0 } + simplified.last()
-            val line = pts.joinToString(",") { "${String.format(Locale.ROOT, "%.5f", it.lat)},${String.format(Locale.ROOT, "%.5f", it.lon)}" }
+            // 4 decimals (~10 m): enough for around:30 and no more precision than needed (review I6).
+            val line = pts.joinToString(",") { "${String.format(Locale.ROOT, "%.4f", it.lat)},${String.format(Locale.ROOT, "%.4f", it.lon)}" }
             return "[out:json][timeout:25];(way(around:$aroundM,$line)[highway~\"^(path|footway|track)$\"][name];relation(around:$aroundM,$line)[route=hiking][name];);out geom 40;"
         }
+
+        /** Tolerant: a member without coordinates is skipped, not a crash (review M10). */
+        private fun geometry(o: kotlinx.serialization.json.JsonObject): List<Pair<Double, Double>>? =
+            o["geometry"]?.jsonArray?.mapNotNull { g ->
+                val la = g.jsonObject["lat"]?.jsonPrimitive?.content?.toDoubleOrNull()
+                val lo = g.jsonObject["lon"]?.jsonPrimitive?.content?.toDoubleOrNull()
+                if (la != null && lo != null) la to lo else null
+            }?.takeIf { it.size >= 2 }
 
         fun parse(body: String): List<TrailCandidate> {
             val els = json.parseToJsonElement(body).jsonObject["elements"]?.jsonArray ?: return emptyList()
@@ -42,10 +51,8 @@ class OverpassClient @Inject constructor(private val http: OsmHttp) {
                 val o = e.jsonObject
                 val name = o["tags"]?.jsonObject?.get("name")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: continue
                 when (o["type"]?.jsonPrimitive?.content) {
-                    "way" -> o["geometry"]?.jsonArray?.map { g -> g.jsonObject["lat"]!!.jsonPrimitive.content.toDouble() to g.jsonObject["lon"]!!.jsonPrimitive.content.toDouble() }?.takeIf { it.size >= 2 }?.let { out += TrailCandidate(name, it) }
-                    "relation" -> o["members"]?.jsonArray?.forEach { m ->
-                        m.jsonObject["geometry"]?.jsonArray?.map { g -> g.jsonObject["lat"]!!.jsonPrimitive.content.toDouble() to g.jsonObject["lon"]!!.jsonPrimitive.content.toDouble() }?.takeIf { it.size >= 2 }?.let { out += TrailCandidate(name, it) }
-                    }
+                    "way" -> geometry(o)?.let { out += TrailCandidate(name, it) }
+                    "relation" -> o["members"]?.jsonArray?.forEach { m -> geometry(m.jsonObject)?.let { out += TrailCandidate(name, it) } }
                 }
             }
             return out

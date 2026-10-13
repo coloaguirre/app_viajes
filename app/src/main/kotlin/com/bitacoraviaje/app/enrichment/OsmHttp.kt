@@ -29,8 +29,8 @@ class OsmHttp @Inject constructor(@ApplicationContext context: Context) {
         .addInterceptor(Interceptor { chain ->
             chain.proceed(chain.request().newBuilder().header("User-Agent", USER_AGENT).header("Accept-Language", "es").build())
         })
-        .addInterceptor(RateLimit())
         .addInterceptor(Backoff())
+        .addNetworkInterceptor(RateLimit()) // after the cache: a cache hit does not wait (review M11)
         .build()
 
     /** Token bucket per host: at most one request per [minIntervalMs] (1/s Nominatim, 1 per 2 s Overpass). */
@@ -39,7 +39,7 @@ class OsmHttp @Inject constructor(@ApplicationContext context: Context) {
 
         override fun intercept(chain: Interceptor.Chain): Response {
             val host = chain.request().url.host
-            val interval = if (host.contains("overpass")) 2_000L else 1_000L
+            val interval = if (chain.request().url.encodedPath.endsWith("/interpreter")) 2_000L else 1_000L // Overpass endpoint, whatever the host
             val wait = synchronized(last) {
                 val now = System.currentTimeMillis()
                 val due = (last[host] ?: 0L) + interval
@@ -66,7 +66,7 @@ class OsmHttp @Inject constructor(@ApplicationContext context: Context) {
                     continue
                 }
                 if (response.code !in RETRY_CODES || attempt >= MAX_RETRIES) return response
-                val retryAfter = response.header("Retry-After")?.toLongOrNull()?.times(1_000)
+                val retryAfter = response.header("Retry-After")?.toLongOrNull()?.times(1_000)?.coerceAtMost(MAX_RETRY_AFTER_MS)
                 response.close()
                 attempt++
                 Thread.sleep(retryAfter ?: (2_000L shl (attempt - 1)))
@@ -75,6 +75,7 @@ class OsmHttp @Inject constructor(@ApplicationContext context: Context) {
 
         companion object {
             const val MAX_RETRIES = 3
+            const val MAX_RETRY_AFTER_MS = 30_000L
             val RETRY_CODES = setOf(429, 503, 504)
         }
     }

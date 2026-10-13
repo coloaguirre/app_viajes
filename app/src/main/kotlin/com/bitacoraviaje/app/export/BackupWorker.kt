@@ -17,14 +17,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Writes `files/backup/<tripId>.json` (the trip.json of DISENO §12.2) every time a
+ * Writes `files/backup/<tripId>.json.gz` (the trip.json of DISENO §12.2, gzipped) every time a
  * segment or the trip is closed (PLAN 3.5). That folder IS in the Auto Backup rules,
  * the database is not: this file is what a new phone restores through import.
  */
 object BackupFiles {
     fun dir(context: Context): File = File(context.filesDir, "backup")
 
-    fun fileFor(context: Context, tripId: String): File = File(dir(context), "$tripId.json")
+    fun fileFor(context: Context, tripId: String): File = File(dir(context), "${com.bitacoraviaje.core.export.SafeId.require(tripId, "trip id")}.json.gz")
 
     /** Atomic: written to a temp file, then renamed, so a crash never leaves a truncated backup. */
     suspend fun write(context: Context, loader: ExportLoader, tripId: String): File? {
@@ -32,7 +32,8 @@ object BackupFiles {
         val target = fileFor(context, tripId)
         target.parentFile?.mkdirs()
         val tmp = File(target.path + ".tmp")
-        tmp.outputStream().use { TripJsonWriter().write(trip, it) }
+        // Compressed (~10x smaller): the whole backup folder must stay well under Android's 25 MB cloud cap (review I5).
+        java.util.zip.GZIPOutputStream(tmp.outputStream()).use { TripJsonWriter().write(trip, it) }
         if (!tmp.renameTo(target)) {
             target.delete()
             check(tmp.renameTo(target)) { "cannot replace ${target.name}" }
@@ -65,10 +66,11 @@ class BackupWorker @AssistedInject constructor(
         const val KEY_TRIP_ID = "trip_id"
         const val KEY_PATH = "path"
 
+        fun request(tripId: String) = OneTimeWorkRequestBuilder<BackupWorker>().setInputData(workDataOf(KEY_TRIP_ID to tripId)).build()
+
         /** REPLACE: only the latest state of the trip matters. */
         fun enqueue(context: Context, tripId: String) {
-            val req = OneTimeWorkRequestBuilder<BackupWorker>().setInputData(workDataOf(KEY_TRIP_ID to tripId)).build()
-            WorkManager.getInstance(context).enqueueUniqueWork("backup-$tripId", ExistingWorkPolicy.REPLACE, req)
+            WorkManager.getInstance(context).enqueueUniqueWork("backup-$tripId", ExistingWorkPolicy.REPLACE, request(tripId))
         }
     }
 }

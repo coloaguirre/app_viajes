@@ -38,7 +38,15 @@ object GpxReader {
     fun read(input: InputStream, fileName: String, tzId: String, importUtcMs: Long = System.currentTimeMillis()): GpxImport {
         val h = Handler()
         try {
-            SAXParserFactory.newInstance().apply { isNamespaceAware = true }.newSAXParser().parse(input, h)
+            val factory = SAXParserFactory.newInstance().apply {
+                isNamespaceAware = true
+                // A file picked from disk is untrusted: no DOCTYPE/entities (billion laughs, external entities) (review I8).
+                runCatching { setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+                runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+                runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+                runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+            }
+            factory.newSAXParser().parse(input, h)
         } catch (e: Exception) {
             throw ImportException("GPX ilegible: ${e.message}", e)
         }

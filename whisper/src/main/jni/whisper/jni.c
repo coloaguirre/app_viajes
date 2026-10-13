@@ -15,6 +15,7 @@ JNIEXPORT jlong JNICALL
 Java_com_bitacoraviaje_whisper_WhisperLib_initContext(JNIEnv *env, jclass clazz, jstring model_path) {
     UNUSED(clazz);
     const char *path = (*env)->GetStringUTFChars(env, model_path, NULL);
+    if (path == NULL) return 0;
     struct whisper_context_params cparams = whisper_context_default_params();
     cparams.use_gpu = false;
     cparams.flash_attn = false;
@@ -37,7 +38,9 @@ Java_com_bitacoraviaje_whisper_WhisperLib_fullTranscribe(JNIEnv *env, jclass cla
     UNUSED(clazz);
     struct whisper_context *ctx = (struct whisper_context *) ptr;
     if (ctx == NULL) return -100;
+    if (audio == NULL) return -101;
     jfloat *samples = (*env)->GetFloatArrayElements(env, audio, NULL);
+    if (samples == NULL) return -102; // OOM
     const jsize n_samples = (*env)->GetArrayLength(env, audio);
     const char *lang = language ? (*env)->GetStringUTFChars(env, language, NULL) : NULL;
     const char *vad = vad_model_path ? (*env)->GetStringUTFChars(env, vad_model_path, NULL) : NULL;
@@ -82,6 +85,7 @@ Java_com_bitacoraviaje_whisper_WhisperLib_fullTranscribe(JNIEnv *env, jclass cla
 JNIEXPORT jint JNICALL
 Java_com_bitacoraviaje_whisper_WhisperLib_segmentCount(JNIEnv *env, jclass clazz, jlong ptr) {
     UNUSED(env); UNUSED(clazz);
+    if (ptr == 0) return 0;
     return whisper_full_n_segments((struct whisper_context *) ptr);
 }
 

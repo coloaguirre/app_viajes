@@ -59,13 +59,16 @@ class OsmClientsTest {
     }
 
     @Test
-    fun `overpass trails are parsed and a track along the recorded trail gets its name`() {
+    fun `the sample trek over a real trail gets the trail name from the recorded overpass answer`() {
         val body = fixture("overpass_chalten_trails.json")
         val trails = OverpassClient.parse(body)
         assertTrue(trails.isNotEmpty(), "the recorded answer holds named trails")
         val longest = trails.maxByOrNull { it.geometry.size }!!
-        // The sample trek: the recorded trail's own vertices as track points.
-        val track = longest.geometry.mapIndexed { i, (la, lo) -> TrackPoint(segmentId = "s", timeUtcMs = i * 10_000L, lat = la, lon = lo) }
+        // tools/sample-trips/trekking-sendero: a walk along the real trail with ±8 m GPS jitter (PLAN 3.6 acceptance).
+        val gpx = javaClass.getResourceAsStream("/trekking-sendero/track.gpx") ?: error("sample trek missing: run tools/sample-trips/make_trail_trek.py")
+        val trek = com.bitacoraviaje.core.export.GpxReader.read(gpx, "track.gpx", "America/Argentina/Buenos_Aires").trip.segments.single()
+        val track = trek.points
+        assertTrue(track.size > 100 && trek.segment.transport == com.bitacoraviaje.core.model.Transport.WALK)
         server.enqueue(MockResponse(body = body))
         val fetched = OverpassClient(http).trailsNear(server.url("/api/interpreter").toString(), track)
         assertEquals(trails.size, fetched.size)

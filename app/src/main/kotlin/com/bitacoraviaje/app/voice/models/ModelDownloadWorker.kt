@@ -85,7 +85,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                         if (done - lastReport > 2 * 1024 * 1024) {
                             lastReport = done
                             setProgress(workDataOf(KEY_DONE to done, KEY_TOTAL to size))
-                            notifications.notify(NOTIFICATION_ID, notification(done, total))
+                            notifications.notify(notificationId(), notification(done, total))
                         }
                     }
                 }
@@ -98,10 +98,12 @@ class ModelDownloadWorker @AssistedInject constructor(
         if (!ModelStore.commitVerified(part, target, sha256)) throw IllegalStateException("la verificación SHA-256 falló; descarga descartada")
     }
 
+    private fun notificationId() = NOTIFICATION_ID_BASE + WhisperModel.byId(inputData.getString(KEY_MODEL)).ordinal
+
     private fun foregroundInfo(done: Long, total: Long): ForegroundInfo {
         notifications.createNotificationChannel(NotificationChannel(CHANNEL_ID, appContext.getString(R.string.model_notif_channel), NotificationManager.IMPORTANCE_LOW))
         val n = notification(done, total)
-        return if (Build.VERSION.SDK_INT >= 29) ForegroundInfo(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) else ForegroundInfo(NOTIFICATION_ID, n)
+        return if (Build.VERSION.SDK_INT >= 29) ForegroundInfo(notificationId(), n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) else ForegroundInfo(notificationId(), n)
     }
 
     private fun notification(done: Long, total: Long) = NotificationCompat.Builder(appContext, CHANNEL_ID)
@@ -116,7 +118,7 @@ class ModelDownloadWorker @AssistedInject constructor(
     companion object {
         private const val TAG = "Bitacora"
         const val CHANNEL_ID = "models"
-        const val NOTIFICATION_ID = 2002
+        const val NOTIFICATION_ID_BASE = 2002
         const val KEY_MODEL = "model"
         const val KEY_DONE = "done"
         const val KEY_TOTAL = "total"
@@ -124,10 +126,11 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         fun workName(model: WhisperModel) = "model-${model.id}"
 
-        fun enqueue(context: Context, model: WhisperModel) {
+        fun enqueue(context: Context, model: WhisperModel, allowMetered: Boolean = false) {
             val req = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
                 .setInputData(workDataOf(KEY_MODEL to model.id))
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresStorageNotLow(true).build())
+                // Hundreds of MB: Wi-Fi only unless the user opts into mobile data (review M13).
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(if (allowMetered) NetworkType.CONNECTED else NetworkType.UNMETERED).setRequiresStorageNotLow(true).build())
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(workName(model), ExistingWorkPolicy.KEEP, req)
         }

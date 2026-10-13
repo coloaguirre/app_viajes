@@ -63,6 +63,16 @@ class SettingsViewModel @Inject constructor(
 
     fun setNominatimUrl(url: String) = viewModelScope.launch { prefs.setNominatimUrl(url) }
 
+    /** Backups the app wrote (or Android restored) under files/backup, newest first (review I4). */
+    val backups: StateFlow<List<java.io.File>> = refresh.map {
+        com.bitacoraviaje.app.export.BackupFiles.dir(appContext).listFiles { f -> f.isFile && (f.name.endsWith(".json.gz") || f.name.endsWith(".json")) }?.sortedByDescending { it.lastModified() }.orEmpty()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Restores a backup through the same import path as an external file; the trip id exists → the Home dialog asks. */
+    fun restoreBackup(file: java.io.File) = com.bitacoraviaje.app.export.ImportWorker.enqueue(appContext, android.net.Uri.fromFile(file))
+
+    fun refreshBackups() { refresh.value++ }
+
     fun setOverpassUrl(url: String) = viewModelScope.launch { prefs.setOverpassUrl(url) }
 
     fun setUnits(units: Units) = viewModelScope.launch { prefs.setUnits(units) }

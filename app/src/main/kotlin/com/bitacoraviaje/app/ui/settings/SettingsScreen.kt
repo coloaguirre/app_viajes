@@ -122,6 +122,22 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 supportingContent = { Text(settings.transcriptionLanguage) },
             )
             HorizontalDivider()
+            SectionTitle(stringResource(R.string.settings_backups))
+            val backups by viewModel.backups.collectAsStateWithLifecycle()
+            androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshBackups() }
+            if (backups.isEmpty()) {
+                Text(stringResource(R.string.settings_backups_none), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+            } else {
+                Text(stringResource(R.string.settings_backups_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+                backups.forEach { f ->
+                    ListItem(
+                        headlineContent = { Text(f.name.removeSuffix(".json.gz").removeSuffix(".json").take(8) + "… · " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(f.lastModified()))) },
+                        supportingContent = { Text(stringResource(R.string.settings_backup_size, f.length() / 1024)) },
+                        trailingContent = { androidx.compose.material3.TextButton(onClick = { viewModel.restoreBackup(f) }, modifier = Modifier.testTag("backup_restore_${f.name}")) { Text(stringResource(R.string.settings_backup_restore)) } },
+                    )
+                }
+            }
+            HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_osm))
             Text(stringResource(R.string.settings_osm_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
             UrlField(stringResource(R.string.settings_nominatim), settings.nominatimUrl, viewModel::setNominatimUrl, "settings_nominatim")

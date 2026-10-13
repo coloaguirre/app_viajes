@@ -26,7 +26,8 @@ class ExportLoader @Inject constructor(
     suspend fun load(tripId: String, options: ExportOptions, nowUtcMs: Long = System.currentTimeMillis()): TripExport? {
         val trip = tracking.getTrip(tripId) ?: return null
         val segments = tracking.segmentsOf(tripId)
-        val mediaByTrip = media.allOfTrip(tripId).filter { !it.isExcluded }
+        // Excluded items travel too (with `excluded = true`, no file) so a re-import keeps the exclusion (review M9).
+        val mediaByTrip = media.allOfTrip(tripId)
         val mediaBySegment = mediaByTrip.groupBy { it.segmentId }
         val orphan = mediaBySegment[null].orEmpty()
         val exports = segments.mapIndexed { i, s ->
@@ -50,7 +51,7 @@ class ExportLoader @Inject constructor(
             return alt
         }
         val mediaFiles = if (options.includeMedia) {
-            mediaByTrip.filter { it.contentUri != null }.associate { m ->
+            mediaByTrip.filter { it.contentUri != null && !it.isExcluded }.associate { m ->
                 m.id to unique(Names.mediaPath(if (m.kind == MediaKind.VIDEO) "videos" else "fotos", m.takenUtcMs, tzBy(m.segmentId), m.displayName, m.id), m.id)
             }
         } else {

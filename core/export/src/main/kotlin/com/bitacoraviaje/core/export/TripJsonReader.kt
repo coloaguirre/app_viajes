@@ -47,7 +47,8 @@ object TripJsonReader {
         }
         if (doc.schema_version != TripJson.SCHEMA_VERSION) throw ImportException("schema_version ${doc.schema_version} no soportada (esperada ${TripJson.SCHEMA_VERSION})")
         val ids = HashMap<String, String>()
-        fun id(old: String): String = if (!regenerateIds) old else ids.getOrPut(old) { UUID.randomUUID().toString() }
+        // Every id is validated whether or not it is regenerated: ids become path components (review B1).
+        fun id(old: String): String = if (!regenerateIds) SafeId.require(old) else ids.getOrPut(SafeId.require(old)) { UUID.randomUUID().toString() }
         val tripId = id(doc.trip.id)
         val trip = Trip(
             id = tripId, title = doc.trip.title, description = doc.trip.description, createdUtcMs = doc.trip.started_utc_ms ?: doc.segments.minOfOrNull { it.started_utc_ms } ?: 0L,

@@ -126,6 +126,7 @@
     <string name="export_done">Listo: %1$s.zip</string>
     <string name="export_done_counts">Fotos y videos: %1$d de %2$d · Audios: %3$d de %4$d</string>
     <string name="export_failed">No se pudo exportar: %1$s</string>
+    <string name="export_no_space">falta espacio en el teléfono (hacen falta unos %1$d MB y hay %2$d MB libres)</string>
     <string name="export_share">Compartir</string>
     <string name="export_retry">Intentar de nuevo</string>
     <string name="export_notif_channel">Exportaciones</string>
@@ -145,8 +146,13 @@
     <string name="settings_engine_whisper_desc">Siempre whisper con el modelo elegido abajo.</string>
     <string name="settings_engine_system">Reconocedor del sistema</string>
     <string name="settings_engine_system_desc">Solo el reconocedor de voz de Android en el dispositivo.</string>
+    <string name="settings_backups">Respaldos en el teléfono</string>
+    <string name="settings_backups_none">Todavía no hay respaldos: se escriben solos al cerrar una etapa.</string>
+    <string name="settings_backups_desc">Un respaldo por viaje (trip.json comprimido). Se incluyen en la copia de seguridad de Android; al restaurar un teléfono aparecen acá y se recuperan con "Restaurar". El resultado se muestra en Mis viajes.</string>
+    <string name="settings_backup_size">%1$d KB</string>
+    <string name="settings_backup_restore">Restaurar</string>
     <string name="settings_osm">Servicios de mapa (OpenStreetMap)</string>
-    <string name="settings_osm_desc">Para nombrar rutas y senderos la app consulta Nominatim y Overpass con tu recorrido muestreado. Si las instancias públicas están saturadas, podés indicar otras.</string>
+    <string name="settings_osm_desc">Para nombrar rutas la app envía a Nominatim 8 puntos del recorrido, y para senderos envía a Overpass el recorrido simplificado (precisión de 10 m), sin los primeros y últimos 200 m. Si las instancias públicas están saturadas, podés indicar otras.</string>
     <string name="settings_nominatim">Instancia de Nominatim</string>
     <string name="settings_overpass">Instancia de Overpass</string>
     <string name="settings_apply">Aplicar</string>
