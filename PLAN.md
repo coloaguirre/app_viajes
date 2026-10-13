@@ -418,6 +418,14 @@ instalación directa; se retoma solo si se decide publicar (D4).
 - [ ] 6.2 Declaraciones de Play Console, seguridad de los datos y
       política de privacidad; migrar el mapa del video a PMTiles.  (est: 3)
 
+### Deseables post-pruebas (backlog, sin fecha; evaluación en `docs/notes/backlog-deseables.md`)
+Pedidos por el usuario el 2026-10-13 para después de las pruebas de campo. No forman parte del
+contrato vigente; entran al plan cuando el usuario los priorice.
+- [ ] D1 Menú de tres puntos por viaje: renombrar, archivar, exportar, video, borrar con respaldo.  (est: 1)
+- [ ] D2 Mapa interactivo: tocar marcadores y recorrido → foto/nota, km acumulados y hora.  (est: 2)
+- [ ] D3 Clima por hora a lo largo del recorrido (Open-Meteo) con resumen mañana/tarde/noche.  (est: 2.5)
+- [ ] D4 "Nuevo viaje" con componentes (etapa, excursión, trekking) en lugar de tres registros.  (est: 2)
+
 ### Calendario
 Suma de estimaciones activas (Fases 0 a 5): **62,5 días de trabajo de
 agente**, sin contar los tiempos de revisión del usuario ni las pruebas en
