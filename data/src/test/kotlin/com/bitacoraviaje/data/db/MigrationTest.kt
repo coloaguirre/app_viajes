@@ -130,8 +130,19 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 7 to 8 adds original_summary and keeps texts`() {
+        helper.createDatabase(DB_NAME, 7).use { v7 ->
+            v7.execSQL("INSERT INTO place (id,name,lat,lon,source) VALUES ('wd-Q1','Pueblo',-49.3,-72.9,'WIKIPEDIA')")
+            v7.execSQL("INSERT INTO enrichment (id,place_id,lang,summary,source_name,source_url,fetched_utc_ms) VALUES ('e1','wd-Q1','es','Texto','Wikipedia','https://es.wikipedia.org/wiki/X',5)")
+        }
+        val v8 = helper.runMigrationsAndValidate(DB_NAME, 8, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v8.query("SELECT summary, original_summary FROM enrichment WHERE id='e1'").use { c -> c.moveToFirst(); assertEquals("Texto", c.getString(0)); assertTrue(c.isNull(1)) }
+        v8.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(7, BitacoraDatabase.VERSION)
+        assertEquals(8, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

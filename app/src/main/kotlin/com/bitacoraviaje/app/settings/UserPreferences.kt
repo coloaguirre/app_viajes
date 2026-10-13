@@ -27,6 +27,8 @@ val TRANSCRIPTION_ENGINES: List<String> = listOf("auto", "whisper", "system")
 /** OSM service instances (PLAN 3.6): changeable in Settings when the public ones are busy or rate-limited. */
 const val DEFAULT_NOMINATIM_URL: String = "https://nominatim.openstreetmap.org"
 const val DEFAULT_OVERPASS_URL: String = "https://overpass-api.de/api/interpreter"
+/** PLAN 4.3: model used to rewrite place texts when the user configured a Claude API key. */
+const val DEFAULT_LLM_MODEL: String = "claude-sonnet-5"
 val REST_AFTER_OPTIONS_MIN: List<Int> = listOf(3, 5, 10, 15)
 
 data class UserSettings(
@@ -45,6 +47,7 @@ data class UserSettings(
     val enrichPlaces: Boolean = true,
     /** DISENO §15: send coordinates rounded to ~1 km to Wikipedia/Nominatim for places. */
     val roundEnrichmentCoords: Boolean = false,
+    val llmModel: String = DEFAULT_LLM_MODEL,
 ) {
     companion object {
         /**
@@ -64,6 +67,7 @@ data class UserSettings(
             overpassUrl: String? = null,
             enrichPlaces: Boolean? = null,
             roundEnrichmentCoords: Boolean? = null,
+            llmModel: String? = null,
             onInvalid: (key: String, value: String) -> Unit = { _, _ -> },
         ): UserSettings = UserSettings(
             units = parseEnum<Units>(units, Units.METRIC) { onInvalid("units", it) },
@@ -89,6 +93,7 @@ data class UserSettings(
             overpassUrl = httpsOr(overpassUrl, DEFAULT_OVERPASS_URL) { onInvalid("overpass_url", it) },
             enrichPlaces = enrichPlaces ?: true,
             roundEnrichmentCoords = roundEnrichmentCoords ?: false,
+            llmModel = llmModel?.trim()?.takeIf { it.matches(Regex("^[A-Za-z0-9._-]{3,64}$")) } ?: run { if (llmModel != null) onInvalid("llm_model", llmModel); DEFAULT_LLM_MODEL },
         )
 
         /** https only, except a loopback host (a local instance on the PC through the emulator's 10.0.2.2 or adb reverse). */
@@ -125,6 +130,7 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
         val OVERPASS_URL = stringPreferencesKey("overpass_url")
         val ENRICH_PLACES = androidx.datastore.preferences.core.booleanPreferencesKey("enrich_places")
         val ROUND_ENRICHMENT_COORDS = androidx.datastore.preferences.core.booleanPreferencesKey("round_enrichment_coords")
+        val LLM_MODEL = stringPreferencesKey("llm_model")
     }
 
     val settings: Flow<UserSettings> = context.settingsStore.data.map { p ->
@@ -141,6 +147,7 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
             overpassUrl = p[Keys.OVERPASS_URL],
             enrichPlaces = p[Keys.ENRICH_PLACES],
             roundEnrichmentCoords = p[Keys.ROUND_ENRICHMENT_COORDS],
+            llmModel = p[Keys.LLM_MODEL],
         )
     }
 
@@ -167,6 +174,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     suspend fun setEnrichPlaces(value: Boolean) = context.settingsStore.edit { it[Keys.ENRICH_PLACES] = value }
 
     suspend fun setRoundEnrichmentCoords(value: Boolean) = context.settingsStore.edit { it[Keys.ROUND_ENRICHMENT_COORDS] = value }
+
+    suspend fun setLlmModel(model: String) = context.settingsStore.edit { it[Keys.LLM_MODEL] = model.trim() }
 
     private companion object {
         const val TAG = "Bitacora"

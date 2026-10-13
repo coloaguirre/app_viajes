@@ -24,7 +24,14 @@ data class ModelState(val model: WhisperModel, val installed: Boolean, val downl
 class SettingsViewModel @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val prefs: UserPreferences,
+    private val secrets: com.bitacoraviaje.app.settings.Secrets,
 ) : ViewModel() {
+    val hasLlmKey: StateFlow<Boolean> = secrets.has(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY)
+
+    fun setLlmKey(key: String?) = secrets.set(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY, key)
+
+    fun setLlmModel(model: String) = viewModelScope.launch { prefs.setLlmModel(model) }
+
     val settings: StateFlow<UserSettings> =
         prefs.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSettings())
 

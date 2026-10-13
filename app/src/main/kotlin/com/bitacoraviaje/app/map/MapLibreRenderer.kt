@@ -158,6 +158,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
                             org.maplibre.android.style.expressions.Expression.stop("TEXT", org.maplibre.android.style.expressions.Expression.rgb(96, 125, 139)),
                             org.maplibre.android.style.expressions.Expression.stop("HIGHLIGHT", org.maplibre.android.style.expressions.Expression.rgb(255, 152, 0)),
                             org.maplibre.android.style.expressions.Expression.stop("PLACED", org.maplibre.android.style.expressions.Expression.rgb(211, 47, 47)),
+                            org.maplibre.android.style.expressions.Expression.stop("PLACE", org.maplibre.android.style.expressions.Expression.rgb(121, 85, 72)),
                         ),
                     ),
                     PropertyFactory.circleRadius(8f),

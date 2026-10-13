@@ -6,7 +6,7 @@ import androidx.compose.ui.Modifier
 /** A WGS84 position for the map layer; keeps the UI independent of the map SDK types. */
 data class MapPoint(val lat: Double, val lon: Double)
 
-enum class MarkerKind { PHOTO, VIDEO, VOICE, TEXT, HIGHLIGHT, PLACED }
+enum class MarkerKind { PHOTO, VIDEO, VOICE, TEXT, HIGHLIGHT, PLACED, PLACE }
 
 data class MapMarker(val id: String, val point: MapPoint, val kind: MarkerKind)
 

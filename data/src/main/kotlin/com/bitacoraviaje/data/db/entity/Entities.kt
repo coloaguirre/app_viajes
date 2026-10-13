@@ -257,6 +257,8 @@ data class EnrichmentEntity(
     @ColumnInfo(name = "source_url") val sourceUrl: String,
     val license: String?,
     @ColumnInfo(name = "thumbnail_url") val thumbnailUrl: String?,
+    /** The source text as fetched, kept when the user or the model rewrites [summary] (DISENO §11.4). */
+    @ColumnInfo(name = "original_summary") val originalSummary: String?,
     @ColumnInfo(name = "llm_rewritten", defaultValue = "0") val llmRewritten: Boolean,
     @ColumnInfo(name = "user_approved", defaultValue = "0") val userApproved: Boolean,
     @ColumnInfo(name = "fetched_utc_ms") val fetchedUtcMs: Long,

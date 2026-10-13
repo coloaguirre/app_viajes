@@ -15,7 +15,7 @@ internal object Diary {
 
     fun days(trip: TripExport): List<Day> {
         val bySeg = trip.segments.map { se ->
-            se to buildTimeline(TimelineInput(se.segment, se.points.filter { !it.isFilteredOut }, se.pauses, se.stops, se.media, se.voiceNotes, se.textNotes, nowUtcMs = trip.exportedUtcMs))
+            se to buildTimeline(TimelineInput(se.segment, se.points.filter { !it.isFilteredOut }, se.pauses, se.stops, se.media, se.voiceNotes, se.textNotes, places = trip.placesOf(se.segment.id), nowUtcMs = trip.exportedUtcMs))
         }
         return bySeg.groupBy { (se, _) -> Iso.localDate(se.segment.startedUtcMs, se.segment.tzId) }.toSortedMap().map { (d, l) -> Day(d, l) }
     }
@@ -53,6 +53,7 @@ internal object Diary {
         is TimelineEvent.Highlight -> "Momento destacado"
         is TimelineEvent.TransportChange -> "Cambio de medio: ${transport(e.transport)}"
         is TimelineEvent.DayChange -> "Nuevo día: ${e.localDate}"
+        is TimelineEvent.PlaceVisited -> "Lugar: ${e.place.name}"
         is TimelineEvent.Summary -> "Recorriste ${km(e.distanceM)} en ${dur(e.durationMs)}"
     }
 }

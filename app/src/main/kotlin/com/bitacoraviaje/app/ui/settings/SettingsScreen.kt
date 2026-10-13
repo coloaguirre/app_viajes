@@ -153,6 +153,12 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 trailingContent = { androidx.compose.material3.Switch(checked = settings.roundEnrichmentCoords, onCheckedChange = viewModel::setRoundEnrichmentCoords, enabled = settings.enrichPlaces, modifier = Modifier.testTag("settings_round_coords")) },
             )
             HorizontalDivider()
+            SectionTitle(stringResource(R.string.settings_llm))
+            Text(stringResource(R.string.settings_llm_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+            val hasKey by viewModel.hasLlmKey.collectAsStateWithLifecycle()
+            SecretField(hasKey = hasKey, onSave = { viewModel.setLlmKey(it) }, onDelete = { viewModel.setLlmKey(null) })
+            if (hasKey) UrlField(stringResource(R.string.settings_llm_model), settings.llmModel, viewModel::setLlmModel, "settings_llm_model")
+            HorizontalDivider()
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_about)) },
                 supportingContent = { Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME)) },
@@ -199,6 +205,28 @@ private fun UrlField(label: String, value: String, onCommit: (String) -> Unit, t
         singleLine = true,
         trailingIcon = { androidx.compose.material3.TextButton(onClick = { onCommit(text) }, enabled = text != value) { Text(stringResource(R.string.settings_apply)) } },
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag(tag),
+    )
+}
+
+/** API key entry: never shows the stored value, only whether one exists (skill play-policy-privacy). */
+@Composable
+private fun SecretField(hasKey: Boolean, onSave: (String) -> Unit, onDelete: () -> Unit) {
+    var text by androidx.compose.runtime.remember(hasKey) { androidx.compose.runtime.mutableStateOf("") }
+    androidx.compose.material3.OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        label = { Text(stringResource(R.string.settings_llm_key)) },
+        placeholder = { Text(stringResource(if (hasKey) R.string.settings_llm_key_set else R.string.settings_llm_key_none)) },
+        singleLine = true,
+        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password, autoCorrectEnabled = false),
+        trailingIcon = {
+            Row {
+                if (hasKey) androidx.compose.material3.TextButton(onClick = onDelete, modifier = Modifier.testTag("settings_llm_key_delete")) { Text(stringResource(R.string.settings_llm_key_delete)) }
+                androidx.compose.material3.TextButton(onClick = { onSave(text); text = "" }, enabled = text.isNotBlank(), modifier = Modifier.testTag("settings_llm_key_save")) { Text(stringResource(R.string.settings_llm_key_save)) }
+            }
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag("settings_llm_key"),
     )
 }
 

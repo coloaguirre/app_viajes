@@ -218,7 +218,7 @@
       "required": ["place_id", "source", "license", "text"],
       "properties": {
         "place_id": { "type": "string" }, "source": { "type": "string" }, "license": { "type": "string" }, "text": { "type": "string" },
-        "id": { "$ref": "#/$defs/nullableString" }, "lang": { "$ref": "#/$defs/nullableString" }, "title": { "$ref": "#/$defs/nullableString" }, "url": { "$ref": "#/$defs/nullableString" }, "thumbnail_url": { "$ref": "#/$defs/nullableString" },
+        "id": { "$ref": "#/$defs/nullableString" }, "lang": { "$ref": "#/$defs/nullableString" }, "title": { "$ref": "#/$defs/nullableString" }, "url": { "$ref": "#/$defs/nullableString" }, "thumbnail_url": { "$ref": "#/$defs/nullableString" }, "original_text": { "$ref": "#/$defs/nullableString" },
         "llm_rewritten": { "type": "boolean" }, "user_approved": { "type": "boolean" }
       }
     },

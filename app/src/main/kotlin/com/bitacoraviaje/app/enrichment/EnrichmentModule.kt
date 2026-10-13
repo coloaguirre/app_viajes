@@ -12,3 +12,13 @@ abstract class EnrichmentModule {
     @Binds
     abstract fun bindWikipedia(impl: WikipediaClient): WikipediaSource
 }
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class LlmModule {
+    @Binds
+    abstract fun bindRewriter(impl: ClaudeRewriter): LlmRewriter
+
+    @Binds
+    abstract fun bindSecrets(impl: com.bitacoraviaje.app.settings.KeystoreSecretStore): com.bitacoraviaje.app.settings.Secrets
+}

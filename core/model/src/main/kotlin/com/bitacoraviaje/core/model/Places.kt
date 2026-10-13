@@ -41,6 +41,8 @@ data class Enrichment(
     val sourceUrl: String,
     val license: String? = null,
     val thumbnailUrl: String? = null,
+    /** Text as fetched from the source, when [summary] was edited or rewritten. */
+    val originalSummary: String? = null,
     val llmRewritten: Boolean = false,
     /** The user accepted it for the video (DISENO §11.4). */
     val userApproved: Boolean = false,

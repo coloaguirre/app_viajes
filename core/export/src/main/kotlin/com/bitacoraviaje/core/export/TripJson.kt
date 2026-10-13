@@ -179,7 +179,7 @@ object TripJson {
     data class EnrichmentDto(
         val place_id: String, val source: String, val license: String, val text: String,
         val id: String? = null, val lang: String? = null, val title: String? = null, val url: String? = null, val thumbnail_url: String? = null,
-        val llm_rewritten: Boolean = false, val user_approved: Boolean = false,
+        val original_text: String? = null, val llm_rewritten: Boolean = false, val user_approved: Boolean = false,
     )
 
     @Serializable
@@ -248,7 +248,7 @@ object TripJson {
             enrichments = t.enrichments.map { e ->
                 EnrichmentDto(
                     place_id = e.placeId, source = e.sourceName, license = e.license ?: "", text = e.summary, id = e.id, lang = e.lang, title = e.title, url = e.sourceUrl,
-                    thumbnail_url = e.thumbnailUrl, llm_rewritten = e.llmRewritten, user_approved = e.userApproved,
+                    thumbnail_url = e.thumbnailUrl, original_text = e.originalSummary, llm_rewritten = e.llmRewritten, user_approved = e.userApproved,
                 )
             },
             attributions = t.attributions.map { AttributionDto(it.name, it.license, it.url) },

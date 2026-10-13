@@ -49,6 +49,7 @@ class EnrichPlacesWorker @AssistedInject constructor(
         const val KEY_SKIPPED = "skipped"
         const val KEY_PARTIAL = "partial"
         const val MAX_ATTEMPTS = 6
+        const val TAG_WORK = "enrich-places"
 
         fun workName(segmentId: String) = "enrich-places-$segmentId"
 
@@ -57,6 +58,7 @@ class EnrichPlacesWorker @AssistedInject constructor(
                 .setInputData(workDataOf(KEY_SEGMENT_ID to segmentId, KEY_FORCE to force))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
+                .addTag(TAG_WORK)
                 .build()
             // KEEP after a segment closes; a user-requested refresh replaces whatever is queued.
             WorkManager.getInstance(context).enqueueUniqueWork(workName(segmentId), if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP, req)

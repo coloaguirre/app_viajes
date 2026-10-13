@@ -340,13 +340,17 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: tests con respuestas grabadas; etapa de ejemplo
       produce ≤ 5 lugares rankeados con atribución.
       Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.1-lugares.md`.
-- [ ] 4.2 Pantalla de lugares con aprobación/descarte y atribuciones.  (est: 1)
+- [x] 4.2 Pantalla de lugares con aprobación/descarte y atribuciones.  (est: 1)
       Aceptación: prueba de Compose; capturas.
-- [ ] 4.3 Reescritura opcional con modelo de lenguaje (clave del usuario
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.2-pantalla-lugares.md`.
+- [x] 4.3 Reescritura opcional con modelo de lenguaje (clave del usuario
       en DataStore cifrado, restringida al texto fuente, desactivada por
       default).  (est: 0.5)
       Aceptación: sin clave, la función no aparece; con clave, el texto
       conserva URL y licencia de origen (test con cliente simulado).
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.3-reescritura-ia.md`
+      (la clave vive en un archivo cifrado con el Keystore, no en DataStore:
+      las reglas de respaldo no lo incluyen).
 - [ ] 4.4 `core/videoplan`: planificador puro con preset "rápido 1 min"
       y duraciones 1/3/5/10 min, selección por favorita > destacada >
       nitidez, sin duplicados.  (est: 1.5)

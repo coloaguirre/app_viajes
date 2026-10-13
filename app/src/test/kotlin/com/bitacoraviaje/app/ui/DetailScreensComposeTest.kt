@@ -4,13 +4,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.ui.review.MediaReviewScreen
@@ -179,5 +184,74 @@ class DetailScreensComposeTest {
         rule.onNodeWithTag("voice_retry").performClick()
         assertEquals("hola mundo corregido", saved)
         assertEquals(1, retried)
+    }
+
+    @Test
+    fun `places tab shows cards with source and license and reports approve, edit, discard and refresh`() {
+        val actions = mutableListOf<com.bitacoraviaje.app.ui.tripdetail.PlaceAction>()
+        val place = com.bitacoraviaje.core.model.Place("wd-Q1", "El Chaltén", -49.33, -72.88, kind = "municipality", admin1 = "Santa Cruz", source = com.bitacoraviaje.core.model.PlaceSource.WIKIPEDIA)
+        val wiki = com.bitacoraviaje.core.model.Enrichment("wd-Q1-wikipedia-es", "wd-Q1", "es", "El Chaltén", "El Chaltén es un municipio.", "Wikipedia", "https://es.wikipedia.org/wiki/El_Chalt%C3%A9n", "CC BY-SA 4.0", fetchedUtcMs = t0)
+        val facts = wiki.copy(id = "wd-Q1-wikidata", summary = "Altitud: 397 m", sourceName = "Wikidata", sourceUrl = "https://www.wikidata.org/wiki/Q1", license = "CC0", userApproved = true)
+        val card = com.bitacoraviaje.app.ui.tripdetail.PlaceCard(segment, place, com.bitacoraviaje.core.model.SegmentPlace("s1", "wd-Q1", t0, 40 * 60_000L, 3.0), listOf(wiki, facts))
+        val bare = com.bitacoraviaje.app.ui.tripdetail.PlaceCard(segment, place.copy(id = "osm-N5", name = "Cerro Paredón", kind = "peak", source = com.bitacoraviaje.core.model.PlaceSource.OVERPASS), com.bitacoraviaje.core.model.SegmentPlace("s1", "osm-N5", t0, null, 0.5), emptyList())
+        rule.setContent {
+            BitacoraTheme {
+                TripDetailScreen(
+                    state = TripDetailUiState(trip = trip, segments = listOf(SegmentTimeline(segment, events, emptyList())), selectedTab = 3, places = listOf(card, bare)),
+                    onBack = {}, onTab = {}, onEvent = {}, onReview = {}, onPlaceAction = { actions += it },
+                )
+            }
+        }
+        rule.onNodeWithText("El Chaltén").assertIsDisplayed()
+        rule.onNodeWithText("Wikipedia · CC BY-SA 4.0").assertIsDisplayed()
+        rule.onNodeWithText("Wikidata · CC0").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Se usa en el video").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("place_approve_wd-Q1-wikipedia-es").performScrollTo().performClick()
+        rule.onNodeWithTag("place_edit_wd-Q1-wikipedia-es").performScrollTo().performClick()
+        rule.onNodeWithTag("place_edit_text").performTextReplacement("Texto corregido")
+        rule.onNodeWithTag("place_edit_save").performClick()
+        rule.onNodeWithTag("places_list").performScrollToNode(hasTestTag("place_osm-N5"))
+        rule.onNodeWithText("Sin texto en internet; solo el nombre del mapa.").assertIsDisplayed()
+        rule.onNodeWithTag("place_discard_osm-N5").performScrollTo().performClick()
+        rule.onNodeWithTag("places_refresh").performClick()
+        assertEquals(
+            listOf(
+                com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Approve("wd-Q1-wikipedia-es", true),
+                com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Edit("wd-Q1-wikipedia-es", "Texto corregido"),
+                com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Discard("s1", "osm-N5"),
+                com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Refresh,
+            ),
+            actions,
+        )
+    }
+
+    @Test
+    fun `places tab empty state and disabled refresh while a search runs`() {
+        rule.setContent {
+            BitacoraTheme {
+                TripDetailScreen(state = TripDetailUiState(trip = trip, selectedTab = 3, placesWork = com.bitacoraviaje.app.ui.tripdetail.PlacesWork.RUNNING), onBack = {}, onTab = {}, onEvent = {}, onReview = {})
+            }
+        }
+        rule.onNodeWithTag("places_empty").assertIsDisplayed()
+        rule.onNodeWithText("Buscando lugares…").assertIsDisplayed()
+        rule.onNodeWithTag("places_refresh").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `rewrite action appears only with an llm key and restore only for an edited text`() {
+        val actions = mutableListOf<com.bitacoraviaje.app.ui.tripdetail.PlaceAction>()
+        val place = com.bitacoraviaje.core.model.Place("wd-Q1", "El Chaltén", -49.33, -72.88, source = com.bitacoraviaje.core.model.PlaceSource.WIKIPEDIA)
+        val wiki = com.bitacoraviaje.core.model.Enrichment("wd-Q1-wikipedia-es", "wd-Q1", "es", "El Chaltén", "Texto.", "Wikipedia", "https://es.wikipedia.org/wiki/X", "CC BY-SA 4.0", fetchedUtcMs = t0)
+        fun state(key: Boolean, e: com.bitacoraviaje.core.model.Enrichment) = TripDetailUiState(trip = trip, selectedTab = 3, llmAvailable = key, places = listOf(com.bitacoraviaje.app.ui.tripdetail.PlaceCard(segment, place, com.bitacoraviaje.core.model.SegmentPlace("s1", "wd-Q1", t0), listOf(e))))
+        var ui by mutableStateOf(state(key = false, e = wiki))
+        rule.setContent { BitacoraTheme { TripDetailScreen(state = ui, onBack = {}, onTab = {}, onEvent = {}, onReview = {}, onPlaceAction = { actions += it }) } }
+        rule.onAllNodesWithTag("place_rewrite_wd-Q1-wikipedia-es").assertCountEquals(0)
+        rule.onAllNodesWithTag("place_restore_wd-Q1-wikipedia-es").assertCountEquals(0)
+        ui = state(key = true, e = wiki.copy(summary = "Reescrito.", originalSummary = "Texto.", llmRewritten = true))
+        rule.onNodeWithText("Reescrito.").assertIsDisplayed()
+        rule.onNodeWithText("Wikipedia · CC BY-SA 4.0 · Texto reescrito").assertIsDisplayed()
+        rule.onNodeWithTag("place_rewrite_wd-Q1-wikipedia-es").performScrollTo().performClick()
+        rule.onNodeWithTag("place_restore_wd-Q1-wikipedia-es").performScrollTo().performClick()
+        assertEquals(listOf(com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Rewrite("wd-Q1-wikipedia-es"), com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Restore("wd-Q1-wikipedia-es")), actions)
     }
 }

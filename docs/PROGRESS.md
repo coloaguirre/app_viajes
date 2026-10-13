@@ -13,7 +13,7 @@
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | 🟨 3.1–3.3, 3.5 y 3.6 cerrados; 3.4 hecho salvo la medición con ≥10 notas; 3.7 (usuario) pendiente | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` · 3.5: `3.5-respaldo.md` · 3.6: `3.6-nombre-de-ruta.md` (+captura) |
-| 4 — Enriquecimiento y video de escritorio | 🟨 4.1 cerrado | 4.1: `docs/notes/evidencia/fase-4/4.1-lugares.md` |
+| 4 — Enriquecimiento y video de escritorio | 🟨 4.1–4.3 cerrados | 4.1: `docs/notes/evidencia/fase-4/4.1-lugares.md` (+captura) · 4.2: `4.2-pantalla-lugares.md` (+captura) · 4.3: `4.3-reescritura-ia.md` |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
 | 6 — Pulido y publicación | ⬜ Pendiente | |
 
@@ -66,6 +66,9 @@
 | 2026-10-13 | Wikipedia detrás de `WikipediaSource`: resumen por REST v1 con caída automática a la Action API (`prop=extracts`) por la migración anunciada de los endpoints REST de Wikimedia; GeoSearch por Action API; inglés como idioma de respaldo marcado en `lang` | PLAN 4.1; DISENO §11.2 |
 | 2026-10-13 | Ranking de lugares (`PlaceRanking`, puro): radios 5 km / 10 km / 300 m por clase, pesos 2·permanencia + 1,5·fotos + 1·notas + 0,5·ln(1+sitelinks) − 1·distancia, 5 por etapa. Qué sale del teléfono: paradas y 10 muestras a 4 decimales sin los 200 m de los extremos; opción de 2 decimales (~1 km) en Ajustes; tope de 45 llamadas por etapa | DISENO §11.3, §15 |
 | 2026-10-13 | `trip.json` suma `places[].visits[]` y campos opcionales de `enrichments[]` sin subir `schema_version` (solo agrega opcionales); `attributions[]` cita cada artículo usado; URLs de servicios aceptan `http` solo hacia loopback (instancia local de prueba) | DISENO §12.2, §11.5 |
+| 2026-10-13 | Pestaña Lugares: tarjetas por etapa con fuente y licencia; aprobar / editar / descartar / buscar de nuevo; evento `PlaceVisited` en la línea de tiempo; descartar solo desvincula (la caché queda) | PLAN 4.2; DISENO §9, §11.4, §14 |
+| 2026-10-13 | Reescritura con IA: clave del usuario en archivo cifrado AES-GCM con el Android Keystore (`files/secrets/`, fuera de respaldos; `security-crypto` está deprecada), modelo configurable (`claude-sonnet-5` por defecto), solo texto de Wikipedia + datos de Wikidata al modelo, validación numérica antes de aceptar; esquema v8 guarda el texto original bajo cualquier edición o reescritura | PLAN 4.3; DISENO §11.4, §15 |
+| 2026-10-13 | Al volver a enriquecer, un texto aprobado, editado o reescrito no se reemplaza: el nuevo texto de la fuente queda como "original" restaurable | Revisión propia del flujo de refresco |
 
 ## Versiones fijadas
 | Componente | Versión | Verificada el |
@@ -122,6 +125,14 @@ Observaciones de la verificación (ítem 0.1):
   pausa manual + excursión anidada; fuente única de altitud (MSL vs
   elipsoidal) por etapa; `ForegroundServiceStartNotAllowedException` a
   vigilar en el Pixel durante 1.7.
+- Room: `@Insert(onConflict = REPLACE)` sobre una tabla padre (por ejemplo `place`)
+  borra la fila vieja y dispara `ON DELETE CASCADE` en los hijos; para refrescar
+  filas compartidas usar `@Upsert`. Detectado en 4.1 (PlacesRepositoryTest).
+- Tests Robolectric: el delegado `preferencesDataStore` es un singleton del proceso,
+  así que los ajustes escritos por un caso se filtran al siguiente; cada test que los
+  use debe reponer sus valores en `setUp` (PlaceEnricherTest).
+- Emulador: FusedLocation entrega pocos fixes aun con `geo fix` cada 3 s (una excursión
+  en bici de 13 min dio 17 puntos); alcanza para enriquecer, no para medir filtros.
 - `adb shell am kill` no mata un proceso con servicio en primer plano; para
   simular una muerte por memoria usar `kill -9 <pid>` (con `adb root`).
 - Tras `adb reboot`, `persist.sys.timezone` del emulador vuelve a UTC; fijarla

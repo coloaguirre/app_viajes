@@ -115,7 +115,7 @@ object TripJsonReader {
             val pid = SafeId.require(e.place_id)
             Enrichment(
                 id = SafeId.require(e.id ?: "$pid-${e.source.lowercase()}"), placeId = pid, lang = e.lang ?: "es", title = e.title, summary = e.text, sourceName = e.source,
-                sourceUrl = e.url ?: "", license = e.license.ifBlank { null }, thumbnailUrl = e.thumbnail_url, llmRewritten = e.llm_rewritten, userApproved = e.user_approved, fetchedUtcMs = 0L,
+                sourceUrl = e.url ?: "", license = e.license.ifBlank { null }, thumbnailUrl = e.thumbnail_url, originalSummary = e.original_text, llmRewritten = e.llm_rewritten, userApproved = e.user_approved, fetchedUtcMs = 0L,
             )
         }
         return TripExport(

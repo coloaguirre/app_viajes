@@ -28,8 +28,9 @@ import kotlinx.coroutines.flow.first
  * [PlaceRanking.DEFAULT_LIMIT] ranked. Idempotent: a segment that already has places is
  * skipped unless [enrich] is forced; the user's approvals survive a re-run (PlacesRepository).
  *
- * What leaves the phone: the stops and up to [SAMPLES] track samples, rounded to ~10 m
- * (or ~1 km with the privacy option), never the first and last [RouteNamer.TRIM_M] metres.
+ * What leaves the phone: the stops rounded to ~10 m (or ~1 km with the privacy option) and
+ * up to [SAMPLES] track samples always rounded to ~1 km, never the first and last
+ * [RouteNamer.TRIM_M] metres.
  * Photos and notes stay on the phone: they only weigh the ranking.
  */
 class PlaceEnricher @Inject constructor(
@@ -65,8 +66,10 @@ class PlaceEnricher @Inject constructor(
         val all = tracking.validPoints(segmentId)
         val points = RouteNamer.trimEnds(all, RouteNamer.TRIM_M)
         if (points.size < RouteNamer.MIN_POINTS) return Outcome(0, skipped = false, lookups = 0, partial = false)
-        val decimals = if (settings.roundEnrichmentCoords) PRIVACY_DECIMALS else DEFAULT_DECIMALS
-        fun r(v: Double) = CoordinateRounding.round(v, decimals)
+        // Stops need ~10 m for points of interest; localities (zoom 10) never need more than ~1 km (skill play-policy-privacy).
+        val stopDecimals = if (settings.roundEnrichmentCoords) PRIVACY_DECIMALS else DEFAULT_DECIMALS
+        fun r(v: Double) = CoordinateRounding.round(v, stopDecimals)
+        fun coarse(v: Double) = CoordinateRounding.round(v, PRIVACY_DECIMALS)
         val stops = tracking.stopsOf(segmentId).sortedByDescending { it.endUtcMs - it.startUtcMs }.take(MAX_STOPS)
         val mediaPts = media.allOfTrip(segment.tripId).filter { it.segmentId == segmentId && !it.isExcluded && it.linkedLat != null && it.linkedLon != null }.map { it.linkedLat!! to it.linkedLon!! }
         val notePts = (notes.textNotesOf(segmentId).mapNotNull { n -> n.lat?.let { la -> n.lon?.let { lo -> la to lo } } } + notes.voiceNotesOf(segmentId).mapNotNull { n -> n.lat?.let { la -> n.lon?.let { lo -> la to lo } } })
@@ -105,7 +108,7 @@ class PlaceEnricher @Inject constructor(
         // 2. Localities crossed: coarse reverse geocoding of equally spaced samples.
         val samples = RouteNamer.sample(points, SAMPLES)
         for (p in samples) {
-            val rg = runCatching { lookups++; nominatim.reverse(settings.nominatimUrl, r(p.lat), r(p.lon), RouteNamer.ZOOM_REGION) }.onFailure { partial = true; warn("nominatim sample", it) }.getOrNull() ?: continue
+            val rg = runCatching { lookups++; nominatim.reverse(settings.nominatimUrl, coarse(p.lat), coarse(p.lon), RouteNamer.ZOOM_REGION) }.onFailure { partial = true; warn("nominatim sample", it) }.getOrNull() ?: continue
             val id = rg.osmPlaceId ?: continue
             if (!seenOsm.add(id)) continue
             val name = rg.locality ?: rg.name ?: continue

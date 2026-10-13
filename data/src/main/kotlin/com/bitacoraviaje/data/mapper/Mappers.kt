@@ -167,12 +167,12 @@ fun com.bitacoraviaje.core.model.Place.toEntity() = com.bitacoraviaje.data.db.en
 
 fun com.bitacoraviaje.data.db.entity.EnrichmentEntity.toDomain() = com.bitacoraviaje.core.model.Enrichment(
     id = id, placeId = placeId, lang = lang, title = title, summary = summary, sourceName = sourceName, sourceUrl = sourceUrl, license = license,
-    thumbnailUrl = thumbnailUrl, llmRewritten = llmRewritten, userApproved = userApproved, fetchedUtcMs = fetchedUtcMs,
+    thumbnailUrl = thumbnailUrl, originalSummary = originalSummary, llmRewritten = llmRewritten, userApproved = userApproved, fetchedUtcMs = fetchedUtcMs,
 )
 
 fun com.bitacoraviaje.core.model.Enrichment.toEntity() = com.bitacoraviaje.data.db.entity.EnrichmentEntity(
     id = id, placeId = placeId, lang = lang, title = title, summary = summary, sourceName = sourceName, sourceUrl = sourceUrl, license = license,
-    thumbnailUrl = thumbnailUrl, llmRewritten = llmRewritten, userApproved = userApproved, fetchedUtcMs = fetchedUtcMs,
+    thumbnailUrl = thumbnailUrl, originalSummary = originalSummary, llmRewritten = llmRewritten, userApproved = userApproved, fetchedUtcMs = fetchedUtcMs,
 )
 
 fun com.bitacoraviaje.data.db.entity.SegmentPlaceEntity.toDomain() = com.bitacoraviaje.core.model.SegmentPlace(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance)

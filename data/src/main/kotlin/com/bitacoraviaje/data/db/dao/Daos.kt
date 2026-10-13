@@ -311,9 +311,13 @@ interface EnrichmentDao {
     @Query("UPDATE enrichment SET user_approved = :approved WHERE id = :id")
     suspend fun setApproved(id: String, approved: Boolean)
 
-    /** User edit keeps the source: only the text changes (DISENO §11.4). */
-    @Query("UPDATE enrichment SET summary = :summary WHERE id = :id")
-    suspend fun setSummary(id: String, summary: String)
+    /** User edit or LLM rewrite keeps the source: the fetched text moves to original_summary once (DISENO §11.4). */
+    @Query("UPDATE enrichment SET original_summary = COALESCE(original_summary, summary), summary = :summary, llm_rewritten = :rewritten WHERE id = :id")
+    suspend fun setSummary(id: String, summary: String, rewritten: Boolean)
+
+    /** Back to the text as fetched. */
+    @Query("UPDATE enrichment SET summary = COALESCE(original_summary, summary), original_summary = NULL, llm_rewritten = 0 WHERE id = :id")
+    suspend fun restoreSummary(id: String)
 
     @Query("DELETE FROM enrichment WHERE id = :id")
     suspend fun delete(id: String)

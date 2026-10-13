@@ -9,8 +9,10 @@ import com.bitacoraviaje.core.model.DayBoundary
 import com.bitacoraviaje.core.model.MediaItem
 import com.bitacoraviaje.core.model.MediaKind
 import com.bitacoraviaje.core.model.PauseKind
+import com.bitacoraviaje.core.model.Place
 import com.bitacoraviaje.core.model.Segment
 import com.bitacoraviaje.core.model.SegmentPause
+import com.bitacoraviaje.core.model.SegmentPlace
 import com.bitacoraviaje.core.model.Stop
 import com.bitacoraviaje.core.model.TextNote
 import com.bitacoraviaje.core.model.TextNoteKind
@@ -44,6 +46,8 @@ sealed interface TimelineEvent {
     /** The user switched means of transport mid-segment (PLAN item 2.9); [transport] is null if the stored name is unknown. */
     data class TransportChange(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val transport: Transport?, val note: TextNote) : TimelineEvent
     data class DayChange(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val localDate: java.time.LocalDate) : TimelineEvent
+    /** A place the enrichment found for this segment (DISENO §9 `PlaceVisited`), at the moment it was first seen. */
+    data class PlaceVisited(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val place: Place, val visit: SegmentPlace) : TimelineEvent
 
     /** "You covered 12.4 km in 2 h 10 min" between two events (DISENO §9). */
     data class Summary(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val distanceM: Double, val durationMs: Long) : TimelineEvent
@@ -57,6 +61,8 @@ data class TimelineInput(
     val media: List<MediaItem> = emptyList(),
     val voiceNotes: List<VoiceNote> = emptyList(),
     val textNotes: List<TextNote> = emptyList(),
+    /** Places linked to this segment (Phase 4), with their visit row. */
+    val places: List<Pair<Place, SegmentPlace>> = emptyList(),
     /** For an open segment: where "now" is. */
     val nowUtcMs: Long? = null,
 )
@@ -108,6 +114,10 @@ fun buildTimeline(input: TimelineInput, config: TimelineConfig = TimelineConfig(
             TextNoteKind.NOTE, TextNoteKind.MARKER -> TimelineEvent.Text(n.timeUtcMs, la, lo, n)
         }
     }
+    for ((place, visit) in input.places) {
+        val t = visit.firstSeenUtcMs.coerceIn(s.startedUtcMs, end)
+        events += TimelineEvent.PlaceVisited(t, place.lat, place.lon, place, visit)
+    }
     // Day separators at every local midnight crossed between start and end.
     var midnight = DayBoundary.nextLocalMidnightUtcMs(s.startedUtcMs, s.tzId)
     while (midnight < end) {
@@ -126,10 +136,11 @@ private fun rank(e: TimelineEvent): Int = when (e) {
     is TimelineEvent.Resume -> 2
     is TimelineEvent.StopArrived -> 3
     is TimelineEvent.Moment, is TimelineEvent.Voice, is TimelineEvent.Text, is TimelineEvent.Highlight, is TimelineEvent.TransportChange -> 4
-    is TimelineEvent.StopLeft -> 5
-    is TimelineEvent.Pause -> 6
-    is TimelineEvent.Summary -> 7
-    is TimelineEvent.SegmentEnd -> 8
+    is TimelineEvent.PlaceVisited -> 5
+    is TimelineEvent.StopLeft -> 6
+    is TimelineEvent.Pause -> 7
+    is TimelineEvent.Summary -> 8
+    is TimelineEvent.SegmentEnd -> 9
 }
 
 private fun groupMoments(media: List<MediaItem>, config: TimelineConfig, at: (Long) -> Pair<Double?, Double?>): List<TimelineEvent.Moment> {

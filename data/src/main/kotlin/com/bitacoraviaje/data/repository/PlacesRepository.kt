@@ -50,7 +50,13 @@ class PlacesRepository @Inject constructor(private val db: BitacoraDatabase) {
         val existing = newEnrichments.map { it.placeId }.distinct().flatMap { enrichments.getByPlace(it) }.associateBy { it.id }
         val merged = newEnrichments.map { e ->
             val old = existing[e.id]
-            if (old == null) e else e.copy(summary = if (old.llmRewritten || old.summary != e.summary && old.userApproved) old.summary else e.summary, userApproved = old.userApproved, llmRewritten = old.llmRewritten)
+            when {
+                old == null -> e
+                // Approved, edited or rewritten: the text the user saw stays; a changed upstream text becomes the "original" to restore.
+                old.userApproved || old.originalSummary != null || old.llmRewritten ->
+                    e.copy(summary = old.summary, originalSummary = if (old.summary != e.summary) e.summary else old.originalSummary, userApproved = old.userApproved, llmRewritten = old.llmRewritten)
+                else -> e
+            }
         }
         if (merged.isNotEmpty()) enrichments.upsertAll(merged.map { it.toEntity() })
         links.deleteBySegment(segmentId)
@@ -66,7 +72,11 @@ class PlacesRepository @Inject constructor(private val db: BitacoraDatabase) {
 
     suspend fun setApproved(enrichmentId: String, approved: Boolean) = enrichments.setApproved(enrichmentId, approved)
 
-    suspend fun editSummary(enrichmentId: String, summary: String) = enrichments.setSummary(enrichmentId, summary)
+    suspend fun editSummary(enrichmentId: String, summary: String) = enrichments.setSummary(enrichmentId, summary, rewritten = false)
+
+    suspend fun setRewritten(enrichmentId: String, summary: String) = enrichments.setSummary(enrichmentId, summary, rewritten = true)
+
+    suspend fun restoreSummary(enrichmentId: String) = enrichments.restoreSummary(enrichmentId)
 
     /** "Descartar": the place leaves this segment; the cached rows stay for other segments or a re-run. */
     suspend fun discard(segmentId: String, placeId: String) = links.delete(segmentId, placeId)
