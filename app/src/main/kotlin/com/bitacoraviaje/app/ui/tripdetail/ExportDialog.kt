@@ -59,7 +59,14 @@ fun ExportDialog(
                         Text(stringResource(R.string.export_done, status.folder ?: ""), modifier = Modifier.testTag("export_done"))
                         Text(stringResource(R.string.export_done_counts, status.mediaWritten, status.mediaTotal, status.audioWritten, status.audioTotal))
                         if (status.missing > 0) Text(androidx.compose.ui.res.pluralStringResource(R.plurals.export_done_missing, status.missing, status.missing))
-                        if (status.privacyPoints + status.privacyStops + status.privacyMedia > 0) Text(stringResource(R.string.export_done_privacy, status.privacyPoints, status.privacyStops, status.privacyMedia), modifier = Modifier.testTag("export_done_privacy"))
+                        if (status.privacyPoints + status.privacyStops + status.privacyMedia > 0) {
+                            val parts = listOf(
+                                androidx.compose.ui.res.pluralStringResource(R.plurals.export_done_privacy_points, status.privacyPoints, status.privacyPoints),
+                                androidx.compose.ui.res.pluralStringResource(R.plurals.export_done_privacy_stops, status.privacyStops, status.privacyStops),
+                                androidx.compose.ui.res.pluralStringResource(R.plurals.export_done_privacy_media, status.privacyMedia, status.privacyMedia),
+                            )
+                            Text(stringResource(R.string.export_done_privacy, parts.joinToString(", ")), modifier = Modifier.testTag("export_done_privacy"))
+                        }
                     }
                     else -> {
                         OptionRow(stringResource(R.string.export_opt_media), media, { media = it }, "export_opt_media")
@@ -75,7 +82,8 @@ fun ExportDialog(
             }
         },
         confirmButton = {
-            val opts = ExportOptions(media, audio, filtered, applyPrivacyZones = zones > 0 && privacy, stripExifGps = stripExif)
+            // The worker reads the zones itself: a tap before the preference count arrives must not export unfiltered (review M4).
+            val opts = ExportOptions(media, audio, filtered, applyPrivacyZones = privacy, stripExifGps = stripExif)
             when {
                 status.running -> Unit
                 status.finished && !status.failed -> Button(onClick = onShareResult, modifier = Modifier.testTag("export_share_result")) { Text(stringResource(R.string.export_share)) }

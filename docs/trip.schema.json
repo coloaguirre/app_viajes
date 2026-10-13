@@ -79,7 +79,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" },
-        "kind": { "enum": ["USER", "AUTO_REST", "NESTED"] },
+        "kind": { "enum": ["USER", "AUTO_REST", "NESTED", "PRIVACY"] },
         "paused": { "$ref": "#/$defs/localTime" },
         "paused_utc_ms": { "type": "integer" },
         "resumed": { "$ref": "#/$defs/nullableLocalTime" },

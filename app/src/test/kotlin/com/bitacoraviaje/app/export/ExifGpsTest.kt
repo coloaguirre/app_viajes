@@ -29,6 +29,7 @@ class ExifGpsTest {
         val stream = assertNotNull(ExifGps.stripped(src.inputStream(), tmp))
         stream.close()
         assertNull(ExifInterface(tmp).latLong, "copy without GPS")
+        ExifGps.GPS_TAGS.forEach { assertNull(ExifInterface(tmp).getAttribute(it), "$it removed from the copy (review M2)") }
         assertEquals("2026:10:13 10:00:00", ExifInterface(tmp).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL), "other tags survive")
         assertTrue(ExifGps.hasGps(src), "the original is untouched")
         assertNull(ExifGps.stripped("not a jpeg".byteInputStream(), File(ctx.cacheDir, "bad.jpg")), "a non-JPEG is reported, not corrupted")

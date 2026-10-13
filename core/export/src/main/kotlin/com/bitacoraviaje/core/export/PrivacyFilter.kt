@@ -1,5 +1,6 @@
 package com.bitacoraviaje.core.export
 
+import com.bitacoraviaje.core.geo.boundingBox
 import com.bitacoraviaje.core.geo.haversineM
 import com.bitacoraviaje.core.model.PauseKind
 import com.bitacoraviaje.core.model.PrivacyZone
@@ -15,8 +16,10 @@ data class PrivacyReport(
     val placesRemoved: Int,
     val mediaBlanked: Int,
     val notesBlanked: Int,
-    /** JPEG copies rewritten without GPS tags by the exporter (null: the option was off or no copy needed it). */
+    /** JPEG copies verified without GPS tags by the exporter (null: the option was off). Measured, not predicted. */
     val exifStripped: Int? = null,
+    /** Copies inside a zone that still carry their own location metadata (HEIC/MP4/failed rewrite): named, never silent. */
+    val mediaWithMetadata: List<String> = emptyList(),
 ) {
     val isEmpty: Boolean get() = pointsRemoved == 0 && stopsRemoved == 0 && placesRemoved == 0 && mediaBlanked == 0 && notesBlanked == 0
 }
@@ -39,39 +42,51 @@ object PrivacyFilter {
         var stopsRemoved = 0
         var mediaBlanked = 0
         var notesBlanked = 0
-        val removedPlaceIds = HashSet<String>()
+        val removedPlaceIds = trip.places.filter { inside(it.lat, it.lon, zones) }.map { it.id }.toSet()
         val segments = trip.segments.map { se ->
             val kept = ArrayList<TrackPoint>()
             val pauses = ArrayList(se.pauses)
             var lastInside = false
+            var openCut: SegmentPause? = null
+            var lastRemovedMs = 0L
             for (p in se.points) {
                 val hit = inside(p.lat, p.lon, zones)
                 if (hit) {
                     pointsRemoved++
+                    lastRemovedMs = p.timeUtcMs
                     if (!lastInside && kept.isNotEmpty()) {
                         // Entering a zone with track behind us: cut here so no straight line crosses the zone.
-                        pauses += SegmentPause("privacy-${se.segment.id}-${p.timeUtcMs}", se.segment.id, PauseKind.PRIVACY, p.timeUtcMs, null)
+                        openCut = SegmentPause("privacy-${se.segment.id}-${p.timeUtcMs}", se.segment.id, PauseKind.PRIVACY, p.timeUtcMs, null)
                         cuts++
                     }
                 } else {
+                    // Leaving a zone closes the cut at the first kept point: "omitted from t1 to t2" (an open pause would
+                    // swallow the rest of the stage in the diary summaries and import as an unfinished pause).
+                    openCut?.let { pauses += it.copy(resumedUtcMs = p.timeUtcMs); openCut = null }
                     kept += p
                 }
                 lastInside = hit
             }
+            openCut?.let { pauses += it.copy(resumedUtcMs = maxOf(lastRemovedMs, it.pausedUtcMs)) }
             val stops = se.stops.filter { !inside(it.lat, it.lon, zones) }.also { stopsRemoved += se.stops.size - it.size }
+                .map { st -> if (st.placeId != null && st.placeId in removedPlaceIds) st.copy(placeId = null) else st }
+            // The stored bbox was computed over every point; a trip that starts at home would still name it (review I2).
+            val stats = se.segment.stats.copy(bbox = boundingBox(kept.filter { !it.isFilteredOut }.ifEmpty { kept }))
             val media = se.media.map { m ->
                 if (inside(m.linkedLat, m.linkedLon, zones) || inside(m.exifLat, m.exifLon, zones)) { mediaBlanked++; m.copy(linkedLat = null, linkedLon = null, exifLat = null, exifLon = null) } else m
             }
             val voice = se.voiceNotes.map { v -> if (inside(v.lat, v.lon, zones)) { notesBlanked++; v.copy(lat = null, lon = null) } else v }
             val text = se.textNotes.map { n -> if (inside(n.lat, n.lon, zones)) { notesBlanked++; n.copy(lat = null, lon = null) } else n }
-            se.copy(points = kept, pauses = pauses.sortedBy { it.pausedUtcMs }, stops = stops, media = media, voiceNotes = voice, textNotes = text)
+            se.copy(segment = se.segment.copy(stats = stats), points = kept, pauses = pauses.sortedBy { it.pausedUtcMs }, stops = stops, media = media, voiceNotes = voice, textNotes = text)
         }
-        val places = trip.places.filter { p -> !inside(p.lat, p.lon, zones).also { if (it) removedPlaceIds += p.id } }
+        val enrichments = trip.enrichments.filter { it.placeId !in removedPlaceIds }
         val filtered = trip.copy(
             segments = segments,
-            places = places,
-            enrichments = trip.enrichments.filter { it.placeId !in removedPlaceIds },
+            places = trip.places.filter { it.id !in removedPlaceIds },
+            enrichments = enrichments,
             segmentPlaces = trip.segmentPlaces.filter { it.placeId !in removedPlaceIds },
+            // Credits name the article (and so the place): recompute them from what is left (review I1).
+            attributions = TripExport.attributionsFor(enrichments),
         )
         return filtered to PrivacyReport(zones.size, pointsRemoved, cuts, stopsRemoved, removedPlaceIds.size, mediaBlanked, notesBlanked)
     }

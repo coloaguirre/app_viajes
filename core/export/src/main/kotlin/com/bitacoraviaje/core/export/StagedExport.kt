@@ -18,15 +18,28 @@ class StagedExport(
     private val thumbnails: Map<String, ByteArray> = emptyMap(),
     private val includeMedia: Boolean = true,
     private val includeAudio: Boolean = true,
+    /**
+     * Identifies what the staged entries were generated with (export options, privacy zones…).
+     * A leftover staging from a run with a different fingerprint is discarded instead of resumed:
+     * otherwise an interrupted unfiltered export would be "resumed" by a privacy export with the
+     * old files and a fresh, false LEEME (review B1 of PR #12).
+     */
+    private val fingerprint: String = "",
 ) {
     private val manifest get() = File(stagingDir, MANIFEST)
 
-    /** Entries already staged (path → ok) and files known to be missing, from a previous run. */
+    /** Entries already staged (path → ok) and files known to be missing, from a previous run with the same fingerprint. */
     private fun readManifest(): Pair<MutableSet<String>, MutableSet<String>> {
         val ok = LinkedHashSet<String>()
         val missing = LinkedHashSet<String>()
         if (manifest.exists()) {
-            manifest.readLines(Charsets.UTF_8).forEach { line ->
+            val lines = manifest.readLines(Charsets.UTF_8)
+            val previous = lines.firstOrNull { it.startsWith("FP\t") }?.substringAfter('\t') ?: ""
+            if (previous != fingerprint) {
+                clear()
+                return ok to missing
+            }
+            lines.forEach { line ->
                 val parts = line.split('\t')
                 when (parts.firstOrNull()) {
                     "OK" -> parts.getOrNull(1)?.let { if (File(stagingDir, it).isFile) ok += it }
@@ -39,10 +52,21 @@ class StagedExport(
 
     private fun note(line: String) = manifest.appendText(line + "\n", Charsets.UTF_8)
 
-    fun run(trip: TripExport, files: FileSource, privacy: PrivacyReport? = null, onProgress: ((done: Int, total: Int) -> Unit)? = null): ExportReport {
+    /**
+     * [finalizePrivacy] runs after every file was copied, so the report can carry measured facts
+     * about the copies (JPEGs verified without GPS, copies that keep metadata) rather than predictions.
+     */
+    fun run(
+        trip: TripExport,
+        files: FileSource,
+        privacy: PrivacyReport? = null,
+        onProgress: ((done: Int, total: Int) -> Unit)? = null,
+        finalizePrivacy: ((PrivacyReport) -> PrivacyReport)? = null,
+    ): ExportReport {
         stagingDir.mkdirs()
         val folder = Names.packageFolder(trip.trip.title, trip.exportedUtcMs, trip.tzId)
         val (ok, missing) = readManifest()
+        if (!manifest.exists()) { stagingDir.mkdirs(); note("FP\t$fingerprint") }
         val writers = ExportPackage.writers(trip, thumbnails)
         val mediaPaths = if (includeMedia) trip.mediaFiles else emptyMap()
         val audioPaths = if (includeAudio) trip.audioFiles else emptyMap()
@@ -105,7 +129,7 @@ class StagedExport(
             audioMissing = audioMissing,
             textNotesInDb = trip.allTextNotes.size,
             stopsInDb = trip.allStops.size,
-            privacy = privacy,
+            privacy = privacy?.let { p -> finalizePrivacy?.invoke(p) ?: p },
         )
         ok.remove("LEEME.txt")
         File(stagingDir, "LEEME.txt").writeText(LeemeWriter.text(trip, report, includeMedia, includeAudio), Charsets.UTF_8)

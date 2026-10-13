@@ -185,6 +185,12 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
 
     suspend fun setPrivacyZones(zones: List<com.bitacoraviaje.core.model.PrivacyZone>) = context.settingsStore.edit { it[Keys.PRIVACY_ZONES] = PrivacyZones.encode(zones) }
 
+    /** Read-modify-write inside the DataStore transaction, so two quick taps cannot lose a zone (review M6). */
+    suspend fun updatePrivacyZones(transform: (List<com.bitacoraviaje.core.model.PrivacyZone>) -> List<com.bitacoraviaje.core.model.PrivacyZone>) = context.settingsStore.edit { p ->
+        val current = p[Keys.PRIVACY_ZONES]?.let { PrivacyZones.parse(it) } ?: emptyList()
+        p[Keys.PRIVACY_ZONES] = PrivacyZones.encode(transform(current))
+    }
+
     private companion object {
         const val TAG = "Bitacora"
     }

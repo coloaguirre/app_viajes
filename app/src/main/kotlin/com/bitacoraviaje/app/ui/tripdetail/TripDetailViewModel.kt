@@ -100,18 +100,31 @@ class TripDetailViewModel @Inject constructor(
     val tripId: String = savedState.toRoute<Route.TripDetail>().tripId
     private val appContext = context
 
+    /** Finished export jobs the user dismissed with "Exportar de nuevo": hidden here instead of pruning WorkManager globally (review I8). */
+    private val dismissedExports = MutableStateFlow<Set<java.util.UUID>>(emptySet())
+
     /** Export job of this trip as the UI sees it (PLAN 3.2). */
-    val export: StateFlow<ExportStatus> = androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(ExportWorker.workName(tripId))
-        .map { infos -> ExportStatus.from(infos.firstOrNull { !it.state.isFinished } ?: infos.firstOrNull()) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportStatus())
+    val export: StateFlow<ExportStatus> = combine(
+        androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(ExportWorker.workName(tripId)),
+        dismissedExports,
+    ) { infos, dismissed ->
+        val visible = infos.filter { it.id !in dismissed }
+        ExportStatus.from(visible.firstOrNull { !it.state.isFinished } ?: visible.firstOrNull())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportStatus())
 
     fun startExport(options: ExportOptions, destination: ExportDestination, targetUri: android.net.Uri? = null) {
         ExportWorker.enqueue(appContext, tripId, options, destination, targetUri)
     }
 
-    /** Clears a finished job so the dialog can offer a new export. */
+    /**
+     * Hides the finished job so the dialog offers a new export. `pruneWork()` would also drop the
+     * import conflict and render results other screens still read (review I8).
+     */
     fun dismissExport() {
-        androidx.work.WorkManager.getInstance(appContext).pruneWork()
+        viewModelScope.launch {
+            val finished = androidx.work.WorkManager.getInstance(appContext).getWorkInfosForUniqueWorkFlow(ExportWorker.workName(tripId)).first().filter { it.state.isFinished }.map { it.id }
+            dismissedExports.value = dismissedExports.value + finished
+        }
     }
     private val tab = MutableStateFlow(0)
     private val focus = MutableStateFlow<Pair<String, MapPoint>?>(null)

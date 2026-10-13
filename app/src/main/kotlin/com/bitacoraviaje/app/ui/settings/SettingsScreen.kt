@@ -246,10 +246,11 @@ fun PrivacyZonesBlock(
         androidx.compose.material3.TextButton(onClick = { dialog = "manual" }, modifier = Modifier.testTag("privacy_add_manual")) { Text(stringResource(R.string.settings_privacy_add_manual)) }
     }
     dialog?.let { mode ->
-        var name by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-        var lat by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-        var lon by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-        var radius by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.bitacoraviaje.app.settings.PrivacyZones.RADII_M[1]) }
+        var name by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+        var lat by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+        var lon by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+        var radius by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(com.bitacoraviaje.app.settings.PrivacyZones.RADII_M[1]) }
+        val decimal = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal)
         val coords = lat.replace(',', '.').toDoubleOrNull()?.takeIf { it in -90.0..90.0 } to lon.replace(',', '.').toDoubleOrNull()?.takeIf { it in -180.0..180.0 }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { dialog = null },
@@ -258,8 +259,8 @@ fun PrivacyZonesBlock(
                 Column {
                     androidx.compose.material3.OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.settings_privacy_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("privacy_name"))
                     if (mode == "manual") {
-                        androidx.compose.material3.OutlinedTextField(value = lat, onValueChange = { lat = it }, label = { Text(stringResource(R.string.settings_privacy_lat)) }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("privacy_lat"))
-                        androidx.compose.material3.OutlinedTextField(value = lon, onValueChange = { lon = it }, label = { Text(stringResource(R.string.settings_privacy_lon)) }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("privacy_lon"))
+                        androidx.compose.material3.OutlinedTextField(value = lat, onValueChange = { lat = it }, label = { Text(stringResource(R.string.settings_privacy_lat)) }, singleLine = true, keyboardOptions = decimal, modifier = Modifier.fillMaxWidth().testTag("privacy_lat"))
+                        androidx.compose.material3.OutlinedTextField(value = lon, onValueChange = { lon = it }, label = { Text(stringResource(R.string.settings_privacy_lon)) }, singleLine = true, keyboardOptions = decimal, modifier = Modifier.fillMaxWidth().testTag("privacy_lon"))
                     }
                     Text(stringResource(R.string.settings_privacy_radius), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
                     // Scrolls sideways: four chips do not fit a narrow dialog and the last one would wrap vertically.

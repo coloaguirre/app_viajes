@@ -159,9 +159,14 @@ object LeemeWriter {
             appendLine("- Paradas omitidas: ${p.stopsRemoved} · Lugares omitidos: ${p.placesRemoved}")
             appendLine("- Fotos y videos sin ubicación en este paquete: ${p.mediaBlanked} · Notas sin ubicación: ${p.notesBlanked}")
             when {
-                p.exifStripped != null -> appendLine("- Copias JPEG reescritas sin GPS en su EXIF: ${p.exifStripped} (los originales del teléfono no se tocan)")
+                p.exifStripped != null -> appendLine("- Copias JPEG verificadas sin GPS en su EXIF: ${p.exifStripped} (los originales del teléfono no se tocan)")
                 p.mediaBlanked > 0 -> appendLine("- Atención: las copias JPEG conservan su propio EXIF (no se eligió quitarles el GPS); las coordenadas de arriba sí fueron omitidas.")
             }
+            if (p.mediaWithMetadata.isNotEmpty()) {
+                appendLine("- Atención: ${p.mediaWithMetadata.size} copias de adentro de una zona conservan la ubicación en sus propios metadatos (HEIC, video o reescritura fallida); revisalas antes de compartir:")
+                p.mediaWithMetadata.forEach { appendLine("    · $it") }
+            }
+            appendLine("- Distancia y tiempos de cada etapa siguen siendo los medidos (incluyen los tramos omitidos); el recuadro geográfico se recalculó sobre los puntos exportados.")
         }
         if (r.mediaMissing.isNotEmpty() || r.audioMissing.isNotEmpty()) {
             appendLine()

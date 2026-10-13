@@ -396,8 +396,8 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: test: puntos dentro del radio no aparecen en el ZIP y
       el conteo de excluidos se reporta.
       Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.5-zonas-privacidad.md`
-      (tests en `core/export` y `app`; E2E en el emulador: 46 puntos, 1 parada
-      y 5 fotos omitidos, 0 puntos dentro del radio en el GPX).
+      (tests en `core/export` y `app`; E2E en el emulador con los conteos
+      verificados contra la base y el GPX).
 - [ ] 5.6 Google Fotos (Picker e importación / subida a álbum propio).
       DESEABLE A FUTURO (2026-10-11, usuario): requiere proyecto en
       Google Cloud con OAuth y el Picker no entrega ubicación.

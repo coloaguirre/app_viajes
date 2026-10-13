@@ -40,11 +40,11 @@ class SettingsViewModel @Inject constructor(
 
     fun addPrivacyZone(name: String, lat: Double, lon: Double, radiusM: Int) = viewModelScope.launch {
         val zone = com.bitacoraviaje.core.model.PrivacyZone(java.util.UUID.randomUUID().toString(), name.ifBlank { appContext.getString(com.bitacoraviaje.app.R.string.settings_privacy) }, lat, lon, radiusM.toDouble())
-        prefs.setPrivacyZones(settings.value.privacyZones + zone)
+        prefs.updatePrivacyZones { it + zone }
         privacyMessage.value = null
     }
 
-    fun removePrivacyZone(id: String) = viewModelScope.launch { prefs.setPrivacyZones(settings.value.privacyZones.filter { it.id != id }) }
+    fun removePrivacyZone(id: String) = viewModelScope.launch { prefs.updatePrivacyZones { zones -> zones.filter { it.id != id } } }
 
     val hasLlmKey: StateFlow<Boolean> = secrets.has(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY)
 

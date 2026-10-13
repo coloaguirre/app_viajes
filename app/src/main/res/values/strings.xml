@@ -229,7 +229,19 @@
     <string name="export_opt_audio">Incluir audios de las notas de voz</string>
     <string name="export_opt_privacy">Aplicar zonas de privacidad (%1$d)</string>
     <string name="export_opt_strip_exif">Quitar el GPS de las fotos exportadas dentro de las zonas</string>
-    <string name="export_done_privacy">Zonas de privacidad: %1$d puntos y %2$d paradas omitidos, %3$d fotos sin ubicación</string>
+    <string name="export_done_privacy">Zonas de privacidad: %1$s</string>
+    <plurals name="export_done_privacy_points">
+        <item quantity="one">%1$d punto omitido</item>
+        <item quantity="other">%1$d puntos omitidos</item>
+    </plurals>
+    <plurals name="export_done_privacy_stops">
+        <item quantity="one">%1$d parada omitida</item>
+        <item quantity="other">%1$d paradas omitidas</item>
+    </plurals>
+    <plurals name="export_done_privacy_media">
+        <item quantity="one">%1$d foto o video sin ubicación</item>
+        <item quantity="other">%1$d fotos y videos sin ubicación</item>
+    </plurals>
     <string name="settings_privacy">Zonas de privacidad</string>
     <string name="settings_privacy_desc">Círculos (tu casa, tu trabajo) que no deben aparecer en lo que exportás: los puntos adentro se omiten, el recorrido se corta y las fotos de ahí pierden la ubicación en el paquete. La base del teléfono conserva todo.</string>
     <string name="settings_privacy_add_here">Agregar mi posición actual</string>

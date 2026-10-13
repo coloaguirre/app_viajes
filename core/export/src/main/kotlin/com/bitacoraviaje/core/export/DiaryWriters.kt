@@ -44,7 +44,7 @@ internal object Diary {
         is TimelineEvent.SegmentStart -> "Inicio"
         is TimelineEvent.SegmentEnd -> "Fin"
         is TimelineEvent.Pause -> when (e.kind) { PauseKind.AUTO_REST -> "Reposo automático"; PauseKind.NESTED -> "Pausa por excursión"; PauseKind.USER -> "Pausa"; PauseKind.PRIVACY -> "Tramo omitido por una zona de privacidad" }
-        is TimelineEvent.Resume -> "Reanudado tras ${dur(e.pausedMs)}"
+        is TimelineEvent.Resume -> if (e.kind == PauseKind.PRIVACY) "Fin del tramo omitido (${dur(e.pausedMs)})" else "Reanudado tras ${dur(e.pausedMs)}"
         is TimelineEvent.StopArrived -> e.stop.userLabel?.let { "Llegada a $it" } ?: "Llegada a una parada"
         is TimelineEvent.StopLeft -> "Salida tras ${dur(e.dwellMs)}"
         is TimelineEvent.Moment -> if (e.isSingle) (e.media.first().userCaption ?: if (e.hasVideo) "Video" else "Foto") else "${e.media.size} fotos y videos"

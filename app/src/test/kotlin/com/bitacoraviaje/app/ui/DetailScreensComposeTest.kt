@@ -132,7 +132,7 @@ class DetailScreensComposeTest {
         assertEquals(listOf(com.bitacoraviaje.app.export.ExportOptions(includeMedia = true, includeAudio = false, includeFilteredPoints = true, applyPrivacyZones = true, stripExifGps = false) to com.bitacoraviaje.app.export.ExportDestination.DOWNLOADS), started)
         rule.onNodeWithTag("export_done").assertIsDisplayed()
         rule.onNodeWithText("Fotos y videos: 4 de 5 · Audios: 2 de 2").assertIsDisplayed()
-        rule.onNodeWithText("Zonas de privacidad: 12 puntos y 1 paradas omitidos, 3 fotos sin ubicación").assertIsDisplayed()
+        rule.onNodeWithText("Zonas de privacidad: 12 puntos omitidos, 1 parada omitida, 3 fotos y videos sin ubicación").assertIsDisplayed()
         rule.onNodeWithTag("export_share_result").assertIsDisplayed()
         // A finished job offers a new export (E2E 5.5: the dialog used to be stuck on the last result).
         rule.onNodeWithTag("export_reset").performClick()

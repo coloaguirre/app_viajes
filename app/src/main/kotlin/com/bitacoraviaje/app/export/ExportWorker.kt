@@ -26,7 +26,6 @@ import androidx.work.workDataOf
 import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.export.FileSource
 import com.bitacoraviaje.core.export.StagedExport
-import kotlinx.coroutines.flow.first
 import com.bitacoraviaje.core.export.TripExport
 import com.bitacoraviaje.core.model.MediaKind
 import dagger.assisted.Assisted
@@ -37,6 +36,7 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /** Where the ZIP goes once built (DISENO §12.4). */
@@ -90,11 +90,17 @@ class ExportWorker @AssistedInject constructor(
         val needed = estimateBytes(trip) * 2 + 20L * 1024 * 1024
         val free = android.os.StatFs(appContext.noBackupFilesDir.path).availableBytes
         if (free < needed) return@withContext Result.failure(workDataOf(KEY_ERROR to appContext.getString(com.bitacoraviaje.app.R.string.export_no_space, needed / 1_048_576, free / 1_048_576)))
-        val staged = StagedExport(staging, thumbnails(trip), options.includeMedia, options.includeAudio)
+        // A leftover staging from a run with other options or zones must not be resumed (review B1).
+        val fingerprint = fingerprint(options, if (forExport.privacy != null) zones else emptyList())
+        val staged = StagedExport(staging, thumbnails(trip), options.includeMedia, options.includeAudio, fingerprint)
+        val stripDir = File(appContext.cacheDir, "export-strip").also { it.deleteRecursively(); it.mkdirs() }
+        val source = StrippingSource(trip, strip, stripDir)
         var createdUri: Uri? = null
         return@withContext try {
-            val privacy = forExport.privacy?.let { if (options.stripExifGps) it.copy(exifStripped = strip.count { id -> trip.allMedia.firstOrNull { m -> m.id == id }?.let { m -> m.kind == MediaKind.PHOTO && (m.mimeType == null || m.mimeType == "image/jpeg") } == true }) else it }
-            val report = staged.run(trip, fileSource(trip, strip), privacy) { done, total -> publish(done, total) }
+            val report = staged.run(trip, source.files, forExport.privacy, { done, total -> publish(done, total) }) { p ->
+                // Measured on the copies actually written, not predicted (review I6/I7).
+                p.copy(exifStripped = if (options.stripExifGps) source.stripped.size else null, mediaWithMetadata = source.retained.toList())
+            }
             val (uri, label) = openDestination(destination, targetUri, report.folder)
             createdUri = if (destination == ExportDestination.DOWNLOADS) uri else null
             // "wt": truncate. Some document providers keep the old tail with plain "w" and a retry would leave a corrupt ZIP (review I2).
@@ -118,25 +124,50 @@ class ExportWorker @AssistedInject constructor(
             // A pending Downloads row of this attempt must not linger (review I2); staging is kept so the retry resumes.
             createdUri?.let { runCatching { appContext.contentResolver.delete(it, null, null) } }
             if (runAttemptCount < 3) Result.retry() else Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
+        } finally {
+            stripDir.deleteRecursively()
         }
     }
+
+    /** What the staged entries depend on; any change discards the staging instead of resuming it. */
+    private fun fingerprint(options: ExportOptions, zones: List<com.bitacoraviaje.core.model.PrivacyZone>): String =
+        "v1;media=${options.includeMedia};audio=${options.includeAudio};filtered=${options.includeFilteredPoints};strip=${options.stripExifGps};zones=" +
+            zones.sortedBy { it.id }.joinToString("|") { "${it.id}@${it.lat},${it.lon},${it.radiusM}" }
 
     private fun estimateBytes(trip: TripExport): Long =
         trip.allMedia.filter { it.id in trip.mediaFiles }.sumOf { it.sizeBytes ?: 0L } + trip.allVoiceNotes.filter { it.id in trip.audioFiles }.sumOf { File(appContext.filesDir, it.audioPath).length() }
 
-    /** [stripIds]: media whose location the privacy zones blanked; their JPEG copies are served without GPS tags (PLAN 5.5). */
-    private fun fileSource(trip: TripExport, stripIds: Set<String> = emptySet()): FileSource {
-        val byMediaPath = trip.allMedia.associateBy({ trip.mediaFiles[it.id] }, { it })
-        val byAudioPath = trip.allVoiceNotes.associateBy({ trip.audioFiles[it.id] }, { it.audioPath })
-        val tmpDir = File(appContext.cacheDir, "export-strip").apply { mkdirs() }
-        return FileSource { path ->
+    /**
+     * Opens media and audio for the staging. [stripIds]: media whose location the privacy zones
+     * blanked; their JPEG copies are served without GPS tags (PLAN 5.5) and counted in [stripped];
+     * any other copy of those (HEIC, PNG, video, or a failed rewrite) keeps its own metadata and is
+     * named in [retained] so the LEEME can say so (review I7).
+     */
+    private inner class StrippingSource(trip: TripExport, private val stripIds: Set<String>, private val tmpDir: File) {
+        private val byMediaPath = trip.allMedia.associateBy({ trip.mediaFiles[it.id] }, { it })
+        private val byAudioPath = trip.allVoiceNotes.associateBy({ trip.audioFiles[it.id] }, { it.audioPath })
+        val stripped = java.util.concurrent.CopyOnWriteArraySet<String>()
+        val retained = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+        private fun open(m: com.bitacoraviaje.core.model.MediaItem): InputStream? = runCatching { appContext.contentResolver.openInputStream(m.contentUri!!.toUri()) }.getOrNull()
+
+        val files = FileSource { path ->
             byMediaPath[path]?.let { m ->
-                val raw = runCatching { appContext.contentResolver.openInputStream(m.contentUri!!.toUri()) }.getOrNull()
-                if (raw != null && m.id in stripIds && m.kind == MediaKind.PHOTO && (m.mimeType == null || m.mimeType == "image/jpeg")) {
-                    val tmp = File(tmpDir, m.id + ".jpg")
-                    ExifGps.stripped(raw, tmp)?.let { StripTempStream(it, tmp) } ?: run { Log.w(TAG, "exif strip failed for ${m.id}; copying the original"); runCatching { appContext.contentResolver.openInputStream(m.contentUri!!.toUri()) }.getOrNull() }
-                } else {
-                    raw
+                val raw = open(m)
+                when {
+                    raw == null || m.id !in stripIds -> raw
+                    m.kind == MediaKind.PHOTO && (m.mimeType == null || m.mimeType == "image/jpeg") -> {
+                        val tmp = File(tmpDir, m.id + ".jpg")
+                        ExifGps.stripped(raw, tmp)?.let { stripped += m.id; StripTempStream(it, tmp) } ?: run {
+                            Log.w(TAG, "exif strip failed for ${m.id}; copying the original")
+                            retained += "$path (reescritura fallida)"
+                            open(m)
+                        }
+                    }
+                    else -> {
+                        retained += "$path (${if (m.kind == MediaKind.PHOTO) m.mimeType ?: "foto" else "video"})"
+                        raw
+                    }
                 }
             }
                 ?: byAudioPath[path]?.let { rel -> File(appContext.filesDir, rel).takeIf { it.isFile }?.let(::FileInputStream) as InputStream? }

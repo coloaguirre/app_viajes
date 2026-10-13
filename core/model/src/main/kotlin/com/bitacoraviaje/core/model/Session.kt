@@ -55,7 +55,11 @@ enum class PauseKind {
     USER,
     AUTO_REST,
     NESTED,
-    /** Export only (never stored): the track was cut because it entered a privacy zone (DISENO §15.3, PLAN 5.5). */
+    /**
+     * Inserted by the exporter, never by the tracker: the track was cut because it entered a
+     * privacy zone (DISENO §15.3, PLAN 5.5). [SegmentPause.resumedUtcMs] is the first kept point
+     * after the zone. A trip imported from such a package keeps it, so a re-export still cuts there.
+     */
     PRIVACY,
 }
 
