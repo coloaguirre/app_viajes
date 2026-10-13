@@ -63,4 +63,18 @@ class UserSettingsTest {
         val off = UserSettings.from(null, null, null, enrichPlaces = false, roundEnrichmentCoords = true)
         assertTrue(!off.enrichPlaces && off.roundEnrichmentCoords)
     }
+
+    @Test
+    fun `privacy zones round trip through json and a corrupt list is reported, never partial`() {
+        val zones = listOf(com.bitacoraviaje.core.model.PrivacyZone("a", "Casa", -34.6, -58.4, 300.0), com.bitacoraviaje.core.model.PrivacyZone("b", "Trabajo", -34.61, -58.38, 100.0))
+        val json = com.bitacoraviaje.app.settings.PrivacyZones.encode(zones)
+        assertEquals(zones, com.bitacoraviaje.app.settings.PrivacyZones.parse(json))
+        val invalid = mutableListOf<Pair<String, String>>()
+        val s = UserSettings.from(null, null, null, privacyZonesJson = "{nope") { k, v -> invalid += k to v }
+        assertTrue(s.privacyZones.isEmpty() && invalid.single().first == "privacy_zones")
+        val ok = UserSettings.from(null, null, null, privacyZonesJson = json)
+        assertEquals(2, ok.privacyZones.size)
+        assertTrue(com.bitacoraviaje.app.settings.PrivacyZones.parse("""[{"id":"x","name":"n","lat":95.0,"lon":0.0,"radius_m":100.0}]""")!!.isEmpty(), "out-of-range zones are dropped")
+    }
 }
+

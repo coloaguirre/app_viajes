@@ -68,6 +68,13 @@ class TextNote(_Lenient):
     text: str | None = None
 
 
+class Pause(_Lenient):
+    id: str
+    kind: str = "USER"
+    paused_utc_ms: int
+    resumed_utc_ms: int | None = None
+
+
 class Stop(_Lenient):
     id: str
     start_utc_ms: int
@@ -89,6 +96,7 @@ class Segment(_Lenient):
     tz_id: str = "UTC"
     stats: Stats = Field(default_factory=Stats)
     points: list[Point] = Field(default_factory=list)
+    pauses: list[Pause] = Field(default_factory=list)
     stops: list[Stop] = Field(default_factory=list)
     media: list[Media] = Field(default_factory=list)
     voice_notes: list[VoiceNote] = Field(default_factory=list)

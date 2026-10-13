@@ -110,25 +110,34 @@ class DetailScreensComposeTest {
     @Test
     fun `export dialog starts with the chosen options and destination and shows the result`() {
         val started = mutableListOf<Pair<com.bitacoraviaje.app.export.ExportOptions, com.bitacoraviaje.app.export.ExportDestination>>()
+        var resets = 0
         rule.setContent {
             var status by remember { mutableStateOf(com.bitacoraviaje.app.export.ExportStatus()) }
             BitacoraTheme {
                 com.bitacoraviaje.app.ui.tripdetail.ExportDialog(
+                    zones = 2,
                     status = status,
                     onDismiss = {},
-                    onStart = { o, d -> started += o to d; status = com.bitacoraviaje.app.export.ExportStatus(finished = true, folder = "Viaje_2026-10-13", mediaWritten = 4, mediaTotal = 5, audioWritten = 2, audioTotal = 2, missing = 1) },
+                    onStart = { o, d -> started += o to d; status = com.bitacoraviaje.app.export.ExportStatus(finished = true, folder = "Viaje_2026-10-13", mediaWritten = 4, mediaTotal = 5, audioWritten = 2, audioTotal = 2, missing = 1, privacyPoints = 12, privacyStops = 1, privacyMedia = 3) },
                     onShareResult = {},
-                    onReset = {},
+                    onReset = { resets++; status = com.bitacoraviaje.app.export.ExportStatus() },
                 )
             }
         }
         rule.onNodeWithTag("export_opt_filtered").performClick()
         rule.onNodeWithTag("export_opt_audio").performClick()
+        rule.onNodeWithTag("export_opt_privacy").performScrollTo().assertIsDisplayed() // zones exist → offered, on by default (PLAN 5.5)
+        rule.onNodeWithTag("export_opt_strip_exif").performScrollTo().performClick()
         rule.onNodeWithTag("export_downloads").performClick()
-        assertEquals(listOf(com.bitacoraviaje.app.export.ExportOptions(includeMedia = true, includeAudio = false, includeFilteredPoints = true) to com.bitacoraviaje.app.export.ExportDestination.DOWNLOADS), started)
+        assertEquals(listOf(com.bitacoraviaje.app.export.ExportOptions(includeMedia = true, includeAudio = false, includeFilteredPoints = true, applyPrivacyZones = true, stripExifGps = false) to com.bitacoraviaje.app.export.ExportDestination.DOWNLOADS), started)
         rule.onNodeWithTag("export_done").assertIsDisplayed()
         rule.onNodeWithText("Fotos y videos: 4 de 5 · Audios: 2 de 2").assertIsDisplayed()
+        rule.onNodeWithText("Zonas de privacidad: 12 puntos omitidos, 1 parada omitida, 3 fotos y videos sin ubicación").assertIsDisplayed()
         rule.onNodeWithTag("export_share_result").assertIsDisplayed()
+        // A finished job offers a new export (E2E 5.5: the dialog used to be stuck on the last result).
+        rule.onNodeWithTag("export_reset").performClick()
+        assertEquals(1, resets)
+        rule.onNodeWithTag("export_downloads").assertIsDisplayed()
     }
 
     @Test

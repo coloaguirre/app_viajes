@@ -21,8 +21,10 @@ class OtherWritersTest {
         val xml = Fixture.render(KmlWriter())
         val d = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(InputSource(StringReader(xml)))
         assertEquals(2, d.getElementsByTagName("Folder").length)
+        // seg-1 has two pauses → three pieces inside a MultiGeometry (the line never bridges a pause, PLAN 5.5); seg-2 is one LineString.
         val lines = d.getElementsByTagName("LineString")
-        assertEquals(2, lines.length)
+        assertEquals(4, lines.length)
+        assertEquals(1, d.getElementsByTagName("MultiGeometry").length)
         val coordsEl = (lines.item(0) as org.w3c.dom.Element).getElementsByTagName("coordinates").item(0)
         val coords = coordsEl.textContent.trim().split(Regex("\\s+"))
         val first = coords.first().split(",")
@@ -49,7 +51,11 @@ class OtherWritersTest {
         val features = doc["features"]!!.jsonArray
         val kinds = features.groupingBy { it.jsonObject["properties"]!!.jsonObject["kind"]!!.jsonPrimitive.content }.eachCount()
         assertEquals(mapOf("track" to 2, "photo" to 1, "video" to 1, "voice" to 2, "marker" to 1, "highlight" to 1, "transport_change" to 1, "stop" to 1), kinds)
-        val pos = features[0].jsonObject["geometry"]!!.jsonObject["coordinates"]!!.jsonArray[0].jsonArray
+        val geom = features[0].jsonObject["geometry"]!!.jsonObject
+        assertEquals("MultiLineString", geom["type"]!!.jsonPrimitive.content, "seg-1 is cut at its two pauses")
+        val pos = geom["coordinates"]!!.jsonArray[0].jsonArray[0].jsonArray
+        val seg2 = features.first { f -> f.jsonObject["properties"]!!.jsonObject.let { it["kind"]!!.jsonPrimitive.content == "track" && it["segment_id"]!!.jsonPrimitive.content == "seg-2" } }
+        assertEquals("LineString", seg2.jsonObject["geometry"]!!.jsonObject["type"]!!.jsonPrimitive.content, "seg-2 has no pauses")
         assertEquals(-58.4, pos[0].jsonPrimitive.content.toDouble(), 1e-6)
         assertEquals(-34.6, pos[1].jsonPrimitive.content.toDouble(), 1e-6)
     }

@@ -24,6 +24,8 @@ data class ExportReport(
     val audioMissing: List<String>,
     val textNotesInDb: Int,
     val stopsInDb: Int,
+    /** What the privacy zones removed, when they were applied (PLAN 5.5). */
+    val privacy: PrivacyReport? = null,
 ) {
     val complete: Boolean get() = mediaMissing.isEmpty() && audioMissing.isEmpty()
 }
@@ -39,7 +41,7 @@ class ExportPackage(
     private val includeMedia: Boolean = true,
     private val includeAudio: Boolean = true,
 ) {
-    fun write(trip: TripExport, out: OutputStream, files: FileSource, onProgress: ((done: Int, total: Int) -> Unit)? = null): ExportReport {
+    fun write(trip: TripExport, out: OutputStream, files: FileSource, privacy: PrivacyReport? = null, onProgress: ((done: Int, total: Int) -> Unit)? = null): ExportReport {
         val folder = Names.packageFolder(trip.trip.title, trip.exportedUtcMs, trip.tzId)
         val zip = ZipOutputStream(out)
         val entries = ArrayList<String>()
@@ -91,6 +93,7 @@ class ExportPackage(
             audioMissing = audioMissing,
             textNotesInDb = trip.allTextNotes.size,
             stopsInDb = trip.allStops.size,
+            privacy = privacy,
         )
         entry("LEEME.txt") { it.write(LeemeWriter.text(trip, report, includeMedia, includeAudio).toByteArray(Charsets.UTF_8)) }
         onProgress?.invoke(++done, total)
@@ -149,6 +152,22 @@ object LeemeWriter {
         appendLine("- Notas de voz: ${r.audioWritten} audios de ${r.voiceNotesInDb} notas${if (!includeAudio) " (no se incluyeron por elección)" else ""}")
         appendLine("- Notas de texto, marcadores y destacados: ${r.textNotesInDb}")
         appendLine("- Paradas detectadas: ${r.stopsInDb}")
+        r.privacy?.let { p ->
+            appendLine()
+            appendLine("ZONAS DE PRIVACIDAD (${p.zones} aplicadas al exportar; la base del teléfono conserva todo)")
+            appendLine("- Puntos del recorrido omitidos: ${p.pointsRemoved} (el recorrido se corta ${p.cuts} ${if (p.cuts == 1) "vez" else "veces"})")
+            appendLine("- Paradas omitidas: ${p.stopsRemoved} · Lugares omitidos: ${p.placesRemoved}")
+            appendLine("- Fotos y videos sin ubicación en este paquete: ${p.mediaBlanked} · Notas sin ubicación: ${p.notesBlanked}")
+            when {
+                p.exifStripped != null -> appendLine("- Copias JPEG verificadas sin GPS en su EXIF: ${p.exifStripped} (los originales del teléfono no se tocan)")
+                p.mediaBlanked > 0 -> appendLine("- Atención: las copias JPEG conservan su propio EXIF (no se eligió quitarles el GPS); las coordenadas de arriba sí fueron omitidas.")
+            }
+            if (p.mediaWithMetadata.isNotEmpty()) {
+                appendLine("- Atención: ${p.mediaWithMetadata.size} copias de adentro de una zona conservan la ubicación en sus propios metadatos (HEIC, video o reescritura fallida); revisalas antes de compartir:")
+                p.mediaWithMetadata.forEach { appendLine("    · $it") }
+            }
+            appendLine("- Distancia y tiempos de cada etapa siguen siendo los medidos (incluyen los tramos omitidos); el recuadro geográfico se recalculó sobre los puntos exportados.")
+        }
         if (r.mediaMissing.isNotEmpty() || r.audioMissing.isNotEmpty()) {
             appendLine()
             appendLine("FALTANTES (el archivo ya no estaba en el teléfono al exportar)")

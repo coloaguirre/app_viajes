@@ -20,9 +20,13 @@ class GeoJsonWriter(override val path: String = "tracks/viaje.geojson") : TripWr
             val s = se.segment
             val z = s.tzId
             val pts = se.points.filter { trip.includeFilteredPoints || !it.isFilteredOut }
-            if (pts.size >= 2) {
+            val pieces = TrackSplitter.split(pts, se.pauses).filter { it.size >= 2 }
+            if (pieces.isNotEmpty()) {
+                // MultiLineString when the track is cut by pauses or privacy zones (PLAN 5.5); plain LineString otherwise.
+                val geom = if (pieces.size == 1) geometry("LineString", buildJsonArray { pieces[0].forEach { p -> add(pos(p.lon, p.lat, p.altM)) } })
+                else geometry("MultiLineString", buildJsonArray { pieces.forEach { piece -> add(buildJsonArray { piece.forEach { p -> add(pos(p.lon, p.lat, p.altM)) } }) } })
                 features += feature(
-                    geometry("LineString", buildJsonArray { pts.forEach { p -> add(pos(p.lon, p.lat, p.altM)) } }),
+                    geom,
                     mapOf(
                         "kind" to JsonPrimitive("track"), "segment_id" to JsonPrimitive(s.id), "type" to JsonPrimitive(s.type.name),
                         "transport" to (s.transport?.let { JsonPrimitive(it.name) } ?: JsonNull), "name" to (s.title?.let { JsonPrimitive(it) } ?: JsonNull),

@@ -392,9 +392,12 @@ su aceptación es la evidencia que él aporta, registrada en
 - [ ] 5.4 Mapas offline con MapLibre (descarga de región).  (est: 1.5)
       Aceptación: con red desactivada en el emulador el mapa de la
       región descargada se muestra.
-- [ ] 5.5 Zonas de privacidad aplicadas al exportar.  (est: 1)
+- [x] 5.5 Zonas de privacidad aplicadas al exportar.  (est: 1)
       Aceptación: test: puntos dentro del radio no aparecen en el ZIP y
       el conteo de excluidos se reporta.
+      Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.5-zonas-privacidad.md`
+      (tests en `core/export` y `app`; E2E en el emulador con los conteos
+      verificados contra la base y el GPX).
 - [ ] 5.6 Google Fotos (Picker e importación / subida a álbum propio).
       DESEABLE A FUTURO (2026-10-11, usuario): requiere proyecto en
       Google Cloud con OAuth y el Picker no entrega ubicación.

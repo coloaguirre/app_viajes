@@ -55,7 +55,16 @@ enum class PauseKind {
     USER,
     AUTO_REST,
     NESTED,
+    /**
+     * Inserted by the exporter, never by the tracker: the track was cut because it entered a
+     * privacy zone (DISENO §15.3, PLAN 5.5). [SegmentPause.resumedUtcMs] is the first kept point
+     * after the zone. A trip imported from such a package keeps it, so a re-export still cuts there.
+     */
+    PRIVACY,
 }
+
+/** A circle the exported trip must not reveal (home, work): points inside are dropped and media there loses its location. */
+data class PrivacyZone(val id: String, val name: String, val lat: Double, val lon: Double, val radiusM: Double)
 
 /** Display units. Lives in core so exporters and the UI format distances the same way. */
 enum class Units {

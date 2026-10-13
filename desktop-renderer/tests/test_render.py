@@ -77,6 +77,22 @@ def test_map_frames_offline_grow_the_route_and_follow_mode_crops():
     assert mapframes.lonlat_to_world(0.0, 0.0, 0) == (128.0, 128.0)
 
 
+def test_legs_split_at_pauses_like_kotlin_and_keep_the_segment_colour():
+    pts = [(i * 1000, -34.6 + i * 1e-4, -58.4) for i in range(10)]
+    legs = render.split_at_pauses(pts, [3500, 7000])
+    assert [len(leg) for leg in legs] == [4, 3, 3], "a leg ends before the first point at or after each cut"
+    assert render.split_at_pauses(pts, [0]) == [pts] and render.split_at_pauses([], [5]) == []
+    # A privacy cut removed points 4-6: the bridged polyline draws a chord across the hole, the legs do not.
+    kept = pts[:4] + pts[7:]
+    legs = render.split_at_pauses(kept, [7000])
+    assert [len(leg) for leg in legs] == [4, 3]
+    bridged = []
+    mapframes.route_frames([kept], 320, 180, 1, "overview", None, "t", lambda b: bridged.append(b))
+    cut = []
+    mapframes.route_frames(legs, 320, 180, 1, "overview", None, "t", lambda b: cut.append(b), [0, 0])
+    assert bridged[0] != cut[0], "the chord across the cut is not drawn"
+
+
 def test_subtitles_and_elevation_helpers():
     text = subtitles.ass([subtitles.Cue(1500, 4000, "Llegamos al mirador {viento}")], 1920, 1080)
     assert "Dialogue: 0,0:00:01.50,0:00:04.00,Voz" in text and "(viento)" in text

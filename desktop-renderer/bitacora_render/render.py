@@ -27,6 +27,26 @@ from .model import (
 ATTRIBUTION_OSM = "© OpenStreetMap contributors"
 
 
+def split_at_pauses(points: list[tuple[int, float, float]], cuts_utc_ms: list[int]) -> list[list[tuple[int, float, float]]]:
+    """Mirror of Kotlin `TrackSplitter.split`: a new leg starts at the first point at or after each pause."""
+    cuts = sorted(cuts_utc_ms)
+    legs: list[list[tuple[int, float, float]]] = []
+    current: list[tuple[int, float, float]] = []
+    ci = 0
+    for p in points:
+        cut_here = False
+        while ci < len(cuts) and cuts[ci] <= p[0]:
+            cut_here = True
+            ci += 1
+        if cut_here and current:
+            legs.append(current)
+            current = []
+        current.append(p)
+    if current:
+        legs.append(current)
+    return legs
+
+
 @dataclass
 class RenderOptions:
     preview_scale: float = 1.0
@@ -76,8 +96,20 @@ class Renderer:
         ])  # fmt: skip
         return out
 
-    def tracks_of(self, segment_ids: list[str]) -> list[list[tuple[int, float, float]]]:
-        return [[(p.t_utc_ms, p.lat, p.lon) for p in self.segments[s].points if not p.filtered] for s in segment_ids if s in self.segments]
+    def tracks_of(self, segment_ids: list[str]) -> tuple[list[list[tuple[int, float, float]]], list[int]]:
+        """One polyline per leg between pauses (never a straight line across a pause or a privacy cut),
+        plus the segment index of each leg so every leg of a stage keeps the stage's colour."""
+        tracks: list[list[tuple[int, float, float]]] = []
+        colors: list[int] = []
+        for si, s in enumerate(segment_ids):
+            if s not in self.segments:
+                continue
+            seg = self.segments[s]
+            pts = [(p.t_utc_ms, p.lat, p.lon) for p in seg.points if not p.filtered]
+            for leg in split_at_pauses(pts, [p.paused_utc_ms for p in seg.pauses]):
+                tracks.append(leg)
+                colors.append(si)
+        return tracks, colors
 
     # -- scenes --------------------------------------------------------------------------------
     def render_scene(self, i: int, scene) -> Path:
@@ -181,8 +213,9 @@ class Renderer:
             log = self.work / f"scene_{i:03d}.ffmpeg.log"
             proc = ffmpeg.start_rawvideo_pipe(out, w, h, self.fps, log=log)
             try:
+                tracks, colors = self.tracks_of(scene.segments)
                 mapframes.route_frames(
-                    self.tracks_of(scene.segments),
+                    tracks,
                     w,
                     h,
                     frames,
@@ -190,6 +223,7 @@ class Renderer:
                     self.tiles,
                     self.opts.tiles_attribution,
                     proc.stdin.write,
+                    colors,
                 )
             finally:
                 proc.stdin.close()
@@ -202,8 +236,9 @@ class Renderer:
                 raise ffmpeg.FfmpegError(f"ninguna tesela pudo descargarse (primer error: {self.tiles.first_error}); revisá --tiles y la clave")
             return out
         if isinstance(scene, VoiceOverlay):
+            tracks, colors = self.tracks_of([scene.segment])
             last = mapframes.route_frames(
-                self.tracks_of([scene.segment]),
+                tracks,
                 w,
                 h,
                 1,
@@ -211,6 +246,7 @@ class Renderer:
                 self.tiles,
                 self.opts.tiles_attribution,
                 lambda _b: None,
+                colors,
             )
             img = cards.caption_overlay(last, scene.text or "Nota de voz") if scene.text else last
             return self.still_clip(img, out, scene.duration_ms)

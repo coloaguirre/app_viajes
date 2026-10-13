@@ -1,6 +1,7 @@
 package com.bitacoraviaje.app.ui.settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -153,6 +154,16 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 trailingContent = { androidx.compose.material3.Switch(checked = settings.roundEnrichmentCoords, onCheckedChange = viewModel::setRoundEnrichmentCoords, enabled = settings.enrichPlaces, modifier = Modifier.testTag("settings_round_coords")) },
             )
             HorizontalDivider()
+            SectionTitle(stringResource(R.string.settings_privacy))
+            Text(stringResource(R.string.settings_privacy_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+            PrivacyZonesBlock(
+                zones = settings.privacyZones,
+                message = viewModel.privacyMessage.collectAsStateWithLifecycle().value,
+                onAddHere = viewModel::addPrivacyZoneHere,
+                onAddManual = viewModel::addPrivacyZone,
+                onRemove = viewModel::removePrivacyZone,
+            )
+            HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_llm))
             Text(stringResource(R.string.settings_llm_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
             val hasKey by viewModel.hasLlmKey.collectAsStateWithLifecycle()
@@ -206,6 +217,73 @@ private fun UrlField(label: String, value: String, onCommit: (String) -> Unit, t
         trailingIcon = { androidx.compose.material3.TextButton(onClick = { onCommit(text) }, enabled = text != value) { Text(stringResource(R.string.settings_apply)) } },
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag(tag),
     )
+}
+
+/** PLAN 5.5: list of zones, add from the current position or by coordinates, remove. */
+@Composable
+fun PrivacyZonesBlock(
+    zones: List<com.bitacoraviaje.core.model.PrivacyZone>,
+    message: String?,
+    onAddHere: (String, Int) -> Unit,
+    onAddManual: (String, Double, Double, Int) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    var dialog by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) } // "here" | "manual"
+    if (zones.isEmpty()) {
+        Text(stringResource(R.string.settings_privacy_none), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("privacy_none"))
+    } else {
+        zones.forEach { z ->
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_privacy_zone_line, z.name, z.radiusM.toInt())) },
+                trailingContent = { androidx.compose.material3.TextButton(onClick = { onRemove(z.id) }, modifier = Modifier.testTag("privacy_remove_${z.id}")) { Text(stringResource(R.string.settings_privacy_delete)) } },
+                modifier = Modifier.testTag("privacy_zone_${z.id}"),
+            )
+        }
+    }
+    message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp).testTag("privacy_message")) }
+    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+        androidx.compose.material3.OutlinedButton(onClick = { dialog = "here" }, modifier = Modifier.testTag("privacy_add_here")) { Text(stringResource(R.string.settings_privacy_add_here)) }
+        androidx.compose.material3.TextButton(onClick = { dialog = "manual" }, modifier = Modifier.testTag("privacy_add_manual")) { Text(stringResource(R.string.settings_privacy_add_manual)) }
+    }
+    dialog?.let { mode ->
+        var name by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+        var lat by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+        var lon by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+        var radius by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(com.bitacoraviaje.app.settings.PrivacyZones.RADII_M[1]) }
+        val decimal = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal)
+        val coords = lat.replace(',', '.').toDoubleOrNull()?.takeIf { it in -90.0..90.0 } to lon.replace(',', '.').toDoubleOrNull()?.takeIf { it in -180.0..180.0 }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text(stringResource(if (mode == "here") R.string.settings_privacy_add_here else R.string.settings_privacy_add_manual)) },
+            text = {
+                Column {
+                    androidx.compose.material3.OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.settings_privacy_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("privacy_name"))
+                    if (mode == "manual") {
+                        androidx.compose.material3.OutlinedTextField(value = lat, onValueChange = { lat = it }, label = { Text(stringResource(R.string.settings_privacy_lat)) }, singleLine = true, keyboardOptions = decimal, modifier = Modifier.fillMaxWidth().testTag("privacy_lat"))
+                        androidx.compose.material3.OutlinedTextField(value = lon, onValueChange = { lon = it }, label = { Text(stringResource(R.string.settings_privacy_lon)) }, singleLine = true, keyboardOptions = decimal, modifier = Modifier.fillMaxWidth().testTag("privacy_lon"))
+                    }
+                    Text(stringResource(R.string.settings_privacy_radius), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                    // Scrolls sideways: four chips do not fit a narrow dialog and the last one would wrap vertically.
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                        com.bitacoraviaje.app.settings.PrivacyZones.RADII_M.forEach { r ->
+                            androidx.compose.material3.FilterChip(selected = radius == r, onClick = { radius = r }, label = { Text(stringResource(R.string.settings_privacy_radius_m, r)) }, modifier = Modifier.testTag("privacy_radius_$r"))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        if (mode == "here") onAddHere(name, radius) else coords.first?.let { la -> coords.second?.let { lo -> onAddManual(name, la, lo, radius) } }
+                        dialog = null
+                    },
+                    enabled = mode == "here" || (coords.first != null && coords.second != null),
+                    modifier = Modifier.testTag("privacy_save"),
+                ) { Text(stringResource(R.string.settings_privacy_save)) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.settings_privacy_cancel)) } },
+        )
+    }
 }
 
 /** API key entry: never shows the stored value, only whether one exists (skill play-policy-privacy). */

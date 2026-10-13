@@ -163,10 +163,13 @@ def route_frames(
     tiles: TileSource | None,
     attribution: str,
     on_frame: Callable[[bytes], None],
+    colors: list[int] | None = None,
 ) -> Image.Image:
     """Draws the route growing over `frames` frames (time-interpolated, ease-in-out) and hands RGB bytes to `on_frame`.
 
-    `tracks`: per segment, (t_utc_ms, lat, lon) in time order. Returns the final frame (used as a still for overlays).
+    `tracks`: polylines of (t_utc_ms, lat, lon) in time order (one per segment, or one per leg between
+    pauses); `colors[i]` is the colour index of track i (default: its position), so the legs of one
+    segment share a colour. Returns the final frame (used as a still for overlays).
     """
     pts_all = [(lat, lon) for tr in tracks for _, lat, lon in tr]
     if not pts_all:
@@ -183,12 +186,13 @@ def route_frames(
     projected = [[(t, *proj.px(lat, lon)) for t, lat, lon in tr] for tr in tracks]
     last = base
     for i in range(frames):
-        t = t_start + span * _ease(i / max(1, frames - 1))
+        # A single frame (the still behind a voice overlay) shows the whole route, not its first point.
+        t = t_start + span * (_ease(i / (frames - 1)) if frames > 1 else 1.0)
         img = base.copy()
         d = ImageDraw.Draw(img)
         tip = None
         for si, tr in enumerate(projected):
-            color = ROUTE_COLORS[si % len(ROUTE_COLORS)]
+            color = ROUTE_COLORS[(colors[si] if colors else si) % len(ROUTE_COLORS)]
             line = [(x, y) for tt, x, y in tr if tt <= t]
             # Interpolate the last leg so the tip moves smoothly.
             nxt = next(((tt, x, y) for tt, x, y in tr if tt > t), None)

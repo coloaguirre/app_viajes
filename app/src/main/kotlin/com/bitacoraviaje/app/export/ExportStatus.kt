@@ -16,6 +16,9 @@ data class ExportStatus(
     val audioWritten: Int = 0,
     val audioTotal: Int = 0,
     val missing: Int = 0,
+    val privacyPoints: Int = 0,
+    val privacyStops: Int = 0,
+    val privacyMedia: Int = 0,
     val error: String? = null,
 ) {
     companion object {
@@ -29,6 +32,7 @@ data class ExportStatus(
                     finished = true, resultUri = info.outputData.getString(ExportWorker.KEY_RESULT_URI), folder = info.outputData.getString(ExportWorker.KEY_RESULT_FOLDER),
                     mediaWritten = info.outputData.getInt(ExportWorker.KEY_MEDIA_WRITTEN, 0), mediaTotal = info.outputData.getInt(ExportWorker.KEY_MEDIA_TOTAL, 0),
                     audioWritten = info.outputData.getInt(ExportWorker.KEY_AUDIO_WRITTEN, 0), audioTotal = info.outputData.getInt(ExportWorker.KEY_AUDIO_TOTAL, 0),
+                    privacyPoints = info.outputData.getInt(ExportWorker.KEY_PRIVACY_POINTS, 0), privacyStops = info.outputData.getInt(ExportWorker.KEY_PRIVACY_STOPS, 0), privacyMedia = info.outputData.getInt(ExportWorker.KEY_PRIVACY_MEDIA, 0),
                     missing = info.outputData.getInt(ExportWorker.KEY_MISSING, 0),
                 )
                 WorkInfo.State.FAILED -> ExportStatus(finished = true, failed = true, error = info.outputData.getString(ExportWorker.KEY_ERROR))

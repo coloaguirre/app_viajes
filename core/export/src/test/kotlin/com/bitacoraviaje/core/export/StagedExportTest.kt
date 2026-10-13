@@ -60,6 +60,34 @@ class StagedExportTest {
     }
 
     @Test
+    fun `a leftover staging made with other options is discarded instead of resumed`() {
+        val dir = tempDir()
+        val trip = Fixture.trip()
+        val src = FileSource { ByteArrayInputStream(ByteArray(5)) }
+        // First run: unfiltered, interrupted after the documents were staged.
+        var opened = 0
+        val flaky = FileSource { opened++; if (opened == 1) throw IOException("boom") else ByteArrayInputStream(ByteArray(5)) }
+        assertFailsWith<IOException> { StagedExport(dir, fingerprint = "media=1;privacy=none").run(trip, flaky) }
+        val unfilteredGpx = File(dir, "tracks/viaje-completo.gpx").readText()
+        assertTrue(unfilteredGpx.contains("<trkpt"))
+        // Second run: the same trip with privacy zones → nothing from the first run may survive (review B1).
+        val (filtered, report) = PrivacyFilter.apply(trip, listOf(com.bitacoraviaje.core.model.PrivacyZone("z", "Casa", -34.6, -58.4, 600.0)))
+        val staged = StagedExport(dir, fingerprint = "media=1;privacy=z@-34.6,-58.4,600")
+        val out = staged.run(filtered, src, report)
+        val gpxNow = File(dir, "tracks/viaje-completo.gpx").readText()
+        assertTrue(gpxNow != unfilteredGpx && gpxNow.count { it == '<' } < unfilteredGpx.count { it == '<' }, "the GPX was regenerated from the filtered trip")
+        assertEquals(out.pointsWritten, gpxNow.split("<trkpt").size - 1)
+        val manifest = File(dir, StagedExport.MANIFEST).readLines()
+        assertEquals("FP\tmedia=1;privacy=z@-34.6,-58.4,600", manifest.first())
+        // Same fingerprint again: resumes (documents not rewritten).
+        val mtime = File(dir, "trip.json").lastModified()
+        Thread.sleep(20)
+        StagedExport(dir, fingerprint = "media=1;privacy=z@-34.6,-58.4,600").run(filtered, src, report)
+        assertEquals(mtime, File(dir, "trip.json").lastModified())
+        staged.clear()
+    }
+
+    @Test
     fun `a synthetic 30 day trip exports with one gpx per day and stays fast`() {
         val base = Fixture.trip()
         val segments = (0 until 30).map { d ->
