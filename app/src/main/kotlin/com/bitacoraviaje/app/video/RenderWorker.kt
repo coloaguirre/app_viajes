@@ -16,6 +16,9 @@ import androidx.hilt.work.HiltWorker
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.EditedMediaItemSequence
+import androidx.media3.common.MediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
@@ -112,7 +115,31 @@ class RenderWorker @AssistedInject constructor(
                 name = prepared.input.title
             }
             val out = File(work, "resumen.mp4")
-            export(built.composition, out)
+            if (built.audioSequences.isEmpty()) {
+                export(built.composition, out)
+            } else {
+                // Three steps (field report 2026-10-13, Pixel 8 Pro, ERROR_CODE_MUXING_TIMEOUT): whenever video and
+                // audio are encoded in the same export, the hardware video encoder keeps its last frames until an
+                // end-of-stream that never comes while the mixed audio runs ahead, and both wait forever. So:
+                // (1) the silent video (the path "subtítulos" already uses); (2) the mixed audio alone, with the
+                // silent video as the clock but its video track removed (no video encoder involved at all);
+                // (3) both containers copied into one MP4 with MediaMuxer, no codec in the loop.
+                val silent = File(work, "silent.mp4")
+                val audioOnly = File(work, "audio.mp4")
+                val wav = File(work, "silence.wav")
+                export(built.videoOnly, silent)
+                // The clock of the audio pass is a silent WAV as long as the video (an item with no tracks is refused).
+                withContext(Dispatchers.IO) { SilentWav.write(wav, measuredDurationMs(silent) ?: built.durationMs) }
+                val clock = EditedMediaItemSequence.Builder(setOf(androidx.media3.common.C.TRACK_TYPE_AUDIO))
+                    .addItem(EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(wav))).build())
+                    .build()
+                val mixed = Composition.Builder(listOf(clock) + built.audioSequences).experimentalSetForceAudioTrack(true).build()
+                export(mixed, audioOnly)
+                withContext(Dispatchers.IO) { Mp4Merge.merge(silent, audioOnly, out) }
+                silent.delete()
+                audioOnly.delete()
+                wav.delete()
+            }
             // What the user is told is measured on the file, never the plan's sum (review I8).
             val actualMs = withContext(Dispatchers.IO) { measuredDurationMs(out) ?: built.durationMs }
             val published = withContext(Dispatchers.IO) { publish(out, name) }
@@ -125,8 +152,13 @@ class RenderWorker @AssistedInject constructor(
             if (e is kotlinx.coroutines.CancellationException) throw e
             // Only the class and an error code reach the log: messages may carry the user's file names (review N5).
             val code = (e as? ExportException)?.errorCode
-            Log.w(TAG, "video failed ${segmentId ?: tripId}: ${e.javaClass.simpleName} code=$code")
-            Result.failure(workDataOf(KEY_ERROR to (if (code != null) "${e.javaClass.simpleName} $code" else e.message ?: e.javaClass.simpleName)))
+            // The cause chain names the stage that stalled (muxer, decoder, audio mixer); file names are not in it.
+            val causes = generateSequence(e.cause) { it.cause }.take(4).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message?.take(1500)}" }
+            Log.w(TAG, "video failed ${segmentId ?: tripId}: ${e.javaClass.simpleName} code=$code causes=[$causes]")
+            // The Media3 trace can run to several KB: logcat drops anything past ~4 KB per line, so it goes in chunks.
+            (e.cause?.message ?: "").chunked(3000).forEachIndexed { i, part -> Log.w(TAG, "video trace[$i]: $part") }
+            // The screen shows the code and the cause chain so a field failure can be diagnosed from a screenshot.
+            Result.failure(workDataOf(KEY_ERROR to (if (code != null) "${e.javaClass.simpleName} $code" + (if (causes.isNotBlank()) " · $causes" else "") else e.message ?: e.javaClass.simpleName)))
         } finally {
             work.listFiles()?.filter { it.name != "resumen.mp4" }?.forEach { it.delete() }
         }
@@ -146,9 +178,14 @@ class RenderWorker @AssistedInject constructor(
     /** Transformer wants the main looper; progress is polled every 500 ms into setProgress and the notification. */
     private suspend fun export(composition: Composition, out: File) = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine<Unit> { cont ->
+            // Debug builds carry Media3's component trace inside a failure message: it names the stage that stalled.
+            if (com.bitacoraviaje.app.BuildConfig.DEBUG) androidx.media3.effect.DebugTraceUtil.enableTracing = true
             val transformer = Transformer.Builder(appContext)
                 .setVideoMimeType(MimeTypes.VIDEO_H264)
                 .setAudioMimeType(MimeTypes.AUDIO_AAC)
+                // Hardware pipelines on phones can pause longer than Media3's default 10 s between muxer samples
+                // (field report: ERROR_CODE_MUXING_TIMEOUT in audio mode); a real stall still fails, later.
+                .setMaxDelayBetweenMuxerSamplesMs(45_000)
                 .addListener(object : Transformer.Listener {
                     override fun onCompleted(composition: Composition, exportResult: ExportResult) { if (cont.isActive) cont.resume(Unit) }
                     override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) { if (cont.isActive) cont.resumeWithException(exportException) }

@@ -71,7 +71,20 @@ class MiniVideoComposer(
         fun map(): RouteSnapshotter.RouteBase? = mapProvider()
     }
 
-    data class Built(val composition: Composition, val durationMs: Long, val skipped: List<String>, val hasAudio: Boolean, val voicesDropped: Int, val warnings: List<String>)
+    /**
+     * [composition] is the single-pass build (video + audio). [videoOnly] and [audioSequences] let the
+     * worker render in two passes: the silent video first, then the audio muxed over it (see RenderWorker).
+     */
+    data class Built(
+        val composition: Composition,
+        val durationMs: Long,
+        val skipped: List<String>,
+        val hasAudio: Boolean,
+        val voicesDropped: Int,
+        val warnings: List<String>,
+        val videoOnly: Composition,
+        val audioSequences: List<EditedMediaItemSequence>,
+    )
 
     /** Stage video: one segment. */
     fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, points: List<TrackPoint>, mapBase: RouteSnapshotter.RouteBase?): Built =
@@ -153,16 +166,21 @@ class MiniVideoComposer(
                 val f = File(context.filesDir, note.audioPath)
                 if (!f.exists() || offsetUs < cursor) { voicesDropped++; continue } // missing file or overlapping the previous note (review I5)
                 if (offsetUs > cursor) b.addGap(offsetUs - cursor)
-                // Clipped to its scene like the desktop `atrim` (review I5).
-                val lengthMs = minOf(note.durationMs, maxUs / 1000)
-                b.addItem(
-                    EditedMediaItem.Builder(
-                        MediaItem.Builder().setUri(Uri.fromFile(f)).setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(lengthMs).build()).build(),
-                    ).setRemoveVideo(true).build(),
-                )
+                // The stored duration is wall-clock time and runs ~100 ms past the audio actually encoded; a clip
+                // end beyond the file's end stalls the audio pipeline and the muxer aborts with 7002 (Pixel, audio
+                // mode). Clip to what the file really holds (review of the field report, 2026-10-13).
+                val fileMs = mediaDurationMs(f) ?: note.durationMs
+                val lengthMs = minOf(note.durationMs, maxUs / 1000, fileMs)
+                val item = MediaItem.Builder().setUri(Uri.fromFile(f))
+                if (lengthMs < fileMs) item.setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(lengthMs).build())
+                b.addItem(EditedMediaItem.Builder(item.build()).setRemoveVideo(true).build())
                 cursor = offsetUs + lengthMs * 1000
                 added++
             }
+            // The voice track must span the whole video: when it ended before the last scene (no music to keep
+            // the audio track alive), the muxer refused to write video more than ~0.5 s ahead of the audio and
+            // aborted with ERROR_CODE_MUXING_TIMEOUT (7002) on the Pixel in "audio original" mode.
+            if (added > 0 && cursor < startUs) b.addGap(startUs - cursor)
             if (added > 0) sequences += b.build()
         }
         musicUri?.let { uri ->
@@ -173,7 +191,25 @@ class MiniVideoComposer(
             val music = EditedMediaItem.Builder(MediaItem.fromUri(uri)).setRemoveVideo(true).setEffects(Effects(listOf(gain), emptyList())).build()
             sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO)).addItem(music).setIsLooping(true).build()
         }
-        return Built(Composition.Builder(sequences).build(), startUs / 1000, skipped, wantAudio, voicesDropped, warnings)
+        // With voices or music the primary (image) sequence must carry a real silent audio track from the first
+        // frame: on the Pixel 8 Pro the muxer otherwise never received a sample and aborted with 7002, while the
+        // emulator's slower pipeline happened to resolve the voice track's leading gap in time.
+        val composition = Composition.Builder(sequences).experimentalSetForceAudioTrack(wantAudio).build()
+        val videoOnly = Composition.Builder(EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).also { b -> items.forEach { b.addItem(it) } }.build()).build()
+        return Built(composition, startUs / 1000, skipped, wantAudio, voicesDropped, warnings, videoOnly, sequences.drop(1))
+    }
+
+    /** Real duration of an audio file (null when it cannot be read, e.g. a placeholder in tests). */
+    private fun mediaDurationMs(f: File): Long? {
+        val r = android.media.MediaMetadataRetriever()
+        return try {
+            r.setDataSource(f.path)
+            r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.takeIf { it > 0 }
+        } catch (e: Exception) {
+            null
+        } finally {
+            runCatching { r.release() }
+        }
     }
 
     private fun statsCard(scene: VideoPlan.Stats, segmentTitle: String?): Bitmap = Cards.stats(
