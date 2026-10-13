@@ -6,13 +6,15 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * A PCM WAV of silence (16 kHz, mono, 16-bit: ~1.9 MB per minute). It is the primary audio item of
- * the audio-only export: Media3 needs a real item to set the composition's length, and a sequence
- * made only of gaps is not allowed.
+ * A PCM WAV of silence (48 kHz stereo 16-bit, nominally 11.5 MB per minute but written sparse, so
+ * it costs no real space). It is the primary audio item of the audio-only export: Media3 needs a
+ * real item to set the composition's length (a sequence made only of gaps is not allowed) and the
+ * primary input fixes the mixer's format, so it must be the full-quality one, not 16 kHz mono
+ * (review I1 of the 7002 fix).
  */
 object SilentWav {
-    const val SAMPLE_RATE = 16_000
-    private const val CHANNELS = 1
+    const val SAMPLE_RATE = 48_000
+    const val CHANNELS = 2
     private const val BITS = 16
 
     fun write(file: File, durationMs: Long) {

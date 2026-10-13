@@ -127,6 +127,18 @@ bitacora-render preview EXPORT_DIR plan.json --scene 12 -o cuadro.png   # un cua
   ```
 - **Ken Burns:** un `MatrixTransformation` que devuelve una `Matrix` según `presentationTimeUs` (escala y traslación interpoladas).
 - **Textos:** `OverlayEffect` con `TextOverlay` (`SpannableString` con estilo) o `BitmapOverlay` (tarjetas dibujadas con `Canvas`), con `OverlaySettings` para la posición.
+- **Video con audio en el teléfono: nunca en una sola exportación.** Aprendizaje de campo (Pixel 8 Pro,
+  2026-10-13): cuando el codificador de video por hardware y la mezcla de audio conviven en la misma
+  `Composition`, el codificador retiene sus últimos cuadros hasta el fin de entrada mientras el audio se
+  adelanta, el `MuxerWrapper` rechaza la pista adelantada y las dos esperan para siempre
+  (`ERROR_CODE_MUXING_TIMEOUT`, 7002). El emulador (códec por software) no lo muestra. Hacer tres pasos:
+  (1) exportar el video **mudo**; (2) exportar **solo el audio**, con un WAV de silencio de la duración del
+  video como ítem primario (`SilentWav`, 48 kHz estéreo: **el primario fija el formato del mezclador**, un
+  WAV de 16 kHz mono degradaría la música) más las secuencias de voces, clips y música; (3) copiar las dos
+  pistas intercaladas con `MediaMuxer` (`Mp4Merge`). El audio de los clips viaja en su propia secuencia
+  (`setRemoveVideo(true)`) porque el video mudo ya no lo lleva. Ejemplo ya implementado: `RenderWorker`.
+- **Diagnóstico de exportaciones:** en builds de depuración `DebugTraceUtil.enableTracing = true` y volcar
+  `cause.message` al log en trozos de 3 KB: la traza dice qué componente dejó de recibir muestras.
 - **Tarjetas y mapa animado:** prerenderizar con `Canvas` y codificar a un MP4 corto con `MediaCodec` + `MediaMuxer` (o una secuencia de imágenes); después entran como `EditedMediaItem` comunes. Mapa base: `MapSnapshotter` de MapLibre (offline si la región está descargada).
 - **Subtítulos de voz:** `TextOverlay` con una ventana de tiempo (overlay que devuelve texto vacío fuera de su intervalo).
 - **Progreso:** `transformer.getProgress(ProgressHolder)` consultado cada 500 ms → `setProgress` del Worker.

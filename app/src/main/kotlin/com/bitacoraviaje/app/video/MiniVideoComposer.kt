@@ -71,6 +71,8 @@ class MiniVideoComposer(
         fun map(): RouteSnapshotter.RouteBase? = mapProvider()
     }
 
+    private data class ClipCue(val offsetUs: Long, val uri: Uri, val mimeType: String?, val startMs: Long, val endMs: Long)
+
     /**
      * [composition] is the single-pass build (video + audio). [videoOnly] and [audioSequences] let the
      * worker render in two passes: the silent video first, then the audio muxed over it (see RenderWorker).
@@ -99,6 +101,7 @@ class MiniVideoComposer(
         val voiceCues = ArrayList<Triple<Long, Long, VoiceNote>>() // offsetUs, maxDurationUs, note
         var startUs = 0L
         var anyClipAudio = false
+        val clipCues = ArrayList<ClipCue>() // the sound of the clips, for the audio-only pass
         var anyMap = false
         val titles = input.segments.associate { it.id to it.title }
         val mapAttribution = "© OpenStreetMap contributors"
@@ -143,7 +146,13 @@ class MiniVideoComposer(
                 is VideoPlan.VideoClip -> {
                     val m = media[scene.media]
                     val uri = m?.contentUri?.toUri()
-                    if (uri == null) { skipped += scene.media; null } else { anyClipAudio = anyClipAudio || scene.keep_audio; clip(uri, m.mimeType, scene.trim_start_ms, scene.trim_end_ms, scene.keep_audio) }
+                    if (uri == null) {
+                        skipped += scene.media
+                        null
+                    } else {
+                        if (scene.keep_audio) { anyClipAudio = true; clipCues += ClipCue(startUs, uri, m.mimeType, scene.trim_start_ms, scene.trim_end_ms) }
+                        clip(uri, m.mimeType, scene.trim_start_ms, scene.trim_end_ms, scene.keep_audio)
+                    }
                 }
             }
             if (item != null) { items += item; startUs += durationMs * 1000 }
@@ -169,7 +178,7 @@ class MiniVideoComposer(
                 // The stored duration is wall-clock time and runs ~100 ms past the audio actually encoded; a clip
                 // end beyond the file's end stalls the audio pipeline and the muxer aborts with 7002 (Pixel, audio
                 // mode). Clip to what the file really holds (review of the field report, 2026-10-13).
-                val fileMs = mediaDurationMs(f) ?: note.durationMs
+                val fileMs = MediaDurations.of(f) ?: note.durationMs
                 val lengthMs = minOf(note.durationMs, maxUs / 1000, fileMs)
                 val item = MediaItem.Builder().setUri(Uri.fromFile(f))
                 if (lengthMs < fileMs) item.setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(lengthMs).build())
@@ -183,6 +192,25 @@ class MiniVideoComposer(
             if (added > 0 && cursor < startUs) b.addGap(startUs - cursor)
             if (added > 0) sequences += b.build()
         }
+        // The clips' own sound as a sequence of its own (review B1 of the 7002 fix): the single-pass composition
+        // keeps it inside the primary items, but the audio-only pass has no primary video to carry it.
+        var clipAudio: EditedMediaItemSequence? = null
+        if (clipCues.isNotEmpty()) {
+            val b = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+            var cursor = 0L
+            for (cue in clipCues.sortedBy { it.offsetUs }) {
+                if (cue.offsetUs > cursor) b.addGap(cue.offsetUs - cursor)
+                b.addItem(
+                    EditedMediaItem.Builder(
+                        MediaItem.Builder().setUri(cue.uri).also { mb -> cue.mimeType?.let(mb::setMimeType) }
+                            .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(cue.startMs).setEndPositionMs(cue.endMs).build()).build(),
+                    ).setRemoveVideo(true).build(),
+                )
+                cursor = cue.offsetUs + (cue.endMs - cue.startMs) * 1000
+            }
+            if (cursor < startUs) b.addGap(startUs - cursor)
+            clipAudio = b.build()
+        }
         musicUri?.let { uri ->
             // Constant-power downmix of 1–6 channels to stereo, scaled by the user's volume (review M5).
             val gain = ChannelMixingAudioProcessor().apply {
@@ -195,21 +223,11 @@ class MiniVideoComposer(
         // frame: on the Pixel 8 Pro the muxer otherwise never received a sample and aborted with 7002, while the
         // emulator's slower pipeline happened to resolve the voice track's leading gap in time.
         val composition = Composition.Builder(sequences).experimentalSetForceAudioTrack(wantAudio).build()
-        val videoOnly = Composition.Builder(EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).also { b -> items.forEach { b.addItem(it) } }.build()).build()
-        return Built(composition, startUs / 1000, skipped, wantAudio, voicesDropped, warnings, videoOnly, sequences.drop(1))
-    }
-
-    /** Real duration of an audio file (null when it cannot be read, e.g. a placeholder in tests). */
-    private fun mediaDurationMs(f: File): Long? {
-        val r = android.media.MediaMetadataRetriever()
-        return try {
-            r.setDataSource(f.path)
-            r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.takeIf { it > 0 }
-        } catch (e: Exception) {
-            null
-        } finally {
-            runCatching { r.release() }
-        }
+        // The same items with their sound removed: the clips' audio travels in [clipAudio] instead.
+        val silentItems = items.map { it.buildUpon().setRemoveAudio(true).build() }
+        val videoOnly = Composition.Builder(EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).also { b -> silentItems.forEach { b.addItem(it) } }.build()).build()
+        val audioSequences = sequences.drop(1).let { rest -> if (clipAudio != null) listOf(rest.firstOrNull { !it.isLooping }).filterNotNull().take(if (voiceCues.isNotEmpty()) 1 else 0) + clipAudio + rest.filter { it.isLooping } else rest }
+        return Built(composition, startUs / 1000, skipped, wantAudio, voicesDropped, warnings, videoOnly, audioSequences)
     }
 
     private fun statsCard(scene: VideoPlan.Stats, segmentTitle: String?): Bitmap = Cards.stats(

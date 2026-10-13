@@ -26,8 +26,8 @@ object Mp4Merge {
             val rotation = runCatching { videoEx.getTrackFormat(vTrack).getInteger(MediaFormat.KEY_ROTATION) }.getOrDefault(0)
             if (rotation != 0) muxer.setOrientationHint(rotation)
             muxer.start()
-            copy(videoEx, muxer, vOut)
-            copy(audioEx, muxer, aOut)
+            val bufferSize = maxOf(maxInputSize(videoEx.getTrackFormat(vTrack)), maxInputSize(audioEx.getTrackFormat(aTrack)), 2 * 1024 * 1024)
+            interleave(videoEx, vOut, audioEx, aOut, muxer, bufferSize)
             muxer.stop()
         } finally {
             runCatching { muxer.release() }
@@ -46,18 +46,28 @@ object Mp4Merge {
         return null
     }
 
-    private fun copy(ex: MediaExtractor, muxer: MediaMuxer, track: Int) {
-        val buffer = ByteBuffer.allocate(2 * 1024 * 1024)
+    private fun maxInputSize(format: MediaFormat): Int = runCatching { format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) }.getOrDefault(0)
+
+    /** Writes the two tracks ordered by presentation time, so the MP4 interleaves video and audio like an encoder would. */
+    private fun interleave(videoEx: MediaExtractor, vOut: Int, audioEx: MediaExtractor, aOut: Int, muxer: MediaMuxer, bufferSize: Int) {
+        val buffer = ByteBuffer.allocate(bufferSize)
         val info = MediaCodec.BufferInfo()
-        while (true) {
+        var videoDone = false
+        var audioDone = false
+        while (!videoDone || !audioDone) {
+            val takeVideo = !videoDone && (audioDone || videoEx.sampleTime <= audioEx.sampleTime)
+            val ex = if (takeVideo) videoEx else audioEx
             val size = ex.readSampleData(buffer, 0)
-            if (size < 0) break
+            if (size < 0) {
+                if (takeVideo) videoDone = true else audioDone = true
+                continue
+            }
             info.offset = 0
             info.size = size
             info.presentationTimeUs = ex.sampleTime
             info.flags = if (ex.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
-            muxer.writeSampleData(track, buffer, info)
-            ex.advance()
+            muxer.writeSampleData(if (takeVideo) vOut else aOut, buffer, info)
+            if (!ex.advance()) { if (takeVideo) videoDone = true else audioDone = true }
         }
     }
 }

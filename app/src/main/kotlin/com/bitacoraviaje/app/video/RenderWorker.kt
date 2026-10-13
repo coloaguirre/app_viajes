@@ -16,9 +16,9 @@ import androidx.hilt.work.HiltWorker
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
+import androidx.media3.common.MediaItem
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
-import androidx.media3.common.MediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
@@ -76,6 +76,7 @@ class RenderWorker @AssistedInject constructor(
         val renderRoot = File(appContext.cacheDir, "render")
         renderRoot.listFiles()?.filter { it.isDirectory && System.currentTimeMillis() - it.lastModified() > STALE_MS }?.forEach { it.deleteRecursively() }
         val work = File(renderRoot, id.toString()).apply { mkdirs() }
+        val out = File(work, "resumen.mp4")
         return try {
             val built: MiniVideoComposer.Built
             val name: String
@@ -114,10 +115,10 @@ class RenderWorker @AssistedInject constructor(
                 built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, w, h, options = options).build(plan, prepared.input, mediaById, voices, perSegment, isActive = { isActive }) }
                 name = prepared.input.title
             }
-            val out = File(work, "resumen.mp4")
-            if (built.audioSequences.isEmpty()) {
+            if (!built.hasAudio) {
                 export(built.composition, out)
             } else {
+                check(built.audioSequences.isNotEmpty()) { "audio planned but no audio sequence" }
                 // Three steps (field report 2026-10-13, Pixel 8 Pro, ERROR_CODE_MUXING_TIMEOUT): whenever video and
                 // audio are encoded in the same export, the hardware video encoder keeps its last frames until an
                 // end-of-stream that never comes while the mixed audio runs ahead, and both wait forever. So:
@@ -127,14 +128,14 @@ class RenderWorker @AssistedInject constructor(
                 val silent = File(work, "silent.mp4")
                 val audioOnly = File(work, "audio.mp4")
                 val wav = File(work, "silence.wav")
-                export(built.videoOnly, silent)
+                export(built.videoOnly, silent, progressFrom = 0, progressTo = 85)
                 // The clock of the audio pass is a silent WAV as long as the video (an item with no tracks is refused).
-                withContext(Dispatchers.IO) { SilentWav.write(wav, measuredDurationMs(silent) ?: built.durationMs) }
+                withContext(Dispatchers.IO) { SilentWav.write(wav, MediaDurations.of(silent) ?: built.durationMs) }
                 val clock = EditedMediaItemSequence.Builder(setOf(androidx.media3.common.C.TRACK_TYPE_AUDIO))
                     .addItem(EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(wav))).build())
                     .build()
-                val mixed = Composition.Builder(listOf(clock) + built.audioSequences).experimentalSetForceAudioTrack(true).build()
-                export(mixed, audioOnly)
+                export(Composition.Builder(listOf(clock) + built.audioSequences).build(), audioOnly, progressFrom = 85, progressTo = 97)
+                publish(98)
                 withContext(Dispatchers.IO) { Mp4Merge.merge(silent, audioOnly, out) }
                 silent.delete()
                 audioOnly.delete()
@@ -150,33 +151,34 @@ class RenderWorker @AssistedInject constructor(
             Result.success(workDataOf(KEY_RESULT_URI to uri.toString(), KEY_DURATION_MS to actualMs, KEY_PLANNED_MS to built.durationMs, KEY_ELAPSED_MS to elapsed, KEY_SKIPPED to built.skipped.size, KEY_VOICES_DROPPED to built.voicesDropped, KEY_WARNINGS to built.warnings.joinToString(" · ")))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            // Only the class and an error code reach the log: messages may carry the user's file names (review N5).
+            out.delete() // a half-written result must not linger until the cache sweep
             val code = (e as? ExportException)?.errorCode
-            // The cause chain names the stage that stalled (muxer, decoder, audio mixer); file names are not in it.
+            // The cause chain names the stage that stalled (muxer, decoder, audio mixer). Messages may carry a path of
+            // the user's own files; they stay on the user's device (log and screen), never leave it.
             val causes = generateSequence(e.cause) { it.cause }.take(4).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message?.take(1500)}" }
             Log.w(TAG, "video failed ${segmentId ?: tripId}: ${e.javaClass.simpleName} code=$code causes=[$causes]")
             // The Media3 trace can run to several KB: logcat drops anything past ~4 KB per line, so it goes in chunks.
             (e.cause?.message ?: "").chunked(3000).forEachIndexed { i, part -> Log.w(TAG, "video trace[$i]: $part") }
-            // The screen shows the code and the cause chain so a field failure can be diagnosed from a screenshot.
-            Result.failure(workDataOf(KEY_ERROR to (if (code != null) "${e.javaClass.simpleName} $code" + (if (causes.isNotBlank()) " · $causes" else "") else e.message ?: e.javaClass.simpleName)))
+            // On screen: the code plus a short cause, readable in a screenshot and well under WorkManager's 10 KB Data cap.
+            val shortCause = e.cause?.let { "${it.javaClass.simpleName}: ${it.message?.substringBefore(" DebugTrace")?.take(200)}" }
+            val shown = if (code != null) "${e.javaClass.simpleName} $code" + (shortCause?.let { " · $it" } ?: "") else (e.message ?: e.javaClass.simpleName).take(300)
+            Result.failure(workDataOf(KEY_ERROR to shown))
         } finally {
             work.listFiles()?.filter { it.name != "resumen.mp4" }?.forEach { it.delete() }
         }
     }
 
     /** Duration of the produced MP4 as the container declares it. */
-    private fun measuredDurationMs(file: File): Long? = runCatching {
-        val r = android.media.MediaMetadataRetriever() // AutoCloseable only from API 29: release by hand (minSdk 26)
-        try {
-            r.setDataSource(file.absolutePath)
-            r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-        } finally {
-            r.release()
-        }
-    }.getOrNull()
+    private fun measuredDurationMs(file: File): Long? = MediaDurations.of(file)
 
     /** Transformer wants the main looper; progress is polled every 500 ms into setProgress and the notification. */
-    private suspend fun export(composition: Composition, out: File) = withContext(Dispatchers.Main) {
+    /** Publishes a global percentage (several export steps map onto one bar). */
+    private fun publish(percent: Int) {
+        setProgressAsync(workDataOf(KEY_PROGRESS to percent))
+        runCatching { setForegroundAsync(foregroundInfo(percent)) }
+    }
+
+    private suspend fun export(composition: Composition, out: File, progressFrom: Int = 0, progressTo: Int = 100) = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine<Unit> { cont ->
             // Debug builds carry Media3's component trace inside a failure message: it names the stage that stalled.
             if (com.bitacoraviaje.app.BuildConfig.DEBUG) androidx.media3.effect.DebugTraceUtil.enableTracing = true
@@ -198,8 +200,7 @@ class RenderWorker @AssistedInject constructor(
                     if (!cont.isActive) return
                     val state = transformer.getProgress(holder)
                     if (state == Transformer.PROGRESS_STATE_AVAILABLE) {
-                        setProgressAsync(workDataOf(KEY_PROGRESS to holder.progress))
-                        runCatching { setForegroundAsync(foregroundInfo(holder.progress)) }
+                        publish(progressFrom + (progressTo - progressFrom) * holder.progress / 100)
                     }
                     handler.postDelayed(this, 500)
                 }

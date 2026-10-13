@@ -125,16 +125,6 @@ class VoiceRecorder @Inject constructor(@ApplicationContext private val context:
         fun relativePath(tripId: String, noteId: String): String = "audio/$tripId/$noteId.m4a"
 
         /** Duration of a recorded note as the container reports it (null if unreadable). */
-        fun durationMs(file: File): Long? {
-            val r = android.media.MediaMetadataRetriever()
-            return try {
-                r.setDataSource(file.path)
-                r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.takeIf { it > 0 }
-            } catch (e: Exception) {
-                null
-            } finally {
-                runCatching { r.release() }
-            }
-        }
+        fun durationMs(file: File): Long? = com.bitacoraviaje.app.video.MediaDurations.of(file)
     }
 }
