@@ -220,9 +220,20 @@ class TrackingRepository @Inject constructor(
 
     suspend fun getTrip(tripId: String): Trip? = trips.getById(tripId)?.toDomain()
 
-    suspend fun setTripArchived(tripId: String, archived: Boolean) = trips.setArchived(tripId, archived)
+    /** An ACTIVE trip receives the next recording, so it cannot be archived (review I5); returns whether the flag changed. */
+    suspend fun setTripArchived(tripId: String, archived: Boolean): Boolean {
+        if (archived && trips.getById(tripId)?.status == TripStatus.ACTIVE.name) return false
+        trips.setArchived(tripId, archived)
+        return true
+    }
 
-    suspend fun renameTrip(tripId: String, title: String) = trips.rename(tripId, title.trim())
+    /** Trims; a blank title is refused (returns false) so the list never shows a nameless trip. */
+    suspend fun renameTrip(tripId: String, title: String): Boolean {
+        val t = title.trim()
+        if (t.isEmpty()) return false
+        trips.rename(tripId, t)
+        return true
+    }
 
     /**
      * Removes a trip and everything that hangs from it (segments, points, pauses, stops, media rows,

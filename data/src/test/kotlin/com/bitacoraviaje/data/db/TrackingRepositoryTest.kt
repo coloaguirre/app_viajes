@@ -213,9 +213,11 @@ class TrackingRepositoryTest {
     @Test
     fun `rename trims the title and archive flips the flag without touching the status`() = runTest {
         val s = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Viejo")
+        assertEquals(false, repo.setTripArchived(s.tripId, true), "an active trip cannot be archived")
+        assertEquals(false, repo.renameTrip(s.tripId, "   "), "a blank title is refused")
         repo.finishTrip(s.tripId)
-        repo.renameTrip(s.tripId, "  Nuevo  ")
-        repo.setTripArchived(s.tripId, true)
+        assertTrue(repo.renameTrip(s.tripId, "  Nuevo  "))
+        assertTrue(repo.setTripArchived(s.tripId, true))
         val t = assertNotNull(repo.getTrip(s.tripId))
         assertEquals("Nuevo", t.title)
         assertTrue(t.archived)

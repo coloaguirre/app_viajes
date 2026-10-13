@@ -19,6 +19,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.ListItem
 import androidx.compose.runtime.getValue
@@ -55,12 +59,14 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
         viewModel.events.collect { e ->
             when (e) {
                 is HomeEvent.OpenActiveSession -> onOpenActiveSession(e.segmentId)
-                HomeEvent.PermissionDenied -> snackbar.showSnackbar(denied)
-                is HomeEvent.TripDeleted -> {
+                HomeEvent.PermissionDenied -> launch { snackbar.showSnackbar(denied) }
+                // Each snackbar in its own coroutine: a 10 s "Deshacer" must not hold back the next event (review M5).
+                is HomeEvent.TripDeleted -> launch {
                     val r = snackbar.showSnackbar(resources.getString(R.string.trip_deleted, e.title), actionLabel = resources.getString(R.string.trip_delete_undo), duration = androidx.compose.material3.SnackbarDuration.Long)
-                    if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.undoDelete()
+                    if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.undoDelete(e.tripId) else viewModel.commitDelete(e.tripId)
                 }
-                HomeEvent.TripInUse -> snackbar.showSnackbar(resources.getString(R.string.trip_delete_in_use))
+                HomeEvent.TripInUse -> launch { snackbar.showSnackbar(resources.getString(R.string.trip_delete_in_use)) }
+                is HomeEvent.TripDeleteFailed -> launch { snackbar.showSnackbar(resources.getString(R.string.trip_delete_failed, e.title), duration = androidx.compose.material3.SnackbarDuration.Long) }
             }
         }
     }
@@ -236,7 +242,7 @@ private fun TripList(trips: List<Trip>, archived: List<Trip>, openTripId: String
             item(key = "archived-header") {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.home_archived, archived.size), style = MaterialTheme.typography.titleSmall) },
-                    trailingContent = { Text(if (showArchived) "▲" else "▼") },
+                    trailingContent = { Icon(if (showArchived) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = stringResource(if (showArchived) R.string.home_archived_collapse else R.string.home_archived_expand)) },
                     modifier = Modifier.clickable { showArchived = !showArchived }.testTag("home_archived_toggle"),
                 )
             }
@@ -262,7 +268,8 @@ private fun TripRow(trip: Trip, recording: Boolean, onOpenTrip: (String) -> Unit
                     androidx.compose.material3.DropdownMenuItem(
                         text = { Text(stringResource(if (trip.archived) R.string.trip_unarchive else R.string.trip_archive)) },
                         onClick = { menu = false; onTripAction(TripAction.Archive(trip.id, !trip.archived)) },
-                        enabled = !recording,
+                        // An active trip is where the next recording goes: it cannot be put away (review I5).
+                        enabled = !recording && !active,
                         modifier = Modifier.testTag("trip_archive_${trip.id}"),
                     )
                     androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.trip_export)) }, onClick = { menu = false; onTripAction(TripAction.Export(trip.id)) }, modifier = Modifier.testTag("trip_export_${trip.id}"))
@@ -284,10 +291,12 @@ private fun TripRow(trip: Trip, recording: Boolean, onOpenTrip: (String) -> Unit
         var field by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) {
             androidx.compose.runtime.mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(initial, androidx.compose.ui.text.TextRange(0, initial.length)))
         }
+        val focus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+        androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
         AlertDialog(
             onDismissRequest = { rename = null },
             title = { Text(stringResource(R.string.trip_rename)) },
-            text = { androidx.compose.material3.OutlinedTextField(value = field, onValueChange = { field = it }, singleLine = true, modifier = Modifier.testTag("trip_rename_field")) },
+            text = { androidx.compose.material3.OutlinedTextField(value = field, onValueChange = { field = it }, singleLine = true, modifier = Modifier.focusRequester(focus).testTag("trip_rename_field")) },
             confirmButton = { TextButton(onClick = { onTripAction(TripAction.Rename(trip.id, field.text)); rename = null }, enabled = field.text.isNotBlank(), modifier = Modifier.testTag("trip_rename_save")) { Text(stringResource(R.string.settings_privacy_save)) } },
             dismissButton = { TextButton(onClick = { rename = null }) { Text(stringResource(R.string.active_cancel)) } },
         )

@@ -14,19 +14,35 @@ pantalla inicial tenga un menú con archivar, borrar y acciones afines.
   (`Route.TripDetail(openExport = true)`); **Crear video** va directo a la pantalla de video.
 - **Borrar** pide confirmación explicando qué se borra (recorrido, paradas, notas, vínculos) y
   qué no (las fotos y videos de la galería nunca se tocan). La fila desaparece al instante y un
-  snackbar ofrece **Deshacer** durante 10 s. Pasado ese tiempo: se reescribe el respaldo del
-  viaje (`files/backup/<id>.json.gz`, el mismo que lista Ajustes → Respaldos), se borra el viaje
-  en una transacción (las claves foráneas arrastran etapas, puntos, pausas, paradas, medios,
-  notas y lugares; los `place` huérfanos se limpian), y se borran los audios y el plan de video
-  guardado de ese viaje. Si el usuario sale de Home antes de los 10 s, el borrado se completa igual.
-- Archivar y Borrar se deshabilitan solo para el viaje que tiene una etapa grabándose. Un viaje
-  "en curso" sin etapa abierta (por ejemplo, entre un día y otro) sí puede borrarse o archivarse.
-  El repositorio además rechaza el borrado si hay una etapa abierta (segunda red).
+  snackbar ofrece **Deshacer** mientras está visible (10 s). Cuando el snackbar se va sin tocar
+  Deshacer, la pantalla encola un trabajo único de WorkManager (`DeleteTripWorker` →
+  `TripDeleter`) que: (1) rechaza si una etapa del viaje está grabando; (2) **escribe el respaldo**
+  `files/backup/<id>.json.gz` (el mismo que lista Ajustes → Respaldos) y, **si falla o queda vacío,
+  no borra nada**: la fila vuelve con el aviso "No se borró «X»: no se pudo guardar el respaldo";
+  (3) mueve las grabaciones de voz a `files/backup/audio/<id>/` (se conservan junto al respaldo,
+  excluidas del respaldo en la nube por el tope de 25 MB); (4) borra el viaje en una transacción
+  (las claves foráneas arrastran etapas, puntos, pausas, paradas, medios, notas y lugares; los
+  `place` huérfanos se limpian); (5) borra el plan de video guardado y la carpeta de staging de
+  exportación. Varios viajes pueden estar pendientes a la vez, cada uno con su snackbar. Si el
+  usuario sale de Home con un snackbar abierto, el borrado se encola igual (lo pidió y confirmó);
+  si el proceso muere antes, el viaje simplemente sigue ahí.
+- Borrar se deshabilita solo para el viaje que tiene una etapa grabándose; un viaje "en curso"
+  sin etapa abierta (entre un día y otro) sí puede borrarse. Archivar se deshabilita para todo
+  viaje en curso (es adonde va la próxima grabación); el repositorio rechaza ambas cosas como
+  segunda red, y `getActive()` ignora los archivados.
+- Limitaciones: `archived` no viaja en el `trip.json` (restaurar un respaldo desarchiva); las
+  regiones de mapa sin red descargadas para el viaje no se borran (se administran desde Ajustes).
 
 ## Pruebas
 - `MigrationTest`: 9→10 conserva los viajes y `archived` arranca en 0; versión 10 con 9 migraciones.
-- `TrackingRepositoryTest`: renombrar recorta espacios y archivar no toca el estado; `deleteTrip`
-  rechaza un viaje con etapa abierta y, cerrado, elimina viaje, etapa y puntos.
+- `TrackingRepositoryTest`: renombrar recorta espacios y rechaza el título vacío; archivar no toca
+  el estado y se rechaza en un viaje en curso; `deleteTrip` rechaza un viaje con etapa abierta y,
+  cerrado, elimina viaje, etapa y puntos.
+- `TripDeleterTest` (Robolectric, Room en memoria, respaldo real): etapa grabando → `IN_USE` sin
+  tocar nada; respaldo nulo / excepción / archivo vacío → `BACKUP_FAILED`, el viaje y sus audios
+  siguen; respaldo escrito → filas borradas, `.json.gz` presente y los `.m4a` movidos a
+  `backup/audio/<id>/`; segunda corrida → `NOT_FOUND`.
+- `BackupRulesTest`: `backup/audio/` excluido del respaldo en la nube.
 - `ScreensComposeTest`: dos tests del menú (ítems deshabilitados mientras se graba; renombrar,
   archivar, borrar con confirmación, desarchivar y la sección plegada).
 - Gate: `./gradlew test` ✅ · `lint assembleDebug` ✅ · 16 KB ✅ · `ruff`/`pytest` del
@@ -42,9 +58,19 @@ pantalla inicial tenga un menú con archivar, borrar y acciones afines.
    pantalla de duración/estilo del video.
 5. Borrar → confirmación → snackbar "Viaje «Patagonia» borrado · Deshacer"
    (`D1-borrar-deshacer.png`); Deshacer → el viaje vuelve y 12 s después sigue ahí, sin
-   `trip deleted` en el log.
-6. Borrar sin deshacer → a los 10 s el viaje desaparece, el log registra `trip deleted id=…` y
-   queda `files/backup/<id>.json.gz` recién escrito.
+   `trip deleted` en el log ni trabajo encolado.
+6. Borrar sin deshacer → al cerrarse el snackbar corre el worker: el viaje desaparece, el log
+   registra `trip deleted id=… backup=<id>.json.gz`, queda `files/backup/<id>.json.gz` recién
+   escrito y los dos `.m4a` del viaje están en `files/backup/audio/<id>/` (ya no en `files/audio/`).
+
+## Revisión de código
+Primera pasada (code-reviewer, 2026-10-13): 1 bloqueante (si fallaba el respaldo se borraba igual),
+6 importantes (reloj del Deshacer distinto al del snackbar, slot único de pendientes, audios
+borrados sin respaldo, `runBlocking` en `onCleared`, archivar un viaje en curso, sin test del
+borrado) y 8 menores. Todo lo anterior se corrigió en el segundo commit de la rama (worker con
+respaldo obligatorio, papelera de audios, cola de pendientes, commit desde el snackbar, foco en el
+diálogo de renombrar, íconos de la sección archivados, título vacío rechazado). El informe
+completo queda en el PR.
 
 ## Arreglo colateral
 Al abrir el detalle de un viaje con dos fotos del mismo milisegundo a más de 100 m la línea de

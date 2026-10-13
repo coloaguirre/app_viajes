@@ -66,9 +66,12 @@
     <string name="trip_video">Crear video</string>
     <string name="trip_delete">Borrar</string>
     <string name="trip_delete_title">¿Borrar «%1$s»?</string>
-    <string name="trip_delete_body">Se borran el recorrido, las paradas, las notas de voz y de texto y los vínculos con tus fotos. Las fotos y videos de la galería no se tocan. Antes de borrar se guarda un respaldo del viaje en Ajustes → Respaldos, y tenés unos segundos para deshacer.</string>
+    <string name="trip_delete_body">Se borran el recorrido, las paradas, las notas de voz y de texto y los vínculos con tus fotos. Las fotos y videos de la galería no se tocan. Antes de borrar se guarda un respaldo del viaje (Ajustes → Respaldos) y las grabaciones de voz se mueven junto a él; si el respaldo falla, no se borra nada. Tenés unos segundos para deshacer.</string>
     <string name="trip_deleted">Viaje «%1$s» borrado</string>
     <string name="trip_delete_undo">Deshacer</string>
+    <string name="trip_delete_failed">No se borró «%1$s»: no se pudo guardar el respaldo. Liberá espacio y probá de nuevo.</string>
+    <string name="home_archived_expand">Mostrar archivados</string>
+    <string name="home_archived_collapse">Ocultar archivados</string>
     <string name="trip_delete_in_use">Ese viaje tiene una etapa en curso: cerrala antes de borrarlo.</string>
     <string name="tab_timeline">Línea de tiempo</string>
     <string name="tab_map">Mapa</string>

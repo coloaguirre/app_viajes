@@ -14,6 +14,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -32,9 +34,10 @@ data class HomeUiState(
 sealed interface HomeEvent {
     data class OpenActiveSession(val segmentId: String) : HomeEvent
     data object PermissionDenied : HomeEvent
-    /** A trip was removed from the list; the snackbar offers to undo for a few seconds (backlog D1). */
-    data class TripDeleted(val title: String) : HomeEvent
+    /** A trip left the list; the snackbar offers to undo and, when it goes away, the screen commits the deletion (backlog D1). */
+    data class TripDeleted(val tripId: String, val title: String) : HomeEvent
     data object TripInUse : HomeEvent
+    data class TripDeleteFailed(val title: String) : HomeEvent
 }
 
 @HiltViewModel
@@ -43,11 +46,15 @@ class HomeViewModel @Inject constructor(
     private val repository: TrackingRepository,
     private val controller: TrackingController,
     stateHolder: TrackingStateHolder,
-    private val exportLoader: com.bitacoraviaje.app.export.ExportLoader,
 ) : ViewModel() {
-    /** Trip waiting for its "Deshacer" window to pass before the rows are really removed. */
-    private val pendingDelete = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
-    private var pendingJob: kotlinx.coroutines.Job? = null
+    /** Last known titles of hidden trips, for the failure message once the row is gone. */
+    private val titles = HashMap<String, String>()
+    /**
+     * Trips the user asked to delete whose rows are hidden: waiting for the "Deshacer" window, or already
+     * handed to [com.bitacoraviaje.app.home.DeleteTripWorker]. They reappear only on undo or on a failed job.
+     */
+    private val pendingDelete = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+    private val workManager = androidx.work.WorkManager.getInstance(appContext)
     /** Import job (PLAN 3.3) as the Home dialog sees it. */
     val importStatus: StateFlow<com.bitacoraviaje.app.export.ImportStatus> = androidx.work.WorkManager.getInstance(appContext)
         .getWorkInfosForUniqueWorkFlow(com.bitacoraviaje.app.export.ImportWorker.WORK_NAME)
@@ -66,7 +73,7 @@ class HomeViewModel @Inject constructor(
     fun dismissImport() = androidx.work.WorkManager.getInstance(appContext).pruneWork()
 
     val state: StateFlow<HomeUiState> = combine(repository.observeTrips(), repository.observeOpenSegment(), stateHolder.state, pendingDelete) { trips, open, live, hidden ->
-        val visible = trips.filter { it.id != hidden }
+        val visible = trips.filter { it.id !in hidden }
         HomeUiState(visible.filter { !it.archived }, visible.filter { it.archived }, open, needsRecovery = open != null && !live.isRunning)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -80,51 +87,57 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Backlog D1: the row disappears at once, the data goes after [UNDO_MS] (10 s) unless [undoDelete] is called.
-     * Before deleting, the trip's backup is rewritten (never lose data), the audio notes and the saved video
-     * plan go with it; photos and videos in the gallery are never touched. A trip with an open segment is refused.
+     * Backlog D1: the row disappears at once and the snackbar offers "Deshacer"; when the snackbar goes away
+     * the screen calls [commitDelete], which hands the trip to [com.bitacoraviaje.app.home.DeleteTripWorker]
+     * (backup first, then delete; see [com.bitacoraviaje.app.home.TripDeleter]). A trip with a recording
+     * segment is refused up front. Several trips can be pending at once, each with its own snackbar.
      */
     fun deleteTrip(tripId: String) {
         viewModelScope.launch {
             val trip = repository.getTrip(tripId) ?: return@launch
             if (repository.getOpenSegment()?.tripId == tripId) { _events.send(HomeEvent.TripInUse); return@launch }
-            pendingJob?.cancel()
-            pendingDelete.value = tripId
-            _events.send(HomeEvent.TripDeleted(trip.title))
-            pendingJob = viewModelScope.launch {
-                kotlinx.coroutines.delay(UNDO_MS)
-                runCatching { com.bitacoraviaje.app.export.BackupFiles.write(appContext, exportLoader, tripId) }
-                    .onFailure { android.util.Log.w("Bitacora", "backup before delete failed: ${it.javaClass.simpleName}") }
-                if (repository.deleteTrip(tripId)) {
-                    java.io.File(appContext.filesDir, "audio/$tripId").deleteRecursively()
-                    runCatching { com.bitacoraviaje.app.video.VideoPlanStore(appContext).clear(tripId) }
-                    android.util.Log.i("Bitacora", "trip deleted id=$tripId")
+            titles[tripId] = trip.title
+            pendingDelete.value += tripId
+            _events.send(HomeEvent.TripDeleted(tripId, trip.title))
+        }
+    }
+
+    fun undoDelete(tripId: String) {
+        pendingDelete.value -= tripId
+    }
+
+    /** The undo window closed: enqueue the job. The row stays hidden until the job reports. */
+    fun commitDelete(tripId: String) {
+        if (tripId !in pendingDelete.value) return
+        com.bitacoraviaje.app.home.DeleteTripWorker.enqueue(appContext, tripId)
+    }
+
+    /** Outcome of every delete job: a success unhides nothing (the row is gone), a failure brings the trip back with a message. */
+    private val deleteOutcomes = workManager.getWorkInfosByTagFlow(com.bitacoraviaje.app.home.DeleteTripWorker.TAG_WORK)
+        .onEach { infos ->
+            infos.filter { it.state.isFinished }.forEach { info ->
+                val id = info.outputData.getString(com.bitacoraviaje.app.home.DeleteTripWorker.KEY_TRIP_ID) ?: return@forEach
+                if (id !in pendingDelete.value) return@forEach
+                pendingDelete.value -= id
+                if (info.state == androidx.work.WorkInfo.State.FAILED) {
+                    val outcome = info.outputData.getString(com.bitacoraviaje.app.home.DeleteTripWorker.KEY_OUTCOME)
+                    val title = titles[id] ?: repository.getTrip(id)?.title ?: ""
+                    _events.send(if (outcome == com.bitacoraviaje.app.home.TripDeleter.Outcome.IN_USE.name) HomeEvent.TripInUse else HomeEvent.TripDeleteFailed(title))
                 }
-                pendingDelete.value = null
+                workManager.pruneWork()
             }
         }
-    }
-
-    fun undoDelete() {
-        pendingJob?.cancel()
-        pendingJob = null
-        pendingDelete.value = null
-    }
+        .launchIn(viewModelScope)
 
     override fun onCleared() {
-        // Leaving Home before the window ends must not lose the deletion the user asked for: run it now.
-        pendingDelete.value?.let { id ->
-            pendingJob?.cancel()
-            kotlinx.coroutines.runBlocking { runCatching { com.bitacoraviaje.app.export.BackupFiles.write(appContext, exportLoader, id) }; repository.deleteTrip(id) }
-        }
+        // Leaving Home with a snackbar still open: the user asked for the deletion, so it is committed, not forgotten.
+        pendingDelete.value.forEach { com.bitacoraviaje.app.home.DeleteTripWorker.enqueue(appContext, it) }
         super.onCleared()
     }
 
     private val _events = Channel<HomeEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
-    private companion object { /** Matches SnackbarDuration.Long, so "Deshacer" is available for as long as it is visible. */
-        const val UNDO_MS = 10_000L }
 
     fun requiredPermissions() = controller.requiredPermissions()
 

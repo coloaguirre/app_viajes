@@ -60,6 +60,7 @@ class BackupRulesTest {
                 assertTrue(includes.none { it.domain == "file" && it.path.startsWith("secrets") }, "$s never includes the encrypted API key (PLAN 4.3)")
                 assertTrue(includes.any { it.domain == "file" && it.path == "backup/" }, "$s includes backup/")
                 if (s != "device-transfer") assertTrue(includes.none { it.domain == "file" && it.path.startsWith("audio") }, "$s leaves audio out of the cloud")
+                if (s == "cloud-backup" || s == "full-backup-content") assertTrue(r.any { it.section == s && it.kind == "exclude" && it.path == "backup/audio/" }, "the recordings kept for deleted trips (D1) stay out of the cloud")
             }
         }
     }
