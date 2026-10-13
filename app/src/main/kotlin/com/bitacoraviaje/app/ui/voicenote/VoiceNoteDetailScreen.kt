@@ -80,7 +80,8 @@ fun VoiceNoteDetailScreen(
                 }
                 AssistChip(onClick = {}, label = { Text(stringResource(statusRes)) }, modifier = Modifier.testTag("voice_status"))
             }
-            if (n.transcriptStatus == TranscriptStatus.FAILED) {
+            // Retry also when a past run stored nothing (status DONE, empty text): otherwise the note is stuck.
+            if (n.transcriptStatus == TranscriptStatus.FAILED || (n.transcriptStatus == TranscriptStatus.DONE && n.displayText.isNullOrBlank())) {
                 OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().testTag("voice_retry")) { Text(stringResource(R.string.voice_retry)) }
             }
             OutlinedTextField(
