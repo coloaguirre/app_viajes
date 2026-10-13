@@ -41,6 +41,7 @@ data class SegmentEntity(
     val transport: String?,
     val title: String?,
     @ColumnInfo(name = "intent_text") val intentText: String?,
+    @ColumnInfo(name = "auto_name", defaultValue = "NULL") val autoName: String? = null,
     @ColumnInfo(name = "started_utc_ms") val startedUtcMs: Long,
     @ColumnInfo(name = "ended_utc_ms") val endedUtcMs: Long?,
     @ColumnInfo(name = "tz_id") val tzId: String,
@@ -106,7 +107,11 @@ data class TrackPointEntity(
  * Clock offset the user confirmed for one camera ("Make Model") in a trip (DISENO §7.6 step 4).
  * Applied on every rescan so the correction survives the next media sweep.
  */
-@Entity(tableName = "camera_clock_offset", primaryKeys = ["trip_id", "camera"])
+@Entity(
+    tableName = "camera_clock_offset",
+    primaryKeys = ["trip_id", "camera"],
+    foreignKeys = [ForeignKey(entity = TripEntity::class, parentColumns = ["id"], childColumns = ["trip_id"], onDelete = ForeignKey.CASCADE)],
+)
 data class CameraClockOffsetEntity(
     @ColumnInfo(name = "trip_id") val tripId: String,
     val camera: String,
@@ -161,7 +166,7 @@ data class MediaItemEntity(
 @Entity(
     tableName = "voice_note",
     foreignKeys = [ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index(value = ["segment_id", "started_utc_ms"], name = "idx_voice_segment_time")],
+    indices = [Index(value = ["segment_id", "started_utc_ms"], name = "idx_voice_segment_time"), Index(value = ["media_item_id"], name = "idx_voice_media")],
 )
 data class VoiceNoteEntity(
     @PrimaryKey val id: String,

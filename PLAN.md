@@ -323,11 +323,12 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: reglas de extracción verificadas en test; archivo
       generado al cerrar una etapa en el emulador.
       Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.5-respaldo.md`).
-- [ ] 3.6 Nombre de ruta y detección de senderos (Nominatim, Overpass)
+- [x] 3.6 Nombre de ruta y detección de senderos (Nominatim, Overpass)
       con política de resiliencia (User-Agent, caché, backoff, instancia
       cambiable en Ajustes).  (est: 1)
       Aceptación: el trekking de ejemplo recibe nombre de sendero (test
       con respuestas grabadas).
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.6-nombre-de-ruta.md`).
 - [ ] 3.7 **(usuario)** Importar el KML en Google My Maps y abrir el
       HTML en la PC.  (est: 0.5)
       Aceptación: captura de My Maps y del HTML en `docs/notes/evidencia/fase-3/`.

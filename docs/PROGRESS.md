@@ -12,7 +12,7 @@
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
-| 3 — Exportación y transcripción local | 🟨 3.1–3.3 y 3.5 cerrados; 3.4 hecho salvo la medición con ≥10 notas | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` · 3.5: `3.5-respaldo.md` |
+| 3 — Exportación y transcripción local | 🟨 3.1–3.3, 3.5 y 3.6 cerrados; 3.4 hecho salvo la medición con ≥10 notas; 3.7 (usuario) pendiente | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` · 3.5: `3.5-respaldo.md` · 3.6: `3.6-nombre-de-ruta.md` (+captura) |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
 | 6 — Pulido y publicación | ⬜ Pendiente | |
@@ -57,6 +57,8 @@
 | 2026-10-13 | whisper.cpp v1.9.5 como submódulo, NDK r29 + CMake 4.1.2, solo CPU, `-O3` en debug, 16 KB; VAD Silero obligatorio; modelos `base`/`small` descargados y verificados por SHA-256, nunca en el APK | DISENO §8.3; PLAN 3.4 |
 | 2026-10-13 | Motor de transcripción por defecto **Automático** (reconocedor del sistema primero, whisper de respaldo) en lugar de whisper primero: con 2 notas reales el sistema no tuvo errores y whisper `base` tuvo ~20–40 % de palabras mal (emulador). Se revisa con ≥10 notas en el Pixel (`3.4-whisper.md`) | Dato manda sobre la doctrina de DISENO §8.3 |
 | 2026-10-13 | Respaldo (3.5): reglas de Auto Backup como listas de inclusión (preferencias, DataStore, `files/backup/`; audio solo en transferencia directa); la base nunca se respalda; `trip.json` automático por viaje al cerrar etapa o viaje, escritura atómica | PLAN 3.5; revisión Fase 0 (`allowBackup`) |
+| 2026-10-13 | Esquema v6: `segment.auto_name` (nombre derivado del mapa; `title` del usuario gana), FK `camera_clock_offset`→`trip` e índice `voice_note.media_item_id` | PLAN 3.6; diferidos del PR #5 |
+| 2026-10-13 | OSM: un cliente OkHttp con User-Agent, caché, 1 pedido/s por host y backoff en 429/503/504; instancias de Nominatim/Overpass configurables; muestras a zoom 16 (a 14 no hay calles); departamento aceptado como lugar en campo abierto | PLAN 3.6; política de uso de Nominatim |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -75,6 +77,7 @@
 | Room | 2.8.5 (plugin `androidx.room`, esquemas en `data/schemas/`) | 2026-10-11 |
 | kotlinx-serialization-json | 1.11.0 (misma que serialization-core) | 2026-10-13 |
 | whisper.cpp (submódulo) | v1.9.5 | 2026-10-13 |
+| OkHttp / MockWebServer (mockwebserver3, solo tests) | 5.5.0 | 2026-10-13 |
 | NDK | 29.0.14206865 | 2026-10-13 |
 | CMake (SDK) | 4.1.2 | 2026-10-13 |
 | Modelos whisper (ggml, Hugging Face) | base 60ed5bc3…, small 1be3a9b2…, VAD silero v5.1.2 29940d98… (SHA-256 completos en `ModelCatalog`) | 2026-10-13 |

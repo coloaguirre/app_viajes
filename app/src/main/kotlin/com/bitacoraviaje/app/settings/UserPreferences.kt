@@ -23,6 +23,10 @@ const val DEFAULT_TRANSCRIPTION_MODEL: String = "base"
 /** "auto" = best engine available (system on-device recognizer, then whisper); "whisper"; "system". */
 const val DEFAULT_TRANSCRIPTION_ENGINE: String = "auto"
 val TRANSCRIPTION_ENGINES: List<String> = listOf("auto", "whisper", "system")
+
+/** OSM service instances (PLAN 3.6): changeable in Settings when the public ones are busy or rate-limited. */
+const val DEFAULT_NOMINATIM_URL: String = "https://nominatim.openstreetmap.org"
+const val DEFAULT_OVERPASS_URL: String = "https://overpass-api.de/api/interpreter"
 val REST_AFTER_OPTIONS_MIN: List<Int> = listOf(3, 5, 10, 15)
 
 data class UserSettings(
@@ -35,6 +39,8 @@ data class UserSettings(
     val transcriptionModel: String = DEFAULT_TRANSCRIPTION_MODEL,
     val transcribeOnlyCharging: Boolean = false,
     val transcriptionEngine: String = DEFAULT_TRANSCRIPTION_ENGINE,
+    val nominatimUrl: String = DEFAULT_NOMINATIM_URL,
+    val overpassUrl: String = DEFAULT_OVERPASS_URL,
 ) {
     companion object {
         /**
@@ -50,6 +56,8 @@ data class UserSettings(
             transcriptionModel: String? = null,
             transcribeOnlyCharging: Boolean? = null,
             transcriptionEngine: String? = null,
+            nominatimUrl: String? = null,
+            overpassUrl: String? = null,
             onInvalid: (key: String, value: String) -> Unit = { _, _ -> },
         ): UserSettings = UserSettings(
             units = parseEnum<Units>(units, Units.METRIC) { onInvalid("units", it) },
@@ -71,7 +79,14 @@ data class UserSettings(
                 in TRANSCRIPTION_ENGINES -> transcriptionEngine
                 else -> { onInvalid("transcription_engine", transcriptionEngine); DEFAULT_TRANSCRIPTION_ENGINE }
             },
+            nominatimUrl = httpsOr(nominatimUrl, DEFAULT_NOMINATIM_URL) { onInvalid("nominatim_url", it) },
+            overpassUrl = httpsOr(overpassUrl, DEFAULT_OVERPASS_URL) { onInvalid("overpass_url", it) },
         )
+
+        private fun httpsOr(raw: String?, default: String, onInvalid: (String) -> Unit): String {
+            val v = raw?.trim()?.trimEnd('/') ?: return default
+            return if (v.startsWith("https://") && v.length > 10) v else { onInvalid(raw); default }
+        }
 
         private inline fun <reified E : Enum<E>> parseEnum(raw: String?, default: E, onInvalid: (String) -> Unit): E {
             if (raw == null) return default
@@ -93,6 +108,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
         val TRANSCRIPTION_MODEL = stringPreferencesKey("transcription_model")
         val TRANSCRIBE_ONLY_CHARGING = androidx.datastore.preferences.core.booleanPreferencesKey("transcribe_only_charging")
         val TRANSCRIPTION_ENGINE = stringPreferencesKey("transcription_engine")
+        val NOMINATIM_URL = stringPreferencesKey("nominatim_url")
+        val OVERPASS_URL = stringPreferencesKey("overpass_url")
     }
 
     val settings: Flow<UserSettings> = context.settingsStore.data.map { p ->
@@ -105,6 +122,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
             transcriptionModel = p[Keys.TRANSCRIPTION_MODEL],
             transcribeOnlyCharging = p[Keys.TRANSCRIBE_ONLY_CHARGING],
             transcriptionEngine = p[Keys.TRANSCRIPTION_ENGINE],
+            nominatimUrl = p[Keys.NOMINATIM_URL],
+            overpassUrl = p[Keys.OVERPASS_URL],
         )
     }
 
@@ -123,6 +142,10 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     suspend fun setTranscribeOnlyCharging(value: Boolean) = context.settingsStore.edit { it[Keys.TRANSCRIBE_ONLY_CHARGING] = value }
 
     suspend fun setTranscriptionEngine(id: String) = context.settingsStore.edit { it[Keys.TRANSCRIPTION_ENGINE] = id }
+
+    suspend fun setNominatimUrl(url: String) = context.settingsStore.edit { it[Keys.NOMINATIM_URL] = url }
+
+    suspend fun setOverpassUrl(url: String) = context.settingsStore.edit { it[Keys.OVERPASS_URL] = url }
 
     private companion object {
         const val TAG = "Bitacora"

@@ -174,7 +174,7 @@ private fun segmentTitle(st: SegmentTimeline): String {
         else -> stringResource(R.string.type_stage)
     }
     val dist = s.stats.distanceM?.let { " · " + TrackingNotificationFactory.formatKm(it) } ?: ""
-    return "${DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(date)} · ${s.title ?: kind}$dist"
+    return "${DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(date)} · ${s.displayName ?: kind}$dist"
 }
 
 @Composable

@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -121,6 +122,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 supportingContent = { Text(settings.transcriptionLanguage) },
             )
             HorizontalDivider()
+            SectionTitle(stringResource(R.string.settings_osm))
+            Text(stringResource(R.string.settings_osm_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+            UrlField(stringResource(R.string.settings_nominatim), settings.nominatimUrl, viewModel::setNominatimUrl, "settings_nominatim")
+            UrlField(stringResource(R.string.settings_overpass), settings.overpassUrl, viewModel::setOverpassUrl, "settings_overpass")
+            HorizontalDivider()
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_about)) },
                 supportingContent = { Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME)) },
@@ -155,6 +161,19 @@ private fun ModelRow(state: ModelState, selected: Boolean, onSelect: () -> Unit,
             else -> androidx.compose.material3.Button(onClick = onDownload, modifier = Modifier.testTag("model_download_${m.id}")) { Text(stringResource(R.string.model_download)) }
         }
     }
+}
+
+@Composable
+private fun UrlField(label: String, value: String, onCommit: (String) -> Unit, tag: String) {
+    var text by androidx.compose.runtime.remember(value) { androidx.compose.runtime.mutableStateOf(value) }
+    androidx.compose.material3.OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        label = { Text(label) },
+        singleLine = true,
+        trailingIcon = { androidx.compose.material3.TextButton(onClick = { onCommit(text) }, enabled = text != value) { Text(stringResource(R.string.settings_apply)) } },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag(tag),
+    )
 }
 
 @Composable

@@ -61,6 +61,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setTranscriptionEngine(id: String) = viewModelScope.launch { prefs.setTranscriptionEngine(id) }
 
+    fun setNominatimUrl(url: String) = viewModelScope.launch { prefs.setNominatimUrl(url) }
+
+    fun setOverpassUrl(url: String) = viewModelScope.launch { prefs.setOverpassUrl(url) }
+
     fun setUnits(units: Units) = viewModelScope.launch { prefs.setUnits(units) }
 
     fun setRecordingMode(mode: RecordingMode) = viewModelScope.launch { prefs.setRecordingMode(mode) }

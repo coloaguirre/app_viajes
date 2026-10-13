@@ -145,6 +145,11 @@
     <string name="settings_engine_whisper_desc">Siempre whisper con el modelo elegido abajo.</string>
     <string name="settings_engine_system">Reconocedor del sistema</string>
     <string name="settings_engine_system_desc">Solo el reconocedor de voz de Android en el dispositivo.</string>
+    <string name="settings_osm">Servicios de mapa (OpenStreetMap)</string>
+    <string name="settings_osm_desc">Para nombrar rutas y senderos la app consulta Nominatim y Overpass con tu recorrido muestreado. Si las instancias públicas están saturadas, podés indicar otras.</string>
+    <string name="settings_nominatim">Instancia de Nominatim</string>
+    <string name="settings_overpass">Instancia de Overpass</string>
+    <string name="settings_apply">Aplicar</string>
     <string name="settings_whisper">Transcripción en el teléfono (whisper)</string>
     <string name="settings_whisper_desc">Las notas de voz se transcriben en el teléfono, sin internet y sin enviar el audio a nadie. Hay que descargar un modelo una sola vez.</string>
     <string name="settings_transcribe_only_charging">Transcribir solo con el teléfono cargando</string>

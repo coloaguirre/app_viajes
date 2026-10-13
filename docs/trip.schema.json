@@ -175,6 +175,7 @@
         "transport": { "oneOf": [ { "enum": ["WALK", "BIKE", "CAR", "BUS", "TRAIN", "BOAT", "PLANE", "MIXED"] }, { "type": "null" } ] },
         "title": { "$ref": "#/$defs/nullableString" },
         "intent_text": { "$ref": "#/$defs/nullableString" },
+        "auto_name": { "$ref": "#/$defs/nullableString" },
         "started": { "$ref": "#/$defs/localTime" },
         "started_utc_ms": { "type": "integer" },
         "ended": { "$ref": "#/$defs/nullableLocalTime" },

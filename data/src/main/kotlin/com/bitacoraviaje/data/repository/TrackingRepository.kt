@@ -213,6 +213,12 @@ class TrackingRepository @Inject constructor(
 
     suspend fun tripExists(tripId: String): Boolean = trips.getById(tripId) != null
 
+    /** PLAN 3.6: name derived from the map; never overwrites a user title (that lives in `title`). */
+    suspend fun setAutoName(segmentId: String, autoName: String?) {
+        val s = segments.getById(segmentId)?.toDomain() ?: return
+        segments.update(s.copy(autoName = autoName).toEntity())
+    }
+
     /**
      * Imports a whole trip in one transaction (DISENO §12.5). With [replace] an existing
      * trip of the same id is deleted first (cascades to everything under it); otherwise

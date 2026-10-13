@@ -58,7 +58,7 @@ fun SegmentEntity.toDomain(): Segment {
     return Segment(
         id = id, tripId = tripId, parentSegmentId = parentSegmentId,
         type = SegmentType.valueOf(type), transport = transport?.let(Transport::valueOf),
-        title = title, intentText = intentText, startedUtcMs = startedUtcMs, endedUtcMs = endedUtcMs,
+        title = title, intentText = intentText, autoName = autoName, startedUtcMs = startedUtcMs, endedUtcMs = endedUtcMs,
         tzId = tzId, samplingProfile = samplingProfile, recordingMode = RecordingMode.valueOf(recordingMode),
         autoCreated = autoCreated, status = SegmentStatus.valueOf(status),
         stats = SegmentStats(
@@ -72,7 +72,7 @@ fun SegmentEntity.toDomain(): Segment {
 
 fun Segment.toEntity() = SegmentEntity(
     id = id, tripId = tripId, parentSegmentId = parentSegmentId, type = type.name,
-    transport = transport?.name, title = title, intentText = intentText,
+    transport = transport?.name, title = title, intentText = intentText, autoName = autoName,
     startedUtcMs = startedUtcMs, endedUtcMs = endedUtcMs, tzId = tzId,
     samplingProfile = samplingProfile, recordingMode = recordingMode.name,
     autoCreated = autoCreated, status = status.name,

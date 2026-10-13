@@ -54,6 +54,7 @@ object TripJson {
         val transport: String?,
         val title: String?,
         val intent_text: String?,
+        val auto_name: String? = null,
         val started: String,
         val started_utc_ms: Long,
         val ended: String?,
@@ -186,7 +187,7 @@ object TripJson {
                 val s = se.segment
                 val z = s.tzId
                 SegmentDto(
-                    id = s.id, parent_segment_id = s.parentSegmentId, type = s.type.name, transport = s.transport?.name, title = s.title, intent_text = s.intentText,
+                    id = s.id, parent_segment_id = s.parentSegmentId, type = s.type.name, transport = s.transport?.name, title = s.title, intent_text = s.intentText, auto_name = s.autoName,
                     started = Iso.local(s.startedUtcMs, z), started_utc_ms = s.startedUtcMs,
                     ended = s.endedUtcMs?.let { Iso.local(it, z) }, ended_utc_ms = s.endedUtcMs,
                     tz_id = z, sampling_profile = s.samplingProfile, recording_mode = s.recordingMode.name, auto_created = s.autoCreated, status = s.status.name,

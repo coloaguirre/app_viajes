@@ -36,7 +36,7 @@ internal object Diary {
     fun segmentTitle(se: SegmentExport): String {
         val s = se.segment
         val kind = when (s.type.name) { "TREKKING" -> "Trekking"; "EXCURSION" -> "Excursión"; else -> "Etapa" }
-        return listOfNotNull(s.title ?: kind, transport(s.transport), s.stats.distanceM?.let { km(it) }, s.stats.movingTimeMs?.let { dur(it) }).joinToString(" · ")
+        return listOfNotNull(s.displayName ?: kind, transport(s.transport), s.stats.distanceM?.let { km(it) }, s.stats.movingTimeMs?.let { dur(it) }).joinToString(" · ")
     }
 
     /** One line of plain text per event, without media links (callers add those). */

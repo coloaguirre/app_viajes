@@ -122,6 +122,7 @@ class TrackingController @Inject constructor(
         done?.let {
             com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, it.tripId, it.id)
             com.bitacoraviaje.app.export.BackupWorker.enqueue(context, it.tripId) // PLAN 3.5: trip.json after every close
+            com.bitacoraviaje.app.enrichment.EnrichRouteWorker.enqueue(context, it.id) // PLAN 3.6: name from the map when online
         }
         val parentId = done?.parentSegmentId ?: return null
         val parent = repository.getSegment(parentId)?.takeIf { it.status == SegmentStatus.PAUSED } ?: return null

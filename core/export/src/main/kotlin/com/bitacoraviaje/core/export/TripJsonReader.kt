@@ -60,7 +60,7 @@ object TripJsonReader {
             val sid = id(s.id)
             val segment = Segment(
                 id = sid, tripId = tripId, parentSegmentId = s.parent_segment_id?.let(::id), type = enumOr(s.type, SegmentType.STAGE), transport = s.transport?.let { enumOrNull<Transport>(it) },
-                title = s.title, intentText = s.intent_text, startedUtcMs = s.started_utc_ms, endedUtcMs = s.ended_utc_ms, tzId = s.tz_id, samplingProfile = s.sampling_profile,
+                title = s.title, intentText = s.intent_text, autoName = s.auto_name, startedUtcMs = s.started_utc_ms, endedUtcMs = s.ended_utc_ms, tzId = s.tz_id, samplingProfile = s.sampling_profile,
                 recordingMode = enumOr(s.recording_mode, RecordingMode.FULL), autoCreated = s.auto_created, status = enumOr(s.status, SegmentStatus.FINISHED),
                 stats = SegmentStats(
                     s.stats.distance_m, s.stats.moving_time_ms, s.stats.total_time_ms, s.stats.max_speed_mps, s.stats.avg_moving_speed_mps, s.stats.elevation_gain_m, s.stats.elevation_loss_m,
