@@ -102,12 +102,13 @@ class ScreensComposeTest {
         rule.onNodeWithTag("active_finish").performClick()
         rule.onNodeWithTag("active_voice").performClick()
         rule.onNodeWithTag("active_highlight").performClick()
+        rule.onNodeWithTag("active_camera").performClick() // PLAN 5.2
         rule.onNodeWithTag("active_marker").performClick()
         rule.onNodeWithTag("marker_save").performClick()
         rule.onNodeWithTag("active_transport").performClick()
         rule.onNodeWithTag("transport_CAR").performClick()
         assertEquals(
-            listOf(ActiveSessionAction.TogglePause, ActiveSessionAction.Finish, ActiveSessionAction.VoiceNote, ActiveSessionAction.Highlight, ActiveSessionAction.Marker(""), ActiveSessionAction.ChangeTransport(Transport.CAR)),
+            listOf(ActiveSessionAction.TogglePause, ActiveSessionAction.Finish, ActiveSessionAction.VoiceNote, ActiveSessionAction.Highlight, ActiveSessionAction.Camera, ActiveSessionAction.Marker(""), ActiveSessionAction.ChangeTransport(Transport.CAR)),
             actions,
         )
     }

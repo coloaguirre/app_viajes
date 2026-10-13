@@ -44,6 +44,10 @@ sealed interface Route {
     /** PLAN 5.1: parameters, editable plan and render of the trip video. */
     @Serializable
     data class VideoCreate(val tripId: String) : Route
+
+    /** PLAN 5.2: the integrated camera for the running stage. */
+    @Serializable
+    data class Camera(val segmentId: String) : Route
 }
 
 @Composable
@@ -88,7 +92,10 @@ fun BitacoraNavHost(mapRenderer: MapRenderer) {
             )
         }
         composable<Route.ActiveSession> {
-            ActiveSessionRoute(mapRenderer = mapRenderer, onFinish = { id -> navController.navigate(Route.FinishSegment(id)) })
+            ActiveSessionRoute(mapRenderer = mapRenderer, onFinish = { id -> navController.navigate(Route.FinishSegment(id)) }, onOpenCamera = { id -> navController.navigate(Route.Camera(id)) })
+        }
+        composable<Route.Camera> {
+            com.bitacoraviaje.app.ui.camera.CameraRoute(onClose = { navController.popBackStack() })
         }
         composable<Route.FinishSegment> {
             FinishSegmentRoute(

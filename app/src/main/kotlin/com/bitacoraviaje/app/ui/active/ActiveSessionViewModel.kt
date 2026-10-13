@@ -42,6 +42,8 @@ sealed interface ActiveSessionAction {
     data object VoiceNote : ActiveSessionAction
     data class Marker(val text: String?) : ActiveSessionAction
     data object Highlight : ActiveSessionAction
+    /** PLAN 5.2: opens the integrated camera (handled by the route, like Finish). */
+    data object Camera : ActiveSessionAction
     data class ChangeTransport(val transport: com.bitacoraviaje.core.model.Transport) : ActiveSessionAction
 }
 
@@ -88,7 +90,7 @@ class ActiveSessionViewModel @Inject constructor(
     fun onAction(a: ActiveSessionAction) {
         when (a) {
             ActiveSessionAction.TogglePause -> if (state.value.live.isPaused) controller.resume() else controller.pause()
-            ActiveSessionAction.Finish -> Unit // navigation handled by the route
+            ActiveSessionAction.Finish, ActiveSessionAction.Camera -> Unit // navigation handled by the route
             ActiveSessionAction.VoiceNote -> viewModelScope.launch { _events.send(ActiveSessionEvent.OpenVoiceNote) }
             is ActiveSessionAction.Marker -> viewModelScope.launch { notes.addMarker(a.text)?.let { _events.send(ActiveSessionEvent.Saved(it.kind)) } }
             ActiveSessionAction.Highlight -> viewModelScope.launch { notes.addHighlight()?.let { _events.send(ActiveSessionEvent.Saved(it.kind)) } }
