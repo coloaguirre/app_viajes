@@ -139,9 +139,10 @@ fun ActiveSessionScreen(
                     Button(onClick = { onAction(ActiveSessionAction.VoiceNote) }, modifier = Modifier.weight(1.4f).height(64.dp).testTag("active_voice")) { Text(stringResource(R.string.action_voice_note)) }
                     OutlinedButton(onClick = { markerText = ""; markerDialog = true }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_marker")) { Text(stringResource(R.string.action_marker)) }
                     OutlinedButton(onClick = { onAction(ActiveSessionAction.Highlight) }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_highlight")) { Text(stringResource(R.string.action_highlight)) }
-                    OutlinedButton(onClick = { onAction(ActiveSessionAction.Camera) }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_camera")) { Text(stringResource(R.string.action_photo)) }
                 }
+                // Camera (PLAN 5.2) shares the second row: four buttons in one row broke the labels in two on a phone.
                 Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = { onAction(ActiveSessionAction.Camera) }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_camera")) { Text(stringResource(R.string.action_photo)) }
                     OutlinedButton(onClick = { onAction(ActiveSessionAction.TogglePause) }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_pause")) {
                         Text(if (live.isPaused) stringResource(R.string.action_resume) else stringResource(R.string.action_pause))
                     }

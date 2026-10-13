@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static launcher shortcuts (DISENO §14.3, PLAN 5.3). Both land on MainActivity, which acts on the action. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="voice_note"
+        android:enabled="true"
+        android:icon="@drawable/ic_mic"
+        android:shortcutShortLabel="@string/shortcut_voice_note"
+        android:shortcutLongLabel="@string/shortcut_voice_note_long">
+        <intent
+            android:action="com.bitacoraviaje.app.action.VOICE_NOTE"
+            android:targetPackage="com.bitacoraviaje.app"
+            android:targetClass="com.bitacoraviaje.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_session"
+        android:enabled="true"
+        android:icon="@drawable/ic_add_circle"
+        android:shortcutShortLabel="@string/shortcut_new_session"
+        android:shortcutLongLabel="@string/shortcut_new_session_long">
+        <intent
+            android:action="com.bitacoraviaje.app.action.NEW_SESSION"
+            android:targetPackage="com.bitacoraviaje.app"
+            android:targetClass="com.bitacoraviaje.app.MainActivity" />
+    </shortcut>
+</shortcuts>
