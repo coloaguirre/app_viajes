@@ -24,7 +24,13 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -41,6 +47,22 @@ class CameraCapture @Inject constructor(
     private val media: MediaRepository,
     private val positions: PositionProvider,
 ) {
+    /** Outcome of a shot's registration, for whoever is still listening (the camera screen may already be gone). */
+    data class Registered(val uri: Uri, val kind: MediaKind, val item: MediaItem?, val withoutFix: Boolean)
+
+    // Registration outlives the camera route: CameraX's callback can arrive after the user left (review I3 of PR #13).
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val _registered = MutableSharedFlow<Registered>(replay = 1, extraBufferCapacity = 8)
+    val registered: SharedFlow<Registered> = _registered.asSharedFlow()
+
+    /** Registers in the application scope and publishes the result on [registered]. */
+    fun enqueue(uri: Uri, kind: MediaKind, segmentId: String, location: Location?, takenUtcMs: Long) {
+        scope.launch {
+            val item = runCatching { register(uri, kind, segmentId, location, takenUtcMs) }.onFailure { Log.w(TAG, "camera register failed: ${it.javaClass.simpleName} ${it.message}") }.getOrNull()
+            _registered.emit(Registered(uri, kind, item, location == null))
+        }
+    }
+
     /** Where the shot goes and how it is named, as MediaStore wants it (API 29+: relative path; older: default folder). */
     fun contentValues(kind: MediaKind, tripTitle: String?, takenUtcMs: Long, tzId: String): ContentValues {
         val stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").withZone(zone(tzId)).format(Instant.ofEpochMilli(takenUtcMs))
@@ -54,24 +76,30 @@ class CameraCapture @Inject constructor(
         }
     }
 
-    /** The fix CameraX writes into the file's GPS tags (null when there is no recent position: the sweep then links by time). */
+    /**
+     * The fix CameraX writes into the file's GPS tags. Null when there is no position or the newest one is
+     * older than [MAX_FIX_AGE_MS]: a stale fix must not become "exact place, confidence 1.0" in a JPEG
+     * forever (review I1); the sweep then links the shot by time like any other photo.
+     */
     suspend fun location(nowUtcMs: Long = System.currentTimeMillis()): Location? {
         val pos = positions.position(nowUtcMs)
         val lat = pos.lat ?: return null
         val lon = pos.lon ?: return null
+        val fixAt = pos.fixUtcMs
+        if (fixAt != null && nowUtcMs - fixAt > MAX_FIX_AGE_MS) return null
         return Location("bitacora").apply {
             latitude = lat
             longitude = lon
             pos.accuracyM?.let { accuracy = it }
-            time = nowUtcMs
+            time = fixAt ?: nowUtcMs
         }
     }
 
     /** Registers a saved shot: EXIF offset stamp (photos), MediaStore metadata, and the linked row. */
     suspend fun register(uri: Uri, kind: MediaKind, segmentId: String, location: Location?, takenUtcMs: Long): MediaItem? = withContext(Dispatchers.IO) {
         val segment = tracking.getSegment(segmentId) ?: return@withContext null
-        val meta = readMediaStore(uri, kind)
         if (kind == MediaKind.PHOTO) stampExif(uri, location, takenUtcMs, segment.tzId)
+        val meta = readMediaStore(uri, kind) // after the stamp: the size is the final one (review M2)
         val item = mediaItem(
             tripId = segment.tripId, segmentId = segmentId, kind = kind, uri = uri, mediaStoreId = meta.id, displayName = meta.displayName,
             mimeType = meta.mimeType, sizeBytes = meta.sizeBytes, width = meta.width, height = meta.height, durationMs = meta.durationMs,
@@ -99,25 +127,39 @@ class CameraCapture @Inject constructor(
     }
 
     /**
-     * Writes GPS (if CameraX could not) and the time-zone offset into the app's own JPEG: the file is
-     * copied to a temp, edited there and written back through the resolver (streams only, so it works
-     * on every provider). Failures are logged, never fatal: the row still carries the position.
+     * Writes GPS (if CameraX could not) and the time-zone offset into the app's own JPEG, which CameraX
+     * just created (never a user's file). Preferred path: in place through a read-write descriptor.
+     * Fallback (providers without seekable descriptors): copy to a temp, edit, verify the temp still
+     * parses, then write it back. Failures are logged, never fatal: the row carries the position anyway.
      */
     private fun stampExif(uri: Uri, location: Location?, takenUtcMs: Long, tzId: String) {
+        val inPlace = runCatching {
+            context.contentResolver.openFileDescriptor(uri, "rw")?.use { pfd ->
+                val exif = ExifInterface(pfd.fileDescriptor)
+                stamp(exif, location, takenUtcMs, tzId)
+                exif.saveAttributes()
+            } ?: error("no descriptor")
+        }
+        if (inPlace.isSuccess) return
         val tmp = java.io.File(context.cacheDir, "camera-stamp-${System.nanoTime()}.jpg")
         runCatching {
             context.contentResolver.openInputStream(uri)?.use { ins -> tmp.outputStream().use { ins.copyTo(it) } } ?: error("cannot read $uri")
             val exif = ExifInterface(tmp)
             stamp(exif, location, takenUtcMs, tzId)
             exif.saveAttributes()
+            // The temp must be a whole, readable JPEG before the original is replaced (review I7).
+            check(tmp.length() > 0 && ExifInterface(tmp).getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL) != null) { "stamped copy unreadable" }
             context.contentResolver.openOutputStream(uri, "wt")?.use { out -> tmp.inputStream().use { it.copyTo(out) } } ?: error("cannot write $uri")
-        }.onFailure { Log.w(TAG, "exif stamp failed for $uri: ${it.javaClass.simpleName} ${it.message}") }
+        }.onFailure { Log.w(TAG, "exif stamp failed for $uri: ${it.javaClass.simpleName} ${it.message} (in place: ${inPlace.exceptionOrNull()?.javaClass?.simpleName})") }
         tmp.delete()
     }
 
     companion object {
         private const val TAG = "Bitacora"
         const val APP_FOLDER = "BitacoraViaje"
+
+        /** A fix older than this is not "the place of the shot" (DISENO §7.6 uses the same 2 min for EXIF vs track). */
+        const val MAX_FIX_AGE_MS = 120_000L
 
         /** Folder per trip under `Pictures/BitacoraViaje/`: the title without path-unsafe characters, or "Viaje". */
         fun folderName(tripTitle: String?): String =
@@ -129,10 +171,14 @@ class CameraCapture @Inject constructor(
         fun offsetString(takenUtcMs: Long, tzId: String): String =
             zone(tzId).rules.getOffset(Instant.ofEpochMilli(takenUtcMs)).toString().let { if (it == "Z") "+00:00" else it }
 
-        /** Pure EXIF edit (testable on a file): DateTimeOriginal in the stage's zone, its offset, and the GPS fix when present. */
+        /**
+         * Pure EXIF edit (testable on a file): the stage's offset, DateTimeOriginal only when the camera
+         * did not write one (CameraX's is the real shutter instant, review I5), and the fix when absent.
+         */
         fun stamp(exif: ExifInterface, location: Location?, takenUtcMs: Long, tzId: String) {
-            val local = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss").withZone(zone(tzId)).format(Instant.ofEpochMilli(takenUtcMs))
-            exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, local)
+            if (exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) == null) {
+                exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss").withZone(zone(tzId)).format(Instant.ofEpochMilli(takenUtcMs)))
+            }
             exif.setAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL, offsetString(takenUtcMs, tzId))
             if (location != null && exif.latLong == null) exif.setGpsInfo(location)
         }
@@ -144,7 +190,9 @@ class CameraCapture @Inject constructor(
         ): MediaItem = MediaItem(
             id = UUID.randomUUID().toString(), tripId = tripId, segmentId = segmentId, kind = kind, source = MediaSource.APP_CAMERA,
             contentUri = uri.toString(), mediaStoreId = mediaStoreId, displayName = displayName, mimeType = mimeType, sizeBytes = sizeBytes,
-            width = width, height = height, durationMs = durationMs, takenUtcMs = takenUtcMs, takenTimeSource = TakenTimeSource.EXIF_WITH_OFFSET,
+            width = width, height = height, durationMs = durationMs, takenUtcMs = takenUtcMs,
+            // The photo carries DateTimeOriginal + offset; the MP4 has no EXIF, its time is the recorder's (as MediaStore reports it).
+            takenTimeSource = if (kind == MediaKind.PHOTO) TakenTimeSource.EXIF_WITH_OFFSET else TakenTimeSource.MEDIASTORE,
             exifLat = lat, exifLon = lon, cameraMake = Build.MANUFACTURER, cameraModel = Build.MODEL,
             linkedLat = lat, linkedLon = lon, linkMethod = if (lat != null && lon != null) LinkMethod.EXIF else LinkMethod.NONE,
             linkConfidence = if (lat != null && lon != null) 1.0 else 0.0, linkTimeGapMs = 0, needsReview = lat == null || lon == null,

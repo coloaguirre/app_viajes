@@ -22,7 +22,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Position + time for a note (DISENO §8.1): last fix if fresh, else a quick current-location request. */
-data class NotePosition(val lat: Double?, val lon: Double?, val accuracyM: Float?)
+data class NotePosition(val lat: Double?, val lon: Double?, val accuracyM: Float?, /** When the fix was measured (null: unknown). */ val fixUtcMs: Long? = null)
 
 /** Where a note or a camera shot gets its position from (the controller in the app; a fake in tests). */
 fun interface PositionProvider {
@@ -42,9 +42,9 @@ class NotesController @Inject constructor(
 
     override suspend fun position(nowUtcMs: Long): NotePosition {
         val last = stateHolder.state.value.lastPoint
-        if (last != null && nowUtcMs - last.timeUtcMs <= FRESH_FIX_MS) return NotePosition(last.lat, last.lon, last.hAccuracyM)
+        if (last != null && nowUtcMs - last.timeUtcMs <= FRESH_FIX_MS) return NotePosition(last.lat, last.lon, last.hAccuracyM, last.timeUtcMs)
         val loc = withTimeoutOrNull(CURRENT_LOCATION_TIMEOUT_MS) { currentLocation() }
-        return if (loc != null) NotePosition(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else null) else NotePosition(last?.lat, last?.lon, last?.hAccuracyM)
+        return if (loc != null) NotePosition(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else null, loc.time.takeIf { it > 0 } ?: nowUtcMs) else NotePosition(last?.lat, last?.lon, last?.hAccuracyM, last?.timeUtcMs)
     }
 
     @Suppress("MissingPermission") // location permission is a precondition of recording

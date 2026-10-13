@@ -80,9 +80,10 @@ class MediaLinker @Inject constructor(
         val offsets = HashMap(media.cameraOffsets(tripId))
         for (c in candidates) {
             val existing = media.getByMediaStoreId(c.mediaStoreId)
-            if (existing != null && (existing.linkMethod == LinkMethod.MANUAL || existing.isExcluded || existing.tripId != tripId || existing.source == MediaSource.APP_CAMERA)) {
-                // User edits win; an item already owned by another trip is not stolen (review M8); a shot taken
-                // by the app's own camera already knows its exact instant and place (PLAN 5.2).
+            if (existing != null && (existing.linkMethod == LinkMethod.MANUAL || existing.isExcluded || existing.tripId != tripId || (existing.source == MediaSource.APP_CAMERA && existing.linkMethod != LinkMethod.NONE))) {
+                // User edits win; an item already owned by another trip is not stolen (review M8); a shot taken by
+                // the app's own camera with a fix already knows its exact instant and place (PLAN 5.2). One taken
+                // without a fix waits here for the sweep, like any other photo.
                 skipped++
                 continue
             }
@@ -111,7 +112,7 @@ class MediaLinker @Inject constructor(
             if (link.needsReview || link.method == LinkMethod.NONE) review++
             val item = MediaItem(
                 id = existing?.id ?: UUID.randomUUID().toString(),
-                tripId = tripId, segmentId = link.segmentId, kind = c.kind, source = MediaSource.MEDIASTORE,
+                tripId = tripId, segmentId = link.segmentId, kind = c.kind, source = existing?.source ?: MediaSource.MEDIASTORE,
                 contentUri = c.contentUri.toString(), mediaStoreId = c.mediaStoreId, displayName = c.displayName, mimeType = c.mimeType,
                 sizeBytes = c.sizeBytes, width = c.width, height = c.height, durationMs = c.durationMs, orientationDeg = c.orientationDeg,
                 takenUtcMs = taken, takenTimeSource = source, exifLat = c.exif?.lat, exifLon = c.exif?.lon,

@@ -355,7 +355,15 @@
     <string name="camera_stop">Detener</string>
     <string name="camera_mode_photo">Modo foto</string>
     <string name="camera_mode_video">Modo video</string>
-    <string name="camera_flip">Girar</string>
+    <string name="camera_flip">Cambiar cámara</string>
+    <string name="camera_locating">Ubicando…</string>
+    <string name="camera_preview_description">Vista previa de la cámara</string>
+    <string name="camera_recording_state">Grabando</string>
+    <string name="camera_saved_with_note">%1$s · %2$s</string>
+    <string name="camera_video_muted">Sin permiso de micrófono el video se graba sin sonido.</string>
+    <string name="camera_error_open">No se pudo abrir la cámara.</string>
+    <string name="camera_error_save">No se pudo guardar la foto.</string>
+    <string name="camera_error_register">La captura quedó en la galería pero no se pudo vincular a la etapa; el barrido la tomará por hora.</string>
     <string name="camera_done">Listo</string>
     <string name="camera_saved_photo">Foto guardada y vinculada</string>
     <string name="camera_saved_video">Video guardado y vinculado</string>

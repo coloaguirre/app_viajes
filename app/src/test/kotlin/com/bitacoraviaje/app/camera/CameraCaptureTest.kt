@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.location.Location
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
 import androidx.room.Room
@@ -61,7 +60,7 @@ class CameraCaptureTest {
 
     private fun capture(fix: NotePosition?) = CameraCapture(ctx, tracking, media) { fix ?: NotePosition(null, null, null) }
 
-    private fun jpeg(name: String): File = File(ctx.cacheDir, name).also { f -> Bitmap.createBitmap(16, 12, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.JPEG, 80, f.outputStream()) }
+    private fun jpeg(name: String): File = File(ctx.cacheDir, name).also { f -> f.outputStream().use { Bitmap.createBitmap(16, 12, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.JPEG, 80, it) } }
 
     @Test
     fun `exif stamp writes the local time, its offset and the fix, and the row links with confidence one`() {
@@ -75,6 +74,14 @@ class CameraCaptureTest {
         assertEquals(-34.6037, ll[0], 1e-4)
         assertEquals(-58.3816, ll[1], 1e-4)
         assertEquals("+00:00", CameraCapture.offsetString(t0, "UTC"))
+        assertEquals("+05:45", CameraCapture.offsetString(t0, "Asia/Kathmandu"))
+        // CameraX already wrote the shutter instant: the stamp keeps it and only adds the offset (review I5).
+        val f2 = jpeg("shot2.jpg")
+        ExifInterface(f2).apply { setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, "2025:10:09 05:53:25"); saveAttributes() }
+        ExifInterface(f2).apply { CameraCapture.stamp(this, null, t0, "America/Argentina/Buenos_Aires"); saveAttributes() }
+        assertEquals("2025:10:09 05:53:25", ExifInterface(f2).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL))
+        assertEquals("-03:00", ExifInterface(f2).getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL))
+        assertNull(ExifInterface(f2).latLong)
         assertEquals("Viaje", CameraCapture.folderName("  "))
         assertEquals("Patagonia 2026 _ norte", CameraCapture.folderName("Patagonia 2026 / norte"))
 
@@ -90,7 +97,7 @@ class CameraCaptureTest {
 
         val values = capture(null).contentValues(MediaKind.PHOTO, "Patagonia", t0, "America/Argentina/Buenos_Aires")
         assertEquals("BV_20251009_055320.jpg", values.getAsString(MediaStore.MediaColumns.DISPLAY_NAME))
-        if (Build.VERSION.SDK_INT >= 29) assertEquals("Pictures/BitacoraViaje/Patagonia", values.getAsString(MediaStore.MediaColumns.RELATIVE_PATH))
+        assertEquals("Pictures/BitacoraViaje/Patagonia", values.getAsString(MediaStore.MediaColumns.RELATIVE_PATH)) // @Config(sdk = 35)
         assertEquals("Movies/BitacoraViaje/Viaje", capture(null).contentValues(MediaKind.VIDEO, null, t0, "UTC").getAsString(MediaStore.MediaColumns.RELATIVE_PATH))
     }
 
@@ -98,10 +105,13 @@ class CameraCaptureTest {
     fun `a registered shot is stored linked by exif with confidence one and the reconciliation sweep does not relink it`() = runTest {
         val s = tracking.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "America/Argentina/Buenos_Aires", tripTitle = "Prueba")
         tracking.insertPoints((0..30).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = t0 + i * 10_000L, lat = -34.6 + i * 10 / 111_320.0, lon = -58.4) })
-        val fix = NotePosition(-34.6010, -58.4, 5f)
+        val fix = NotePosition(-34.6010, -58.4, 5f, fixUtcMs = t0 + 90_000)
         val cap = capture(fix)
         val loc = assertNotNull(cap.location(t0 + 100_000))
         assertEquals(-34.6010, loc.latitude)
+        assertEquals(t0 + 90_000, loc.time, "the GPS time stamp is the fix's, not the tap's")
+        assertNull(capture(fix.copy(fixUtcMs = t0 - 200_000)).location(t0 + 100_000), "a fix older than 2 min is no fix (review I1)")
+        assertNull(capture(NotePosition(-34.6, null, null)).location(t0), "lat without lon is no fix")
         val f = jpeg("registered.jpg")
         // A file uri: MediaStore has nothing to say about it, the EXIF stamp still lands on the file.
         val item = assertNotNull(cap.register(Uri.fromFile(f), MediaKind.PHOTO, s.id, loc, t0 + 100_000))
@@ -136,6 +146,54 @@ class CameraCaptureTest {
         assertEquals(1.0, after.linkConfidence)
         assertEquals(2, media.countByTrip(s.tripId), "no duplicate row")
         assertNull(media.allOfTrip(s.tripId).firstOrNull { it.source == MediaSource.MEDIASTORE })
+    }
+
+    @Test
+    fun `a shot without a fix waits for the sweep, which links it by time and keeps it as the app's own`() = runTest {
+        val s = tracking.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Sin fix")
+        tracking.insertPoints((0..30).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = t0 + i * 10_000L, lat = -34.6 + i * 10 / 111_320.0, lon = -58.4) })
+        val cap = capture(null)
+        val own = assertNotNull(cap.register(Uri.parse("content://media/external/images/media/78"), MediaKind.PHOTO, s.id, null, t0 + 150_000))
+        assertEquals(LinkMethod.NONE, own.linkMethod)
+        assertTrue(own.needsReview)
+        val catalog = object : MediaCatalog {
+            override suspend fun queryByTime(fromUtcMs: Long, toUtcMs: Long) = listOf(
+                MediaCandidate(
+                    mediaStoreId = 78, contentUri = Uri.parse("content://media/external/images/media/78"), kind = MediaKind.PHOTO, displayName = "BV.jpg", mimeType = "image/jpeg",
+                    sizeBytes = 1, width = 16, height = 12, durationMs = null, orientationDeg = null, dateTakenMs = t0 + 150_000, dateAddedS = null, dateModifiedS = null,
+                    relativePath = "Pictures/BitacoraViaje/Sin fix", exif = null,
+                ),
+            )
+        }
+        clockNow = t0 + 400_000
+        tracking.finishSegment(s.id)
+        val r = MediaLinker(catalog, tracking, media).linkTrip(s.tripId, nowUtcMs = t0 + 500_000)
+        assertEquals(0, r.skipped)
+        val after = assertNotNull(media.get(own.id))
+        assertEquals(LinkMethod.TRACK_INTERPOLATED, after.linkMethod, "linked by time by the sweep (review B1)")
+        assertEquals(MediaSource.APP_CAMERA, after.source, "still the app's own shot")
+        assertEquals(1, media.countByTrip(s.tripId))
+    }
+
+    @Test
+    fun `when the sweep runs first the app's registration still wins without a duplicate`() = runTest {
+        val s = tracking.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Carrera")
+        tracking.insertPoints((0..30).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = t0 + i * 10_000L, lat = -34.6 + i * 10 / 111_320.0, lon = -58.4) })
+        val uri = Uri.parse("content://media/external/images/media/79")
+        val catalog = object : MediaCatalog {
+            override suspend fun queryByTime(fromUtcMs: Long, toUtcMs: Long) = listOf(
+                MediaCandidate(mediaStoreId = 79, contentUri = uri, kind = MediaKind.PHOTO, displayName = "BV.jpg", mimeType = "image/jpeg", sizeBytes = 1, width = 16, height = 12, durationMs = null, orientationDeg = null, dateTakenMs = t0 + 150_000, dateAddedS = null, dateModifiedS = null, relativePath = "Pictures/BitacoraViaje/Carrera", exif = null),
+            )
+        }
+        MediaLinker(catalog, tracking, media).linkTrip(s.tripId, listOf(s.id), nowUtcMs = t0 + 160_000)
+        assertEquals(MediaSource.MEDIASTORE, assertNotNull(media.getByMediaStoreId(79)).source)
+        val fix = NotePosition(-34.6013, -58.4, 5f, fixUtcMs = t0 + 150_000)
+        val own = assertNotNull(capture(fix).register(uri, MediaKind.PHOTO, s.id, capture(fix).location(t0 + 150_000), t0 + 150_000))
+        val row = assertNotNull(media.getByMediaStoreId(79))
+        assertEquals(own.id, row.id)
+        assertEquals(MediaSource.APP_CAMERA, row.source)
+        assertEquals(1.0, row.linkConfidence)
+        assertEquals(1, media.countByTrip(s.tripId), "one row per MediaStore id (review M5)")
     }
 
     @Test
