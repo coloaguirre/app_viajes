@@ -154,6 +154,16 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 trailingContent = { androidx.compose.material3.Switch(checked = settings.roundEnrichmentCoords, onCheckedChange = viewModel::setRoundEnrichmentCoords, enabled = settings.enrichPlaces, modifier = Modifier.testTag("settings_round_coords")) },
             )
             HorizontalDivider()
+            SectionTitle(stringResource(R.string.settings_offline))
+            Text(stringResource(R.string.settings_offline_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+            OfflineRegionsBlock(
+                regions = viewModel.offlineRegions.collectAsStateWithLifecycle().value,
+                available = viewModel.offlineAvailable,
+                downloading = viewModel.offlineActive.collectAsStateWithLifecycle().value?.let { !it.done } == true,
+                onResume = viewModel::resumeOfflineRegion,
+                onDelete = viewModel::deleteOfflineRegion,
+            )
+            HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_privacy))
             Text(stringResource(R.string.settings_privacy_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
             PrivacyZonesBlock(
@@ -217,6 +227,39 @@ private fun UrlField(label: String, value: String, onCommit: (String) -> Unit, t
         trailingIcon = { androidx.compose.material3.TextButton(onClick = { onCommit(text) }, enabled = text != value) { Text(stringResource(R.string.settings_apply)) } },
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag(tag),
     )
+}
+
+/** PLAN 5.4: downloaded map regions with their size; "Reanudar" finishes a partial one, "Quitar" (confirmed) frees the space. */
+@Composable
+fun OfflineRegionsBlock(regions: List<com.bitacoraviaje.app.map.OfflineRegionInfo>?, available: Boolean, downloading: Boolean = false, onResume: (Long) -> Unit = {}, onDelete: (Long) -> Unit) {
+    var confirm by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<Long?>(null) }
+    when {
+        !available -> Text(stringResource(R.string.map_not_configured), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        regions == null -> Unit
+        regions.isEmpty() -> Text(stringResource(R.string.settings_offline_none), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("offline_none"))
+        else -> regions.forEach { r ->
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_offline_line, r.name, r.maxZoom, com.bitacoraviaje.app.ui.tripdetail.formatMb(r.sizeBytes))) },
+                supportingContent = if (!r.complete) ({ Text(stringResource(R.string.settings_offline_partial), color = MaterialTheme.colorScheme.error) }) else null,
+                trailingContent = {
+                    Row {
+                        if (!r.complete) androidx.compose.material3.TextButton(onClick = { onResume(r.id) }, enabled = !downloading, modifier = Modifier.testTag("offline_resume_${r.id}")) { Text(stringResource(R.string.settings_offline_resume)) }
+                        androidx.compose.material3.TextButton(onClick = { confirm = r.id }, modifier = Modifier.testTag("offline_remove_${r.id}")) { Text(stringResource(R.string.settings_offline_delete)) }
+                    }
+                },
+                modifier = Modifier.testTag("offline_region_${r.id}"),
+            )
+        }
+    }
+    confirm?.let { id ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text(stringResource(R.string.settings_offline_delete_title)) },
+            text = { Text(stringResource(R.string.settings_offline_delete_body)) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { onDelete(id); confirm = null }, modifier = Modifier.testTag("offline_remove_confirm")) { Text(stringResource(R.string.settings_offline_delete)) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirm = null }) { Text(stringResource(R.string.settings_privacy_cancel)) } },
+        )
+    }
 }
 
 /** PLAN 5.5: list of zones, add from the current position or by coordinates, remove. */

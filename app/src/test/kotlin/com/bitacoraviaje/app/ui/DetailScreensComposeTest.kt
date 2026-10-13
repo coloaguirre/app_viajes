@@ -141,6 +141,44 @@ class DetailScreensComposeTest {
     }
 
     @Test
+    fun `offline dialog offers both detail levels with an estimate, shows progress and the result`() {
+        val chosen = mutableListOf<Int>()
+        val boxes = listOf(com.bitacoraviaje.core.model.BoundingBox(-34.61, -58.42, -34.59, -58.38))
+        rule.setContent {
+            var st by remember { mutableStateOf(com.bitacoraviaje.app.ui.tripdetail.OfflineUiState(available = true, stageBoxes = boxes)) }
+            BitacoraTheme {
+                com.bitacoraviaje.app.ui.tripdetail.OfflineDialog(
+                    state = st,
+                    // As in production: a start publishes progress; "Cancelar" drops the run and the dialog returns to the chooser (review I5).
+                    onStart = { z -> chosen += z; st = st.copy(running = true, progress = com.bitacoraviaje.app.map.OfflineProgress("t", 40, 1_048_576, fraction = 0.4f, region = 1, regions = 2)) },
+                    onCancel = { st = st.copy(running = false, progress = null) },
+                    onDismiss = {},
+                )
+            }
+        }
+        rule.onNodeWithTag("offline_zoom_12").assertIsDisplayed()
+        rule.onNodeWithTag("offline_zoom_14").assertIsDisplayed()
+        rule.onNodeWithTag("offline_zoom_12").performClick()
+        assertEquals(listOf(12), chosen)
+        rule.onNodeWithText("Zona 1 de 2 · 40 teselas · 1 MB").assertIsDisplayed()
+        rule.onNodeWithTag("offline_cancel").performClick()
+        rule.onNodeWithTag("offline_zoom_12").assertIsDisplayed()
+    }
+
+    @Test
+    fun `offline dialog shows the finished result, the error and the busy state`() {
+        val boxes = listOf(com.bitacoraviaje.core.model.BoundingBox(-34.61, -58.42, -34.59, -58.38))
+        var st by mutableStateOf(com.bitacoraviaje.app.ui.tripdetail.OfflineUiState(available = true, stageBoxes = boxes, progress = com.bitacoraviaje.app.map.OfflineProgress("t", 166, 44_040_192, 1f, done = true)))
+        rule.setContent { BitacoraTheme { com.bitacoraviaje.app.ui.tripdetail.OfflineDialog(state = st, onStart = {}, onCancel = {}, onDismiss = {}) } }
+        rule.onNodeWithTag("offline_done").assertIsDisplayed()
+        rule.onNodeWithText("Listo: 166 teselas, 42 MB. El mapa de esta zona se ve sin red.").assertIsDisplayed()
+        st = st.copy(progress = com.bitacoraviaje.app.map.OfflineProgress("t", done = true, error = "tile_limit:6000"))
+        rule.onNodeWithTag("offline_error").assertIsDisplayed()
+        st = st.copy(progress = null, busyElsewhere = true)
+        rule.onNodeWithTag("offline_busy").assertIsDisplayed()
+    }
+
+    @Test
     fun `media review exposes the three actions and the camera fix only with a suggestion`() {
         var useTrack = 0
         var excluded = 0

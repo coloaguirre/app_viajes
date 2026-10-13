@@ -27,7 +27,20 @@ class SettingsViewModel @Inject constructor(
     private val secrets: com.bitacoraviaje.app.settings.Secrets,
     private val stateHolder: com.bitacoraviaje.app.tracking.TrackingStateHolder,
     private val tracking: com.bitacoraviaje.data.repository.TrackingRepository,
+    private val offlineMaps: com.bitacoraviaje.app.map.OfflineMaps,
 ) : ViewModel() {
+    /** PLAN 5.4: offline map regions on the phone (null while loading). */
+    val offlineRegions: kotlinx.coroutines.flow.StateFlow<List<com.bitacoraviaje.app.map.OfflineRegionInfo>?> = offlineMaps.regions
+    val offlineAvailable: Boolean get() = offlineMaps.isAvailable
+
+    init {
+        viewModelScope.launch { runCatching { offlineMaps.refresh() } }
+    }
+
+    fun deleteOfflineRegion(id: Long) = viewModelScope.launch { offlineMaps.delete(id) }
+    fun resumeOfflineRegion(id: Long) = offlineMaps.resume(id)
+    val offlineActive: kotlinx.coroutines.flow.StateFlow<com.bitacoraviaje.app.map.OfflineProgress?> = offlineMaps.active
+
     /** PLAN 5.5: privacy zones. The position comes from the live session or the last recorded point; never from a network lookup. */
     val privacyMessage = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 

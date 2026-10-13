@@ -91,7 +91,36 @@ class TripDetailViewModel @Inject constructor(
     private val prefs: com.bitacoraviaje.app.settings.UserPreferences,
     private val secrets: com.bitacoraviaje.app.settings.Secrets,
     private val rewriter: com.bitacoraviaje.app.enrichment.LlmRewriter,
+    private val offlineMaps: com.bitacoraviaje.app.map.OfflineMaps,
 ) : ViewModel() {
+    // PLAN 5.4: offline map of this trip's area. The download itself runs in OfflineMaps' own scope.
+    init {
+        viewModelScope.launch { runCatching { offlineMaps.refresh() } }
+    }
+
+    /** One raw box per stage with points: the offline plan merges them into as few regions as fit. */
+    private fun stageBoxes(map: TrackMapState): List<com.bitacoraviaje.core.model.BoundingBox> = stageBoxesOf(map.tracks)
+
+    val offline: StateFlow<OfflineUiState> = combine(offlineMaps.active, offlineMaps.regions) { active, regions ->
+        val mine = active?.takeIf { it.tripId == tripId }
+        OfflineUiState(
+            available = offlineMaps.isAvailable,
+            hasRegion = regions?.any { it.tripId == tripId && it.complete } == true,
+            running = mine != null && !mine.done,
+            busyElsewhere = active != null && !active.done && active.tripId != tripId,
+            progress = mine,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OfflineUiState())
+
+    fun startOfflineDownload(maxZoom: Int) {
+        val plan = com.bitacoraviaje.app.map.OfflineMaps.plan(stageBoxes(state.value.map), maxZoom)?.takeIf { it.isNotEmpty() } ?: return
+        offlineMaps.startPlan(tripId, state.value.trip?.title ?: appContext.getString(com.bitacoraviaje.app.R.string.offline_region_default_name), plan, com.bitacoraviaje.app.map.OfflineMaps.MIN_ZOOM, maxZoom)
+    }
+
+    /** Stops the download; the partial region stays listed in Settings, where it can be resumed. */
+    fun cancelOfflineDownload() = offlineMaps.cancel()
+
+    fun clearOfflineResult() = offlineMaps.clearResult()
     /** Number of privacy zones in Settings: the export dialog offers to apply them (PLAN 5.5). */
     val privacyZones: StateFlow<Int> = prefs.settings.map { it.privacyZones.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
