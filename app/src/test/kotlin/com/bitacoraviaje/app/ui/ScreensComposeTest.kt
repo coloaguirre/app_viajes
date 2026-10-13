@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -128,5 +129,32 @@ class ScreensComposeTest {
         assertEquals(1, closedSegment)
         assertEquals(1, closedTrip)
         assertEquals(1, cancelled)
+    }
+
+    @Test
+    fun `finish screen offers the one minute video and reflects its progress, result and failure`() {
+        var created = 0
+        var opened: String? = null
+        var render by mutableStateOf(com.bitacoraviaje.app.video.RenderStatus())
+        val closed = com.bitacoraviaje.core.model.Segment("s1", "t1", null, com.bitacoraviaje.core.model.SegmentType.STAGE, null, "Etapa", null, 0L, 1000L, "UTC", "WALK", com.bitacoraviaje.core.model.RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.FINISHED)
+        rule.setContent {
+            BitacoraTheme {
+                com.bitacoraviaje.app.ui.finish.FinishSegmentScreen(
+                    state = com.bitacoraviaje.app.ui.finish.FinishSegmentUiState(segment = closed, closed = closed),
+                    onCancel = {}, onCloseSegment = {}, onCloseTrip = {}, onDone = {},
+                    render = render, onCreateVideo = { created++ }, onOpenVideo = { opened = it },
+                )
+            }
+        }
+        rule.onNodeWithTag("video_create").performClick()
+        assertEquals(1, created)
+        render = com.bitacoraviaje.app.video.RenderStatus(running = true, progress = 42)
+        rule.onNodeWithText("Creando el video… 42 %").assertIsDisplayed()
+        render = com.bitacoraviaje.app.video.RenderStatus(finished = true, resultUri = "content://media/external/video/1", durationMs = 59_000, elapsedMs = 95_000)
+        rule.onNodeWithText("Video listo (59 s, generado en 95 s)").assertIsDisplayed()
+        rule.onNodeWithTag("video_open").performClick()
+        assertEquals("content://media/external/video/1", opened)
+        render = com.bitacoraviaje.app.video.RenderStatus(failed = true, error = "codec")
+        rule.onNodeWithTag("video_retry").assertIsDisplayed()
     }
 }

@@ -15,6 +15,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class FinishSegmentUiState(
@@ -34,6 +36,7 @@ data class FinishSegmentUiState(
 @HiltViewModel
 class FinishSegmentViewModel @Inject constructor(
     savedState: SavedStateHandle,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val repository: TrackingRepository,
     private val controller: TrackingController,
     stateHolder: TrackingStateHolder,
@@ -53,6 +56,19 @@ class FinishSegmentViewModel @Inject constructor(
                 pointCount = repository.validPoints(segmentId).size,
             )
         }
+    }
+
+    /** PLAN 4.6: the 1-minute video job of this stage as the screen sees it. */
+    val render: StateFlow<com.bitacoraviaje.app.video.RenderStatus> = androidx.work.WorkManager.getInstance(appContext)
+        .getWorkInfosForUniqueWorkFlow(com.bitacoraviaje.app.video.RenderWorker.workName(segmentId))
+        .map { infos -> com.bitacoraviaje.app.video.RenderStatus.from(infos.firstOrNull { !it.state.isFinished } ?: infos.firstOrNull()) }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), com.bitacoraviaje.app.video.RenderStatus())
+
+    fun createVideo() = com.bitacoraviaje.app.video.RenderWorker.enqueue(appContext, segmentId)
+
+    fun retryVideo() {
+        androidx.work.WorkManager.getInstance(appContext).pruneWork()
+        createVideo()
     }
 
     fun closeSegment() = close(trip = false)
