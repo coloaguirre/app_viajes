@@ -13,7 +13,7 @@
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | 🟨 3.1–3.3, 3.5 y 3.6 cerrados; 3.4 hecho salvo la medición con ≥10 notas; 3.7 (usuario) pendiente | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` · 3.5: `3.5-respaldo.md` · 3.6: `3.6-nombre-de-ruta.md` (+captura) |
-| 4 — Enriquecimiento y video de escritorio | 🟨 4.1–4.4 cerrados | 4.1: `docs/notes/evidencia/fase-4/4.1-lugares.md` (+captura) · 4.2: `4.2-pantalla-lugares.md` (+captura) · 4.3: `4.3-reescritura-ia.md` · 4.4: `4.4-videoplan.md` |
+| 4 — Enriquecimiento y video de escritorio | 🟨 4.1–4.5 cerrados; 4.6 pendiente | 4.1: `docs/notes/evidencia/fase-4/4.1-lugares.md` (+captura) · 4.2: `4.2-pantalla-lugares.md` (+captura) · 4.3: `4.3-reescritura-ia.md` · 4.4: `4.4-videoplan.md` · 4.5: `4.5-desktop-renderer.md` (+2 cuadros) · 4.2 captura `4.2-pestana-lugares.png` |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
 | 6 — Pulido y publicación | ⬜ Pendiente | |
 
@@ -70,6 +70,7 @@
 | 2026-10-13 | Reescritura con IA: clave del usuario en archivo cifrado AES-GCM con el Android Keystore (`files/secrets/`, fuera de respaldos; `security-crypto` está deprecada), modelo configurable (`claude-sonnet-5` por defecto), solo texto de Wikipedia + datos de Wikidata al modelo, validación numérica antes de aceptar; esquema v8 guarda el texto original bajo cualquier edición o reescritura | PLAN 4.3; DISENO §11.4, §15 |
 | 2026-10-13 | Al volver a enriquecer, un texto aprobado, editado o reescrito no se reemplaza: el nuevo texto de la fuente queda como "original" restaurable | Revisión propia del flujo de refresco |
 | 2026-10-13 | `VideoPlan` en módulo propio `core/videoplan` (no en `core/timeline`): contrato + planificador determinista; `docs/video-plan.schema.json`; conformidad Kotlin↔Python por fixtures en `tools/plan-fixtures/`; solo lugares `user_approved` entran al video; mapa general solo con más de una etapa; con poco contenido el video sale más corto en vez de repetir fotos | PLAN 4.4; DISENO §13.3; skill trip-video |
+| 2026-10-13 | Renderizador de escritorio: planificador portado a Python con conformidad por fixtures; teselas solo de proveedor con clave (`--tiles`), sin clave fondo liso; fuente DejaVu incluida (licencia Bitstream Vera); mapa por tubería a ffmpeg; SSIM global sobre miniaturas como regresión visual; `--dem` con OpenTopoData opcional | PLAN 4.5; skill trip-video |
 
 ## Versiones fijadas
 | Componente | Versión | Verificada el |
@@ -92,6 +93,7 @@
 | CMake (SDK) | 4.1.2 | 2026-10-13 |
 | Modelos whisper (ggml, Hugging Face) | base 60ed5bc3…, small 1be3a9b2…, VAD silero v5.1.2 29940d98… (SHA-256 completos en `ModelCatalog`) | 2026-10-13 |
 | json-schema-validator (optimumcode, solo tests) | 0.5.5 | 2026-10-13 |
+| desktop-renderer (uv): pydantic / typer / Pillow / numpy / requests / pillow-heif; dev pytest / ruff / jsonschema | 2.14.1 / 0.27.3 / 12.3.0 / 2.4.6 / 2.34.2 / 1.8.1; ruff 0.17.0 (ver `uv.lock`) | 2026-10-13 |
 | androidx.test core-ktx / runner | 1.7.0 / 1.7.0 | 2026-10-12 |
 | Navigation Compose / Activity Compose / Lifecycle | 2.10.2 / 1.13.0 / 2.11.0 | 2026-10-11 |
 | WorkManager / DataStore / core-ktx | 2.12.0 / 1.2.1 / 1.19.1 | 2026-10-11 |

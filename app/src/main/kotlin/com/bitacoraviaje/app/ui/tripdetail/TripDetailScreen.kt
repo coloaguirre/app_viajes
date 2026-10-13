@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -325,7 +327,7 @@ private fun PlaceCardView(
     androidx.compose.material3.Card(Modifier.fillMaxWidth().testTag("place_${p.id}")) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                wiki?.thumbnailUrl?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.padding(end = 2.dp).aspectRatio(1f).fillMaxWidth(0.22f)) }
+                wiki?.thumbnailUrl?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(72.dp).clip(MaterialTheme.shapes.small)) }
                 Column(Modifier.weight(1f)) {
                     Text(p.name, style = MaterialTheme.typography.titleMedium)
                     val sub = listOfNotNull(p.kind, p.locality?.takeIf { it != p.name }, p.admin1, card.visit.dwellMs?.takeIf { it > 0 }?.let { stringResource(R.string.places_dwell, TrackingNotificationFactory.formatElapsed(it)) }).joinToString(" · ")

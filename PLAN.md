@@ -358,12 +358,15 @@ su aceptación es la evidencia que él aporta, registrada en
       en ±5 %.
       Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.4-videoplan.md`
       (pHash y nitidez llegan nulos hasta que la Fase 5 los calcule).
-- [ ] 4.5 `desktop-renderer` (uv): CLI `plan` y `render`, mapa animado
+- [x] 4.5 `desktop-renderer` (uv): CLI `plan` y `render`, mapa animado
       con teselas de MapTiler, Ken Burns, clips, tarjetas, subtítulos de
       voz, música con atenuación, créditos, HEIC, corrección de altitud
       con modelo de elevación.  (est: 5)
       Aceptación: `uv run pytest` verde; MP4 de duración ±5 %, 1080p, con
       audio según ffprobe; cuadros clave comparados por SSIM.
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.5-desktop-renderer.md`
+      (59,0 s / 60 s objetivo, 1920×1080, h264+aac; teselas de MapTiler
+      opcionales por `--tiles`, pendiente de probar con la clave del usuario).
 - [ ] 4.6 Minivideo de 1 min en el teléfono: motor Media3 mínimo
       (título, fotos con Ken Burns, mapa estático por etapa, subtítulos,
       música, créditos) desde la pantalla de fin de etapa.  (est: 2.5)
