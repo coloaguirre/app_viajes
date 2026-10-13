@@ -16,7 +16,7 @@ interface Transcriber {
     suspend fun transcribe(audio: File, languageTag: String): TranscriptResult
 }
 
-class TranscriptionException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class TranscriptionException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /** Last resort: records that no engine could run, so the note shows "Reintentar". */
 class StubTranscriber : Transcriber {
