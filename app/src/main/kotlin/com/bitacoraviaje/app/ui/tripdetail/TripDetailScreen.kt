@@ -74,7 +74,7 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
     val offlineWithBoxes = offline.copy(stageBoxes = offlineBoxes)
     val export by viewModel.export.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
-    var showExport by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var showExport by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(viewModel.openExportOnStart) }
     var pendingMedia by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
     var pendingAudio by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
     var pendingFiltered by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }

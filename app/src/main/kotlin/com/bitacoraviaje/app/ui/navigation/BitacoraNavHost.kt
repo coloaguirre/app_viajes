@@ -33,7 +33,7 @@ sealed interface Route {
     data class FinishSegment(val segmentId: String) : Route
 
     @Serializable
-    data class TripDetail(val tripId: String) : Route
+    data class TripDetail(val tripId: String, val openExport: Boolean = false) : Route
 
     @Serializable
     data class MediaReview(val tripId: String) : Route
@@ -63,6 +63,8 @@ fun BitacoraNavHost(mapRenderer: MapRenderer, newSessionRequest: Int = 0) {
                 onOpenSettings = { navController.navigate(Route.Settings) },
                 onNewSession = { navController.navigate(Route.NewSession) },
                 onOpenActiveSession = { id -> navController.navigate(Route.ActiveSession(id)) },
+                onExportTrip = { id -> navController.navigate(Route.TripDetail(id, openExport = true)) },
+                onCreateVideo = { id -> navController.navigate(Route.VideoCreate(id)) },
                 onOpenTrip = { id -> navController.navigate(Route.TripDetail(id)) },
             )
         }

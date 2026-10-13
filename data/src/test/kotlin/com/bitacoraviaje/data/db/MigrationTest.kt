@@ -154,8 +154,18 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 9 to 10 adds archived defaulting to false`() {
+        helper.createDatabase(DB_NAME, 9).use { v9 ->
+            v9.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'FINISHED')")
+        }
+        val v10 = helper.runMigrationsAndValidate(DB_NAME, 10, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v10.query("SELECT archived, title FROM trip WHERE id='t'").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)); assertEquals("T", c.getString(1)) }
+        v10.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(9, BitacoraDatabase.VERSION)
+        assertEquals(10, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

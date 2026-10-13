@@ -220,6 +220,35 @@ class TrackingRepository @Inject constructor(
 
     suspend fun getTrip(tripId: String): Trip? = trips.getById(tripId)?.toDomain()
 
+    /** An ACTIVE trip receives the next recording, so it cannot be archived (review I5); returns whether the flag changed. */
+    suspend fun setTripArchived(tripId: String, archived: Boolean): Boolean {
+        if (archived && trips.getById(tripId)?.status == TripStatus.ACTIVE.name) return false
+        trips.setArchived(tripId, archived)
+        return true
+    }
+
+    /** Trims; a blank title is refused (returns false) so the list never shows a nameless trip. */
+    suspend fun renameTrip(tripId: String, title: String): Boolean {
+        val t = title.trim()
+        if (t.isEmpty()) return false
+        trips.rename(tripId, t)
+        return true
+    }
+
+    /**
+     * Removes a trip and everything that hangs from it (segments, points, pauses, stops, media rows,
+     * notes, place links; the foreign keys cascade) and the places nobody references any more.
+     * Refused while the trip has an open segment. The caller confirms with the user and writes the
+     * backup first (backlog D1: "nunca perder datos").
+     */
+    suspend fun deleteTrip(tripId: String): Boolean = db.withTransaction {
+        val open = segments.getOpen()
+        if (open != null && open.tripId == tripId) return@withTransaction false
+        trips.delete(tripId)
+        db.placeDao().deleteOrphans()
+        true
+    }
+
     suspend fun tripExists(tripId: String): Boolean = trips.getById(tripId) != null
 
     /** PLAN 3.6: name derived from the map; never overwrites a user title (that lives in `title`). */

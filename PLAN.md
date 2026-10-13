@@ -421,7 +421,8 @@ instalación directa; se retoma solo si se decide publicar (D4).
 ### Deseables post-pruebas (backlog, sin fecha; evaluación en `docs/notes/backlog-deseables.md`)
 Pedidos por el usuario el 2026-10-13 para después de las pruebas de campo. No forman parte del
 contrato vigente; entran al plan cuando el usuario los priorice.
-- [ ] D1 Menú de tres puntos por viaje: renombrar, archivar, exportar, video, borrar con respaldo.  (est: 1)
+- [x] D1 Menú de tres puntos por viaje: renombrar, archivar, exportar, video, borrar con respaldo.  (est: 1)
+      Hecho 2026-10-13 (PR feat/trip-menu): evidencia en `docs/notes/evidencia/backlog/D1-menu-viaje.md`.
 - [ ] D2 Mapa interactivo: tocar marcadores y recorrido → foto/nota, km acumulados y hora.  (est: 2)
 - [ ] D3 Clima por hora a lo largo del recorrido (Open-Meteo) con resumen mañana/tarde/noche.  (est: 2.5)
 - [ ] D4 "Nuevo viaje" con componentes (etapa, excursión, trekking) en lugar de tres registros.  (est: 2)

@@ -60,7 +60,7 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun segmentPlaceDao(): SegmentPlaceDao
 
     companion object {
-        const val VERSION = 9
+        const val VERSION = 10
         const val NAME = "bitacora.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -220,6 +220,13 @@ abstract class BitacoraDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+        /** Backlog D1: trips can be archived (hidden from the main list). */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trip ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
     }
 }

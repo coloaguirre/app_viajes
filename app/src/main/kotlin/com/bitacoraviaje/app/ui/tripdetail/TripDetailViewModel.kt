@@ -127,6 +127,8 @@ class TripDetailViewModel @Inject constructor(
     private val rewriting = MutableStateFlow<Set<String>>(emptySet())
     private val placesMessage = MutableStateFlow<String?>(null)
     val tripId: String = savedState.toRoute<Route.TripDetail>().tripId
+    /** Opened from the Home menu's "Exportar": the dialog shows at once (backlog D1). */
+    val openExportOnStart: Boolean = savedState.toRoute<Route.TripDetail>().openExport
     private val appContext = context
 
     /** Finished export jobs the user dismissed with "Exportar de nuevo": hidden here instead of pruning WorkManager globally (review I8). */
@@ -298,7 +300,22 @@ class TripDetailViewModel @Inject constructor(
     }
 
     companion object {
-        fun eventKey(e: TimelineEvent): String = "${e::class.simpleName}-${e.timeUtcMs}"
+        /**
+         * Stable identity of an event for LazyColumn keys, map marker ids and focus. Class + time alone collided
+         * (two photos taken the same millisecond far apart are two moments) and crashed the list; events that
+         * carry a row use its id.
+         */
+        fun eventKey(e: TimelineEvent): String = when (e) {
+            is TimelineEvent.Moment -> "Moment-${e.timeUtcMs}-${e.media.firstOrNull()?.id}-${e.media.size}"
+            is TimelineEvent.Voice -> "Voice-${e.note.id}"
+            is TimelineEvent.Text -> "Text-${e.note.id}"
+            is TimelineEvent.Highlight -> "Highlight-${e.note.id}"
+            is TimelineEvent.TransportChange -> "TransportChange-${e.note.id}"
+            is TimelineEvent.StopArrived -> "StopArrived-${e.stop.id}"
+            is TimelineEvent.StopLeft -> "StopLeft-${e.stop.id}"
+            is TimelineEvent.PlaceVisited -> "PlaceVisited-${e.place.id}-${e.timeUtcMs}"
+            else -> "${e::class.simpleName}-${e.timeUtcMs}"
+        }
 
         fun markerOf(e: TimelineEvent): MapMarker? {
             val la = e.lat ?: return null

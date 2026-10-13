@@ -11,6 +11,8 @@
         <include domain="sharedpref" path="." />
         <include domain="file" path="datastore/" />
         <include domain="file" path="backup/" />
+        <!-- Voice recordings of deleted trips are kept here (backlog D1); too big for the 25 MB cloud cap. -->
+        <exclude domain="file" path="backup/audio/" />
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="." />
