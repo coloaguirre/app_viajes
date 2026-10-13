@@ -150,9 +150,15 @@ object Cards {
      * Static map of the stage: the route over [base] (a MapLibre snapshot, with the points already
      * projected by its camera, review I2) or over a plain ground with an equirectangular fit.
      */
-    fun route(w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>? = null): Bitmap {
+    fun route(w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>? = null, progress: Double = 1.0): Bitmap {
         val (b, c) = bitmap(w, h, GROUND)
-        if (base != null) drawCover(c, base, w, h, darken = 1f)
+        drawRoute(c, w, h, points, base, attribution, projected, progress)
+        return b
+    }
+
+    /** Draws the (partial, up to [progress] of the time span, eased by the caller) route on [c]; used for stills and animated frames. */
+    fun drawRoute(c: Canvas, w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>?, progress: Double) {
+        if (base != null) drawCover(c, base, w, h, darken = 1f) else c.drawColor(GROUND)
         val pixels: List<Pair<Float, Float>> = if (base != null && projected != null && projected.size == points.size) {
             // Snapshot pixels → frame pixels (the snapshot may have been clamped to MAX_SIDE, drawCover scales it to cover).
             val scale = max(w.toFloat() / base.width, h.toFloat() / base.height)
@@ -171,13 +177,29 @@ object Cards {
         } else {
             emptyList()
         }
-        if (pixels.size >= 2) {
+        // Time-interpolated prefix of the track (DISENO §13.4): the tip moves smoothly between fixes.
+        val drawn: List<Pair<Float, Float>> = if (pixels.size >= 2 && progress < 1.0) {
+            val t0 = points.first().timeUtcMs; val t1 = points.last().timeUtcMs
+            val t = t0 + ((t1 - t0) * progress.coerceIn(0.0, 1.0)).toLong()
+            val n = points.indexOfFirst { it.timeUtcMs > t }.let { if (it < 0) points.size else it }
+            val prefix = pixels.take(max(1, n)).toMutableList()
+            if (n in 1 until points.size) {
+                val pa = points[n - 1]; val pb = points[n]
+                val f = ((t - pa.timeUtcMs).toDouble() / max(1L, pb.timeUtcMs - pa.timeUtcMs)).coerceIn(0.0, 1.0).toFloat()
+                val (ax, ay) = pixels[n - 1]; val (bx, by) = pixels[n]
+                prefix += (ax + (bx - ax) * f) to (ay + (by - ay) * f)
+            }
+            prefix
+        } else {
+            pixels
+        }
+        if (drawn.size >= 2) {
             val path = android.graphics.Path()
-            pixels.forEachIndexed { i, (px, py) -> if (i == 0) path.moveTo(px, py) else path.lineTo(px, py) }
+            drawn.forEachIndexed { i, (px, py) -> if (i == 0) path.moveTo(px, py) else path.lineTo(px, py) }
             val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
             c.drawPath(path, stroke.apply { color = Color.WHITE; strokeWidth = h * 0.012f })
             c.drawPath(path, stroke.apply { color = NAVY; strokeWidth = h * 0.007f })
-            val (ex, ey) = pixels.last()
+            val (ex, ey) = drawn.last()
             c.drawCircle(ex, ey, h * 0.014f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
             c.drawCircle(ex, ey, h * 0.01f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(212, 63, 31) })
         }
@@ -188,8 +210,10 @@ object Cards {
             c.drawRect(w - tw - 18f, h - p.textSize - 18f, w.toFloat(), h.toFloat(), Paint().apply { color = Color.WHITE })
             c.drawText(attribution, w - tw - 9f, h - 12f, p)
         }
-        return b
     }
+
+    /** Ease-in-out for the map animation (same curve as desktop `_ease`). */
+    fun ease(t: Double): Double = 0.5 - 0.5 * kotlin.math.cos(Math.PI * t.coerceIn(0.0, 1.0))
 
     /** Scales a bitmap to cover the frame (centre crop); [darken] multiplies the colours (1 = unchanged). */
     private fun drawCover(c: Canvas, src: Bitmap, w: Int, h: Int, darken: Float) {

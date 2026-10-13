@@ -28,6 +28,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.bitacoraviaje.app.R
+import com.bitacoraviaje.core.videoplan.VideoPlan
 import com.bitacoraviaje.data.repository.MediaRepository
 import com.bitacoraviaje.data.repository.NotesRepository
 import com.bitacoraviaje.data.repository.TrackingRepository
@@ -51,6 +52,8 @@ class RenderWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted params: WorkerParameters,
     private val planner: MiniVideoPlanner,
+    private val tripPlanner: TripVideoPlanner,
+    private val store: VideoPlanStore,
     private val tracking: TrackingRepository,
     private val media: MediaRepository,
     private val notes: NotesRepository,
@@ -58,29 +61,60 @@ class RenderWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo(0)
 
     override suspend fun doWork(): Result {
-        val segmentId = inputData.getString(KEY_SEGMENT_ID) ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
+        val segmentId = inputData.getString(KEY_SEGMENT_ID)
+        val tripId = inputData.getString(KEY_TRIP_ID)
+        if (segmentId == null && tripId == null) return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
         val started = System.currentTimeMillis()
         runCatching { setForeground(foregroundInfo(0)) }.onFailure { Log.w(TAG, "foreground not allowed: ${it.message}") }
-        val work = File(appContext.cacheDir, "render/$segmentId").apply { deleteRecursively(); mkdirs() }
+        val work = File(appContext.cacheDir, "render/${segmentId ?: tripId}").apply { deleteRecursively(); mkdirs() }
         return try {
-            val prepared = withContext(Dispatchers.IO) { planner.prepare(segmentId) } ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
-            val segment = prepared.segment
-            val points = withContext(Dispatchers.IO) { tracking.validPoints(segmentId) }
-            val mediaById = withContext(Dispatchers.IO) { media.allOfTrip(segment.tripId).associateBy { it.id } }
-            val voices = withContext(Dispatchers.IO) { notes.voiceNotesOf(segmentId).associateBy { it.id } }
-            val base = RouteSnapshotter(appContext).snapshot(points, WIDTH, HEIGHT)
-            val built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, WIDTH, HEIGHT).build(prepared.plan, prepared.input, mediaById, voices, points, base) }
+            val built: MiniVideoComposer.Built
+            val name: String
+            if (segmentId != null) {
+                // PLAN 4.6: the 1-minute stage video, static map.
+                val prepared = withContext(Dispatchers.IO) { planner.prepare(segmentId) } ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
+                val segment = prepared.segment
+                val points = withContext(Dispatchers.IO) { tracking.validPoints(segmentId) }
+                val mediaById = withContext(Dispatchers.IO) { media.allOfTrip(segment.tripId).associateBy { it.id } }
+                val voices = withContext(Dispatchers.IO) { notes.voiceNotesOf(segmentId).associateBy { it.id } }
+                val base = RouteSnapshotter(appContext).snapshot(points, WIDTH, HEIGHT)
+                built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, WIDTH, HEIGHT).build(prepared.plan, prepared.input, mediaById, voices, points, base) }
+                name = segment.displayName ?: appContext.getString(R.string.video_default_name)
+            } else {
+                // PLAN 5.1: the full trip video from the plan the user reviewed (VideoPlanStore), animated map, voices and music.
+                val (params, plan) = store.load(tripId!!) ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_plan)))
+                val prepared = withContext(Dispatchers.IO) { tripPlanner.input(tripId) } ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
+                val w = plan.output.width; val h = plan.output.height
+                val mediaById = withContext(Dispatchers.IO) { media.allOfTrip(tripId).associateBy { it.id } }
+                val voices = withContext(Dispatchers.IO) { prepared.segments.flatMap { notes.voiceNotesOf(it.id) }.associateBy { it.id } }
+                val snapshotter = RouteSnapshotter(appContext)
+                val wanted = plan.scenes.filterIsInstance<VideoPlan.MapRoute>().flatMap { it.segments }.toSet() + plan.scenes.filterIsInstance<VideoPlan.VoiceOverlay>().map { it.segment }
+                val perSegment = HashMap<String, MiniVideoComposer.SegmentMedia>()
+                for (s in prepared.segments) {
+                    val points = withContext(Dispatchers.IO) { tracking.validPoints(s.id) }
+                    val base = if (s.id in wanted) snapshotter.snapshot(points, w, h) else null
+                    perSegment[s.id] = MiniVideoComposer.SegmentMedia(points, base)
+                }
+                val options = MiniVideoComposer.Options(
+                    voice = params.toPlanParams().voice,
+                    animateMap = true,
+                    musicUri = params.musicUri?.let { Uri.parse(it) },
+                    musicVolume = params.musicVolume.toFloat(),
+                )
+                built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, w, h, options = options).build(plan, prepared.input, mediaById, voices, perSegment) }
+                name = prepared.input.title
+            }
             val out = File(work, "resumen.mp4")
             export(built.composition, out)
-            val published = withContext(Dispatchers.IO) { publish(out, segment.displayName ?: appContext.getString(R.string.video_default_name)) }
+            val published = withContext(Dispatchers.IO) { publish(out, name) }
             if (published != null) out.delete() // the MediaStore copy is the one that counts (review M2)
             val uri = published ?: Uri.fromFile(out)
             val elapsed = System.currentTimeMillis() - started
-            Log.i(TAG, "mini video rendered segment=$segmentId duration=${built.durationMs}ms elapsed=${elapsed}ms skipped=${built.skipped.size}")
+            Log.i(TAG, "video rendered ${segmentId?.let { "segment=$it" } ?: "trip=$tripId"} duration=${built.durationMs}ms elapsed=${elapsed}ms skipped=${built.skipped.size} audio=${built.hasAudio}")
             Result.success(workDataOf(KEY_RESULT_URI to uri.toString(), KEY_DURATION_MS to built.durationMs, KEY_ELAPSED_MS to elapsed, KEY_SKIPPED to built.skipped.size))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            Log.w(TAG, "mini video failed segment=$segmentId: ${e.javaClass.simpleName} ${e.message}")
+            Log.w(TAG, "video failed ${segmentId ?: tripId}: ${e.javaClass.simpleName} ${e.message}")
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
         } finally {
             work.listFiles()?.filter { it.name != "resumen.mp4" }?.forEach { it.delete() }
@@ -163,6 +197,7 @@ class RenderWorker @AssistedInject constructor(
     companion object {
         private const val TAG = "Bitacora"
         const val KEY_SEGMENT_ID = "segment_id"
+        const val KEY_TRIP_ID = "trip_id"
         const val KEY_PROGRESS = "progress"
         const val KEY_RESULT_URI = "result_uri"
         const val KEY_DURATION_MS = "duration_ms"
@@ -176,9 +211,19 @@ class RenderWorker @AssistedInject constructor(
 
         fun workName(segmentId: String) = "render-$segmentId"
 
+        fun tripWorkName(tripId: String) = "render-trip-$tripId"
+
         fun enqueue(context: Context, segmentId: String) {
             val req = OneTimeWorkRequestBuilder<RenderWorker>().setInputData(workDataOf(KEY_SEGMENT_ID to segmentId)).build()
             WorkManager.getInstance(context).enqueueUniqueWork(workName(segmentId), ExistingWorkPolicy.KEEP, req)
         }
+
+        /** Full trip video from the plan saved in [VideoPlanStore]; REPLACE so a re-render after editing the plan wins. */
+        fun enqueueTrip(context: Context, tripId: String) {
+            val req = OneTimeWorkRequestBuilder<RenderWorker>().setInputData(workDataOf(KEY_TRIP_ID to tripId)).build()
+            WorkManager.getInstance(context).enqueueUniqueWork(tripWorkName(tripId), ExistingWorkPolicy.REPLACE, req)
+        }
+
+        fun cancelTrip(context: Context, tripId: String) = WorkManager.getInstance(context).cancelUniqueWork(tripWorkName(tripId))
     }
 }

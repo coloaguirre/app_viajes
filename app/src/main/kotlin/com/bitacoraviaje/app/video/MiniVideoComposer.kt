@@ -10,11 +10,15 @@ import android.graphics.RectF
 import android.net.Uri
 import androidx.core.net.toUri
 import androidx.exifinterface.media.ExifInterface
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.audio.ChannelMixingAudioProcessor
+import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -25,18 +29,21 @@ import com.bitacoraviaje.core.model.TrackPoint
 import com.bitacoraviaje.core.model.VoiceNote
 import com.bitacoraviaje.core.videoplan.PlanInput
 import com.bitacoraviaje.core.videoplan.VideoPlan
+import com.bitacoraviaje.core.videoplan.VoiceMode
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.max
 
 /**
- * Turns a [VideoPlan] into a Media3 [Composition] (DISENO §13.6, skill trip-video §4).
+ * Turns a [VideoPlan] into a Media3 [Composition] (DISENO §13.6, skill trip-video §4) — the one
+ * engine behind the 1-minute stage video (PLAN 4.6) and the full trip video (PLAN 5.1).
  * Every scene becomes a frame-sized JPEG "still" (cards drawn with Canvas; photos scaled to
- * cover the frame, vertical ones over their own blurred copy like the desktop renderer,
- * review I5) so the sequence has one format and no Presentation effect is needed. Photos get a
- * Ken Burns [MatrixTransformation] timed from the item's start inside the composition
- * (review B1) and a subtitle [BitmapOverlay] the size of its panel (review M8). Music is a
- * Fase 5 feature (full engine); the preset never asks for it.
+ * cover the frame, vertical ones over their own blurred copy like the desktop renderer) so the
+ * video sequence has one format. Photos get a Ken Burns [MatrixTransformation] timed from the
+ * item's start inside the composition and a subtitle [BitmapOverlay]. With [Options.animateMap]
+ * the map scenes become short clips drawn frame by frame and encoded with [ClipEncoder]. Voice
+ * notes (mode audio/both) go in a parallel audio sequence with gaps at their scene offsets;
+ * the user's music loops in a third sequence scaled by [Options.musicVolume].
  */
 @UnstableApi
 class MiniVideoComposer(
@@ -45,15 +52,34 @@ class MiniVideoComposer(
     private val width: Int,
     private val height: Int,
     private val fps: Int = 30,
+    private val options: Options = Options(),
+    private val encoder: ClipEncoder = MapClipEncoder(),
 ) {
-    data class Built(val composition: Composition, val durationMs: Long, val skipped: List<String>)
+    data class Options(
+        val voice: VoiceMode = VoiceMode.SUBTITLES,
+        val animateMap: Boolean = false,
+        val musicUri: Uri? = null,
+        val musicVolume: Float = 0.4f,
+    )
 
-    fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, points: List<TrackPoint>, mapBase: RouteSnapshotter.RouteBase?): Built {
+    /** What the engine needs per segment: the track and, when the map could be fetched, its snapshot. */
+    data class SegmentMedia(val points: List<TrackPoint>, val mapBase: RouteSnapshotter.RouteBase?)
+
+    data class Built(val composition: Composition, val durationMs: Long, val skipped: List<String>, val hasAudio: Boolean)
+
+    /** Stage video: one segment. */
+    fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, points: List<TrackPoint>, mapBase: RouteSnapshotter.RouteBase?): Built =
+        build(plan, input, media, voices, input.segments.associate { it.id to SegmentMedia(points, mapBase) })
+
+    fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, segments: Map<String, SegmentMedia>): Built {
         workDir.mkdirs()
         val items = ArrayList<EditedMediaItem>()
         val skipped = ArrayList<String>()
+        val voiceCues = ArrayList<Pair<Long, VoiceNote>>() // offsetUs → note
         var startUs = 0L
-        val segment = input.segments.firstOrNull()
+        var anyClipAudio = false
+        val titles = input.segments.associate { it.id to it.title }
+        val anyMap = segments.values.any { it.mapBase != null }
         val mapAttribution = "© OpenStreetMap contributors"
         for ((i, scene) in plan.scenes.withIndex()) {
             val durationMs = scene.durationMs
@@ -64,51 +90,91 @@ class MiniVideoComposer(
                 }
                 is VideoPlan.Chapter -> image(card("chapter_$i", Cards.chapter(width, height, scene.title, scene.date)), durationMs)
                 is VideoPlan.PlaceCard -> image(card("place_$i", Cards.place(width, height, scene.title, scene.text, scene.source)), durationMs)
-                is VideoPlan.Stats -> image(
-                    card(
-                        "stats_$i",
-                        Cards.stats(
-                            width, height, segment?.title ?: context.getString(com.bitacoraviaje.app.R.string.video_stats_title),
-                            listOf(
-                                context.getString(com.bitacoraviaje.app.R.string.video_stat_distance) to Cards.fmtKm(scene.distance_m),
-                                context.getString(com.bitacoraviaje.app.R.string.video_stat_moving) to Cards.fmtDur(scene.moving_time_ms),
-                                context.getString(com.bitacoraviaje.app.R.string.video_stat_gain) to Cards.fmtM(scene.elevation_gain_m),
-                                context.getString(com.bitacoraviaje.app.R.string.video_stat_max_alt) to Cards.fmtM(scene.max_alt_m),
-                                context.getString(com.bitacoraviaje.app.R.string.video_stat_photos) to (scene.photos?.toString() ?: "—"),
-                            ),
-                        ),
-                    ),
-                    durationMs,
-                )
+                is VideoPlan.Stats -> image(card("stats_$i", statsCard(scene, titles[scene.segment ?: ""])), durationMs)
                 is VideoPlan.Credits -> {
                     // The tile provider is credited only when its map was actually used (review M1).
-                    val lines = if (mapBase == null) scene.lines.filterNot { it == MiniVideoPlanner.TILES_CREDIT } else scene.lines
+                    val lines = if (!anyMap) scene.lines.filterNot { it == MiniVideoPlanner.TILES_CREDIT } else scene.lines
                     image(card("credits_$i", Cards.credits(width, height, lines)), durationMs)
                 }
-                is VideoPlan.MapRoute -> image(card("map_$i", Cards.route(width, height, points, mapBase?.bitmap, mapAttribution, mapBase?.projected)), durationMs)
-                is VideoPlan.VoiceOverlay -> image(
-                    card("voice_$i", Cards.route(width, height, points, mapBase?.bitmap, mapAttribution, mapBase?.projected).also { b -> scene.text?.let { overlayOn(b, Cards.caption(width, height, it)) } }),
-                    durationMs,
-                )
+                is VideoPlan.MapRoute -> mapScene(i, scene, segments, mapAttribution)
+                is VideoPlan.VoiceOverlay -> {
+                    val sm = segments[scene.segment]
+                    val still = Cards.route(width, height, sm?.points.orEmpty(), sm?.mapBase?.bitmap, mapAttribution, sm?.mapBase?.projected)
+                    if (options.voice != VoiceMode.AUDIO) scene.text?.let { overlayOn(still, Cards.caption(width, height, it)) }
+                    if (options.voice != VoiceMode.SUBTITLES) voices[scene.voice]?.let { voiceCues += startUs to it }
+                    image(card("voice_$i", still), durationMs)
+                }
                 is VideoPlan.Photo -> {
                     val m = media[scene.media]
                     val still = m?.let { still("photo_$i", it) }
                     if (still == null) { skipped += scene.media; null } else {
-                        val subtitle = scene.subtitle_from_voice?.let { voices[it]?.displayText } ?: scene.caption
+                        val voice = scene.subtitle_from_voice?.let { voices[it] }
+                        if (voice != null && options.voice != VoiceMode.SUBTITLES) voiceCues += startUs to voice
+                        val subtitle = if (options.voice == VoiceMode.AUDIO) scene.caption else (voice?.displayText ?: scene.caption)
                         photo(still, durationMs, scene.kenburns, subtitle, startUs)
                     }
                 }
                 is VideoPlan.VideoClip -> {
                     val m = media[scene.media]
                     val uri = m?.contentUri?.toUri()
-                    if (uri == null) { skipped += scene.media; null } else clip(uri, m.mimeType, scene.trim_start_ms, scene.trim_end_ms)
+                    if (uri == null) { skipped += scene.media; null } else { anyClipAudio = anyClipAudio || scene.keep_audio; clip(uri, m.mimeType, scene.trim_start_ms, scene.trim_end_ms, scene.keep_audio) }
                 }
             }
             if (item != null) { items += item; startUs += durationMs * 1000 }
         }
         require(items.isNotEmpty()) { context.getString(com.bitacoraviaje.app.R.string.video_error_no_scenes) }
-        val video = EditedMediaItemSequence.Builder(items).build()
-        return Built(Composition.Builder(listOf(video)).build(), startUs / 1000, skipped)
+        val wantAudio = anyClipAudio || voiceCues.isNotEmpty() || options.musicUri != null
+        // Declaring both tracks fills the items without audio with silence, so clips, voices and music can mix.
+        val videoBuilder = if (wantAudio) EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO, C.TRACK_TYPE_AUDIO)) else EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO))
+        items.forEach { videoBuilder.addItem(it) }
+        val sequences = arrayListOf(videoBuilder.build())
+        if (voiceCues.isNotEmpty()) {
+            val b = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+            var cursor = 0L
+            for ((offsetUs, note) in voiceCues.sortedBy { it.first }) {
+                val f = File(context.filesDir, note.audioPath)
+                if (!f.exists() || offsetUs < cursor) continue
+                if (offsetUs > cursor) b.addGap(offsetUs - cursor)
+                b.addItem(EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(f))).setRemoveVideo(true).build())
+                cursor = offsetUs + note.durationMs * 1000
+            }
+            if (cursor > 0) sequences += b.build()
+        }
+        options.musicUri?.let { uri ->
+            val gain = ChannelMixingAudioProcessor().apply {
+                putChannelMixingMatrix(ChannelMixingMatrix.createForConstantGain(1, 2).scaleBy(options.musicVolume))
+                putChannelMixingMatrix(ChannelMixingMatrix.createForConstantGain(2, 2).scaleBy(options.musicVolume))
+            }
+            val music = EditedMediaItem.Builder(MediaItem.fromUri(uri)).setRemoveVideo(true).setEffects(Effects(listOf(gain), emptyList())).build()
+            sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO)).addItem(music).setIsLooping(true).build()
+        }
+        return Built(Composition.Builder(sequences).build(), startUs / 1000, skipped, wantAudio)
+    }
+
+    private fun statsCard(scene: VideoPlan.Stats, segmentTitle: String?): Bitmap = Cards.stats(
+        width, height, segmentTitle ?: context.getString(com.bitacoraviaje.app.R.string.video_stats_title),
+        listOf(
+            context.getString(com.bitacoraviaje.app.R.string.video_stat_distance) to Cards.fmtKm(scene.distance_m),
+            context.getString(com.bitacoraviaje.app.R.string.video_stat_moving) to Cards.fmtDur(scene.moving_time_ms),
+            context.getString(com.bitacoraviaje.app.R.string.video_stat_gain) to Cards.fmtM(scene.elevation_gain_m),
+            context.getString(com.bitacoraviaje.app.R.string.video_stat_max_alt) to Cards.fmtM(scene.max_alt_m),
+            context.getString(com.bitacoraviaje.app.R.string.video_stat_photos) to (scene.photos?.toString() ?: "—"),
+        ),
+    )
+
+    /** Static route card, or an animated clip (route growing with ease-in-out) when the engine runs the full video. */
+    private fun mapScene(i: Int, scene: VideoPlan.MapRoute, segments: Map<String, SegmentMedia>, attribution: String): EditedMediaItem {
+        val parts = scene.segments.mapNotNull { segments[it] }
+        val points = parts.flatMap { it.points }
+        // One snapshot covers one segment; an overview of several segments is drawn on the plain ground unless there is exactly one.
+        val base = parts.singleOrNull()?.mapBase
+        if (!options.animateMap || points.size < 2) return image(card("map_$i", Cards.route(width, height, points, base?.bitmap, attribution, base?.projected)), scene.duration_ms)
+        val frames = max(2, (scene.duration_ms * fps / 1000).toInt())
+        val out = File(workDir, "map_$i.mp4")
+        encoder.encode(out, width, height, fps, frames) { f, canvas ->
+            Cards.drawRoute(canvas, width, height, points, base?.bitmap, attribution, base?.projected, Cards.ease(f.toDouble() / (frames - 1)))
+        }
+        return EditedMediaItem.Builder(MediaItem.Builder().setUri(Uri.fromFile(out)).setMimeType("video/mp4").build()).setRemoveAudio(true).build()
     }
 
     private fun card(name: String, bitmap: Bitmap): Uri {
@@ -134,7 +200,6 @@ class MiniVideoComposer(
         if (ratio < frameRatio - 0.2f) {
             val bg = cover(src, width, height)
             val darken = Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = android.graphics.ColorMatrixColorFilter(android.graphics.ColorMatrix().apply { setScale(0.5f, 0.5f, 0.5f, 1f) }) }
-            // Cheap blur: draw a tiny downscale back up.
             val tiny = Bitmap.createScaledBitmap(bg, max(8, width / 40), max(8, height / 40), true)
             c.drawBitmap(tiny, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), darken)
             tiny.recycle(); bg.recycle()
@@ -169,7 +234,6 @@ class MiniVideoComposer(
         effects += kenBurns
         caption?.takeIf { it.isNotBlank() }?.let {
             val panel = Cards.captionPanel(width, height, it)
-            // Anchor the panel's bottom-centre to the frame's bottom-centre, slightly up (NDC: y up).
             val settings = StaticOverlaySettings.Builder().setBackgroundFrameAnchor(0f, -0.88f).setOverlayFrameAnchor(0f, -1f).build()
             effects += OverlayEffect(listOf(BitmapOverlay.createStaticBitmapOverlay(panel, settings)))
         }
@@ -179,11 +243,11 @@ class MiniVideoComposer(
             .build()
     }
 
-    private fun clip(uri: Uri, mimeType: String?, startMs: Long, endMs: Long): EditedMediaItem =
+    private fun clip(uri: Uri, mimeType: String?, startMs: Long, endMs: Long, keepAudio: Boolean): EditedMediaItem =
         EditedMediaItem.Builder(
             MediaItem.Builder().setUri(uri).also { b -> mimeType?.let(b::setMimeType) }
                 .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs).setEndPositionMs(endMs).build()).build(),
-        ).setEffects(Effects(emptyList(), listOf(androidx.media3.effect.Presentation.createForWidthAndHeight(width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT)))).build()
+        ).setRemoveAudio(!keepAudio).setEffects(Effects(emptyList(), listOf(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT)))).build()
 
     /** Decodes a photo near the frame size, honouring EXIF orientation; the intermediate bitmap is recycled (review N2). */
     private fun decode(m: TripMedia): Bitmap? {

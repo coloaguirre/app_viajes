@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
@@ -65,7 +66,7 @@ import java.util.Locale
 private val APP_LOCALE: Locale = Locale.forLanguageTag("es-AR")
 
 @Composable
-fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (String) -> Unit, onVoiceNote: (String) -> Unit, viewModel: TripDetailViewModel = hiltViewModel()) {
+fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (String) -> Unit, onVoiceNote: (String) -> Unit, onCreateVideo: (String) -> Unit = {}, viewModel: TripDetailViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val export by viewModel.export.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -83,6 +84,7 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
         onEvent = { e -> if (e is TimelineEvent.Voice) onVoiceNote(e.note.id) else viewModel.focusOn(e) },
         onReview = { onReview(viewModel.tripId) },
         onExport = { showExport = true },
+        onCreateVideo = { onCreateVideo(viewModel.tripId) },
         onPlaceAction = viewModel::onPlaceAction,
         map = { s, m -> mapRenderer.TrackMap(s, m) },
     )
@@ -123,6 +125,7 @@ fun TripDetailScreen(
     onEvent: (TimelineEvent) -> Unit,
     onReview: () -> Unit,
     onExport: () -> Unit = {},
+    onCreateVideo: () -> Unit = {},
     onPlaceAction: (PlaceAction) -> Unit = {},
     map: @Composable (TrackMapState, Modifier) -> Unit = { _, m -> Box(m) },
 ) {
@@ -132,7 +135,10 @@ fun TripDetailScreen(
             TopAppBar(
                 title = { Text(state.trip?.title ?: "") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
-                actions = { IconButton(onClick = onExport, modifier = Modifier.testTag("trip_export")) { Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.export_title)) } },
+                actions = {
+                    IconButton(onClick = onCreateVideo, modifier = Modifier.testTag("trip_video")) { Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.video_title)) }
+                    IconButton(onClick = onExport, modifier = Modifier.testTag("trip_export")) { Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.export_title)) }
+                },
             )
         },
     ) { padding ->

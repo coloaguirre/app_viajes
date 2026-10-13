@@ -377,10 +377,13 @@ su aceptación es la evidencia que él aporta, registrada en
       usuario al cerrar su próxima etapa: ver "Pendientes del usuario").
 
 ### Fase 5 — Video completo en el dispositivo y extras  (est: 10 días)
-- [ ] 5.1 Motor Media3 completo (mapa animado, clips, vista previa del
+- [x] 5.1 Motor Media3 completo (mapa animado, clips, vista previa del
       plan editable) bajo el gestor de tareas largas.  (est: 4)
       Aceptación: video de 3 min generado en el Pixel 8 Pro; el mismo
       `VideoPlan` rinde en escritorio y teléfono.
+      Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.1-motor-media3.md`
+      (3 min verificados en el emulador; el Pixel lo mide el usuario; el
+      plan se guarda como `video_plan.json` para el renderizador de la PC).
 - [ ] 5.2 Cámara integrada (CameraX) con EXIF GPS y nota sobre la foto.  (est: 1.5)
       Aceptación: foto tomada en el emulador queda vinculada con
       confianza 1,0.
