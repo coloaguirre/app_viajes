@@ -12,7 +12,7 @@ data class TimeInterval(val startUtcMs: Long, val endUtcMs: Long)
 fun List<SegmentPause>.toIntervals(nowUtcMs: Long): List<TimeInterval> =
     map { TimeInterval(it.pausedUtcMs, it.resumedUtcMs ?: nowUtcMs) }
 
-private fun List<TimeInterval>.covers(t0: Long, t1: Long): Boolean = any { t0 < it.endUtcMs && t1 > it.startUtcMs }
+internal fun List<TimeInterval>.covers(t0: Long, t1: Long): Boolean = any { t0 < it.endUtcMs && t1 > it.startUtcMs }
 
 /**
  * Elevation gain/loss with a 5-point moving average and hysteresis: changes smaller

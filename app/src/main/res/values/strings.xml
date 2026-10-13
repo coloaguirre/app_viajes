@@ -75,6 +75,11 @@
     <string name="trip_delete_in_use">Ese viaje tiene una etapa en curso: cerrala antes de borrarlo.</string>
     <string name="tab_timeline">Línea de tiempo</string>
     <string name="tab_map">Mapa</string>
+    <string name="map_sel_track_point">Punto del recorrido</string>
+    <string name="map_sel_km">%1$s de la etapa</string>
+    <string name="map_sel_speed">%1$s km/h</string>
+    <string name="map_sel_alt">%1$d m de altitud</string>
+    <string name="map_sel_close">Cerrar</string>
     <string name="tab_photos">Fotos</string>
     <string name="tab_places">Lugares</string>
     <string name="places_empty">Todavía no hay lugares. Al cerrar una etapa con conexión, la app busca información de las paradas y localidades en Wikipedia, Wikidata y OpenStreetMap.</string>

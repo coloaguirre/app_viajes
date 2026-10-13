@@ -10,6 +10,13 @@ enum class MarkerKind { PHOTO, VIDEO, VOICE, TEXT, HIGHLIGHT, PLACED, PLACE }
 
 data class MapMarker(val id: String, val point: MapPoint, val kind: MarkerKind)
 
+/** What was under the finger on a tap (backlog D2): a marker, the track itself, or nothing of ours. */
+sealed interface MapTap {
+    data class Marker(val id: String) : MapTap
+    data class Track(val point: MapPoint) : MapTap
+    data class Empty(val point: MapPoint) : MapTap
+}
+
 /** What the live/detail map shows. All inputs are plain data so renderers are swappable. */
 data class TrackMapState(
     /** One polyline per segment. */
@@ -36,5 +43,9 @@ interface MapRenderer {
     val isConfigured: Boolean
 
     @Composable
-    fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)? = null)
+    /**
+     * [onMapClick] receives every tap as a position (media review places a photo). [onTap] receives what
+     * the tap hit (trip detail opens the event/point card); a renderer without hit-testing reports [MapTap.Empty].
+     */
+    fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)? = null, onTap: ((MapTap) -> Unit)? = null)
 }

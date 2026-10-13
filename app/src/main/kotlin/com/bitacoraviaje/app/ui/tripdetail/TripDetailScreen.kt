@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import com.bitacoraviaje.app.map.MapTap
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Badge
@@ -92,7 +94,9 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
         onExport = { showExport = true },
         onCreateVideo = { onCreateVideo(viewModel.tripId) },
         onPlaceAction = viewModel::onPlaceAction,
-        map = { s, m -> mapRenderer.TrackMap(s, m) },
+        map = { s, m, tap -> mapRenderer.TrackMap(s, m, onTap = tap) },
+        onMapTap = viewModel::onMapTap,
+        onCloseSelection = viewModel::clearSelection,
         offline = offlineWithBoxes,
         onOffline = { showOffline = true },
     )
@@ -149,7 +153,9 @@ fun TripDetailScreen(
     onPlaceAction: (PlaceAction) -> Unit = {},
     offline: OfflineUiState = OfflineUiState(),
     onOffline: () -> Unit = {},
-    map: @Composable (TrackMapState, Modifier) -> Unit = { _, m -> Box(m) },
+    map: @Composable (TrackMapState, Modifier, (MapTap) -> Unit) -> Unit = { _, m, _ -> Box(m) },
+    onMapTap: (MapTap) -> Unit = {},
+    onCloseSelection: () -> Unit = {},
 ) {
     val titles = listOf(R.string.tab_timeline, R.string.tab_map, R.string.tab_photos, R.string.tab_places)
     Scaffold(
@@ -173,13 +179,15 @@ fun TripDetailScreen(
             when (state.selectedTab) {
                 0 -> TimelineTab(state, onEvent)
                 1 -> Box(Modifier.fillMaxSize()) {
-                    map(state.map, Modifier.fillMaxSize().testTag("trip_map"))
+                    map(state.map, Modifier.fillMaxSize().testTag("trip_map"), onMapTap)
                     // PLAN 5.4: download this area for use without network (only when the map provider is configured).
                     if (offline.available) {
-                        androidx.compose.material3.FilledTonalButton(onClick = onOffline, modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).testTag("trip_offline")) {
+                        androidx.compose.material3.FilledTonalButton(onClick = onOffline, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).testTag("trip_offline")) {
                             Text(stringResource(if (offline.hasRegion) R.string.offline_button_ready else R.string.offline_button))
                         }
                     }
+                    // Backlog D2: what the user tapped on the map (marker or track point).
+                    state.mapSelection?.let { sel -> MapSelectionCard(sel, Modifier.align(Alignment.BottomCenter).padding(12.dp), onCloseSelection) }
                 }
                 2 -> PhotosTab(state, onReview)
                 else -> PlacesTab(state, onPlaceAction)
@@ -222,10 +230,40 @@ private fun segmentTitle(st: SegmentTimeline): String {
     return "${DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(date)} · ${s.displayName ?: kind}$dist"
 }
 
+/** Backlog D2: time, progress along the stage, speed and altitude of the tapped point, plus the event (photos, note text). */
 @Composable
-private fun EventRow(e: TimelineEvent, zone: ZoneId, selected: Boolean, onClick: () -> Unit) {
-    val time = DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(e.timeUtcMs).atZone(zone))
-    val (icon, text) = when (e) {
+private fun MapSelectionCard(sel: MapSelection, modifier: Modifier, onClose: () -> Unit) {
+    val zone = ZoneId.of(sel.segment.tzId)
+    val time = DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(sel.timeUtcMs).atZone(zone))
+    val (icon, title) = sel.event?.let { eventLabel(it) } ?: ("📍" to stringResource(R.string.map_sel_track_point))
+    val facts = buildList {
+        add(time)
+        sel.distanceM?.let { add(stringResource(R.string.map_sel_km, TrackingNotificationFactory.formatKm(it))) }
+        sel.speedMps?.let { add(stringResource(R.string.map_sel_speed, "%.1f".format(it * 3.6))) }
+        sel.altM?.let { add(stringResource(R.string.map_sel_alt, it.toInt())) }
+    }
+    androidx.compose.material3.Card(modifier = modifier.fillMaxWidth().testTag("map_selection")) {
+        Column(Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(icon, modifier = Modifier.padding(end = 8.dp))
+                Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 2)
+                IconButton(onClick = onClose, modifier = Modifier.testTag("map_selection_close")) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.map_sel_close)) }
+            }
+            Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("map_selection_facts"))
+            when (val e = sel.event) {
+                is TimelineEvent.Moment -> Row(Modifier.padding(top = 8.dp)) {
+                    e.media.take(4).forEach { m -> AsyncImage(model = m.contentUri, contentDescription = m.displayName, contentScale = ContentScale.Crop, modifier = Modifier.padding(end = 6.dp).size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant)) }
+                }
+                is TimelineEvent.PlaceVisited -> Text(stringResource(R.string.ev_place, e.place.name), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                else -> Unit
+            }
+        }
+    }
+}
+
+/** Icon and one-line label of a timeline event, shared by the list rows and the map card. */
+@Composable
+private fun eventLabel(e: TimelineEvent): Pair<String, String> = when (e) {
         is TimelineEvent.SegmentStart -> "▶" to stringResource(R.string.ev_start)
         is TimelineEvent.SegmentEnd -> "■" to stringResource(R.string.ev_end)
         is TimelineEvent.Pause -> (if (e.kind == PauseKind.AUTO_REST) "💤" else "⏸") to stringResource(if (e.kind == PauseKind.AUTO_REST) R.string.ev_rest else if (e.kind == PauseKind.NESTED) R.string.ev_nested else R.string.ev_pause)
@@ -240,7 +278,12 @@ private fun EventRow(e: TimelineEvent, zone: ZoneId, selected: Boolean, onClick:
         is TimelineEvent.DayChange -> "📅" to DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", APP_LOCALE).format(e.localDate)
         is TimelineEvent.PlaceVisited -> "🏛" to stringResource(R.string.ev_place, e.place.name)
         is TimelineEvent.Summary -> "↝" to stringResource(R.string.ev_summary, TrackingNotificationFactory.formatKm(e.distanceM), TrackingNotificationFactory.formatElapsed(e.durationMs))
-    }
+}
+
+@Composable
+private fun EventRow(e: TimelineEvent, zone: ZoneId, selected: Boolean, onClick: () -> Unit) {
+    val time = DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(e.timeUtcMs).atZone(zone))
+    val (icon, text) = eventLabel(e)
     ListItem(
         headlineContent = { Text(text, style = if (e is TimelineEvent.Summary) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyLarge) },
         leadingContent = { Text(icon) },

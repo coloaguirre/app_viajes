@@ -56,7 +56,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
     internal val styleUrl = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
 
     @Composable
-    override fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)?) {
+    override fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)?, onTap: ((MapTap) -> Unit)?) {
         if (!isConfigured) {
             Box(modifier, contentAlignment = Alignment.Center) {
                 Text(
@@ -102,11 +102,16 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
                         map.addOnCameraMoveStartedListener { reason ->
                             if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) holder.userMoved = true
                         }
-                        map.addOnMapClickListener { ll -> holder.onClick?.invoke(MapPoint(ll.latitude, ll.longitude)); holder.onClick != null }
+                        map.addOnMapClickListener { ll ->
+                            val p = MapPoint(ll.latitude, ll.longitude)
+                            holder.onClick?.invoke(p)
+                            holder.onTap?.invoke(holder.hitTest(map, ll, p))
+                            holder.onClick != null || holder.onTap != null
+                        }
                     }
                 }
             },
-            update = { holder.onClick = onMapClick; holder.latest = state; holder.render(state) },
+            update = { holder.onClick = onMapClick; holder.onTap = onTap; holder.latest = state; holder.render(state) },
             modifier = modifier.fillMaxSize(),
         )
     }
@@ -123,6 +128,20 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         private var lastMarkers: List<MapMarker>? = null
         private var lastFocus: MapPoint? = null
         var onClick: ((MapPoint) -> Unit)? = null
+        var onTap: ((MapTap) -> Unit)? = null
+
+        /** Markers win over the track; both are hit-tested on a finger-sized box around the tap (backlog D2). */
+        fun hitTest(m: MapLibreMap, ll: LatLng, p: MapPoint): MapTap {
+            val px = m.projection.toScreenLocation(ll)
+            fun box(r: Float) = android.graphics.RectF(px.x - r, px.y - r, px.x + r, px.y + r)
+            // Markers are already 8 dp circles, so a small slop keeps the track between two close markers reachable.
+            val marker = m.queryRenderedFeatures(box(MARKER_SLOP_PX), LAYER_MARKERS).firstOrNull { it.hasProperty("id") }?.getStringProperty("id")
+            if (marker != null) return MapTap.Marker(marker)
+            val onTrack = m.queryRenderedFeatures(box(TRACK_SLOP_PX), LAYER_TRACK).isNotEmpty()
+            if (BuildConfig.DEBUG) android.util.Log.d("Bitacora", "map tap px=(${px.x.toInt()},${px.y.toInt()}) marker=$marker track=$onTrack")
+            if (onTrack) return MapTap.Track(p)
+            return MapTap.Empty(p)
+        }
         private var lastCurrent: MapPoint? = null
         private var lastStops: List<MapPoint>? = null
         var userMoved = false
@@ -225,6 +244,8 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
             const val LAYER_STOPS = "stops"
             const val LAYER_MARKERS = "markers"
             const val LAYER_CURRENT = "current"
+            const val MARKER_SLOP_PX = 14f
+            const val TRACK_SLOP_PX = 24f
         }
     }
 }
