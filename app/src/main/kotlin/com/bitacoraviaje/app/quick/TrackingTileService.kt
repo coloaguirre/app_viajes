@@ -5,7 +5,9 @@ import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.util.Log
 import com.bitacoraviaje.app.MainActivity
+import com.bitacoraviaje.app.R
 import com.bitacoraviaje.app.tracking.TrackingController
 import com.bitacoraviaje.app.tracking.TrackingStateHolder
 import com.bitacoraviaje.data.repository.TrackingRepository
@@ -15,8 +17,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Quick Settings tile "Iniciar/Pausar" (DISENO §14.3): pauses or resumes the running recording
@@ -34,19 +38,20 @@ class TrackingTileService : TileService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var listening: Job? = null
-    private var model: TrackingTileModel = TrackingTileModel(false, com.bitacoraviaje.app.R.string.tile_tracking_start, TrackingTileModel.Action.OPEN_NEW_SESSION)
+    private var model: TrackingTileModel = TrackingTileModel(false, R.string.tile_tracking_start, TrackingTileModel.Action.OPEN_NEW_SESSION)
 
     override fun onStartListening() {
         listening?.cancel()
         listening = scope.launch {
             stateHolder.state.collectLatest { live ->
-                val hasOpen = if (live.isRunning) true else withIo { repository.getOpenSegment() != null }
+                // Only when nothing runs: is there an open stage to go back to? (one query per state change)
+                val hasOpen = if (live.isRunning) true else withContext(Dispatchers.IO) { repository.getOpenSegment() != null }
                 model = TrackingTileModel.of(live, hasOpen)
                 qsTile?.apply {
                     state = if (model.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
                     // Below API 29 there is no subtitle: the label itself says what the tap does.
                     if (Build.VERSION.SDK_INT >= 29) {
-                        label = getString(com.bitacoraviaje.app.R.string.tile_tracking)
+                        label = getString(R.string.tile_tracking)
                         subtitle = getString(model.labelRes)
                     } else {
                         label = getString(model.labelRes)
@@ -57,8 +62,6 @@ class TrackingTileService : TileService() {
         }
     }
 
-    private suspend fun <T> withIo(block: suspend () -> T): T = kotlinx.coroutines.withContext(Dispatchers.IO) { block() }
-
     override fun onStopListening() {
         listening?.cancel()
         listening = null
@@ -67,24 +70,31 @@ class TrackingTileService : TileService() {
     // The Intent overload is the only one below API 34; the PendingIntent one is used from 34 on.
     @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
-        android.util.Log.i("Bitacora", "tracking tile click action=${model.action} live=${stateHolder.state.value.let { "running=${it.isRunning} paused=${it.isPaused}" }}")
+        Log.d(TAG, "tracking tile click action=${model.action}")
         when (model.action) {
             TrackingTileModel.Action.PAUSE -> controller.pause()
             TrackingTileModel.Action.RESUME -> controller.resume()
-            TrackingTileModel.Action.OPEN_NEW_SESSION -> {
-                val intent = Intent(this, MainActivity::class.java).setAction(ShortcutActions.NEW_SESSION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                if (Build.VERSION.SDK_INT >= 34) {
-                    startActivityAndCollapse(PendingIntent.getActivity(this, 1, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
-                } else {
-                    @Suppress("DEPRECATION")
-                    startActivityAndCollapse(intent)
-                }
-            }
+            TrackingTileModel.Action.OPEN_NEW_SESSION -> open(Intent(this, MainActivity::class.java).setAction(ShortcutActions.NEW_SESSION))
+            TrackingTileModel.Action.OPEN_APP -> open(Intent(this, MainActivity::class.java))
+        }
+    }
+
+    // The Intent overload is the only one below API 34; the PendingIntent one is used from 34 on.
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
+    private fun open(intent: Intent) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (Build.VERSION.SDK_INT >= 34) {
+            startActivityAndCollapse(PendingIntent.getActivity(this, 1, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+        } else {
+            @Suppress("DEPRECATION")
+            startActivityAndCollapse(intent)
         }
     }
 
     override fun onDestroy() {
-        listening?.cancel()
+        scope.cancel() // every coroutine of this instance, not only the listener (review M2)
         super.onDestroy()
     }
+
+    private companion object { const val TAG = "Bitacora" }
 }

@@ -2,7 +2,7 @@ package com.bitacoraviaje.app.widget
 
 import android.content.Context
 import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
-import androidx.glance.testing.unit.hasContentDescription
+import androidx.glance.testing.unit.hasTestTag
 import androidx.glance.testing.unit.hasText
 import androidx.test.core.app.ApplicationProvider
 import com.bitacoraviaje.app.R
@@ -27,7 +27,7 @@ class BitacoraWidgetTest {
         assertEquals(WidgetModel(R.string.widget_running, "1 min", "1.2 km", recording = true), WidgetModel.of(running, true, t0))
         assertEquals(R.string.widget_paused, WidgetModel.of(running.copy(isPaused = true, pausedSinceUtcMs = t0), true, t0).statusRes)
         assertEquals(R.string.widget_resting, WidgetModel.of(running.copy(isResting = true), true, t0).statusRes)
-        assertEquals(R.string.widget_idle, WidgetModel.of(running, hasOpenSegment = false, nowUtcMs = t0).statusRes, "a running flag without an open segment is not a recording")
+        assertEquals(WidgetModel(R.string.widget_interrupted, interrupted = true), WidgetModel.of(LiveTrackingState(), hasOpenSegment = true, nowUtcMs = t0), "service gone, stage open: offer to go back")
     }
 
     @Test
@@ -35,9 +35,10 @@ class BitacoraWidgetTest {
         setContext(ctx)
         provideComposable { WidgetContent(WidgetModel(R.string.widget_running, "42 min", "3.1 km", recording = true)) }
         onNode(hasText("En curso · 42 min · 3.1 km")).assertExists()
-        onNode(hasContentDescription("widget_voice")).assertExists()
-        onNode(hasContentDescription("widget_marker")).assertExists()
-        onNode(hasContentDescription("widget_start")).assertDoesNotExist()
+        onNode(hasTestTag("widget_voice")).assertExists()
+        onNode(hasText("Nota de voz")).assertExists()
+        onNode(hasTestTag("widget_marker")).assertExists()
+        onNode(hasTestTag("widget_start")).assertDoesNotExist()
     }
 
     @Test
@@ -45,7 +46,17 @@ class BitacoraWidgetTest {
         setContext(ctx)
         provideComposable { WidgetContent(WidgetModel(R.string.widget_idle)) }
         onNode(hasText("Sin registro en curso")).assertExists()
-        onNode(hasContentDescription("widget_start")).assertExists()
-        onNode(hasContentDescription("widget_marker")).assertDoesNotExist()
+        onNode(hasTestTag("widget_start")).assertExists()
+        onNode(hasTestTag("widget_marker")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `interrupted recording offers only the way back to the app`() = runGlanceAppWidgetUnitTest {
+        setContext(ctx)
+        provideComposable { WidgetContent(WidgetModel(R.string.widget_interrupted, interrupted = true)) }
+        onNode(hasText("Registro interrumpido")).assertExists()
+        onNode(hasTestTag("widget_back")).assertExists()
+        onNode(hasTestTag("widget_marker")).assertDoesNotExist()
+        onNode(hasTestTag("widget_start")).assertDoesNotExist()
     }
 }

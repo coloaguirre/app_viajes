@@ -351,6 +351,11 @@
     <string name="tile_tracking_start">Iniciar registro</string>
     <string name="tile_tracking_pause">Pausar registro</string>
     <string name="tile_tracking_resume">Reanudar registro</string>
+    <string name="tile_tracking_back">Volver a la sesión</string>
+    <string name="tile_voice_ready">Dictar una nota</string>
+    <string name="tile_voice_no_session">Sin registro en curso</string>
+    <string name="widget_interrupted">Registro interrumpido</string>
+    <string name="widget_back">Volver a la sesión</string>
     <string name="widget_label">Bitácora de Viaje</string>
     <string name="widget_description">Estado del registro con botones de nota de voz y marcador.</string>
     <string name="widget_idle">Sin registro en curso</string>

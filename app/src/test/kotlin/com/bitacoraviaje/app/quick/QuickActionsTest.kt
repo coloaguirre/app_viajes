@@ -17,14 +17,13 @@ class QuickActionsTest {
     @Test
     fun `tracking tile starts when idle, pauses when running and resumes when paused or resting`() {
         assertEquals(TrackingTileModel(false, R.string.tile_tracking_start, TrackingTileModel.Action.OPEN_NEW_SESSION), TrackingTileModel.of(LiveTrackingState(), hasOpenSegment = false))
-        // The service died (phone killed it) but a segment is open: still "start", the app shows the resume dialog.
-        assertEquals(TrackingTileModel.Action.OPEN_NEW_SESSION, TrackingTileModel.of(LiveTrackingState(isRunning = false), hasOpenSegment = true).action)
+        // The service died (phone killed it) but a stage is open: back to the app, never a new session on top (review I2).
+        assertEquals(TrackingTileModel(false, R.string.tile_tracking_back, TrackingTileModel.Action.OPEN_APP), TrackingTileModel.of(LiveTrackingState(isRunning = false), hasOpenSegment = true))
         val running = LiveTrackingState(segmentId = "s", isRunning = true, startedUtcMs = 1)
         assertEquals(TrackingTileModel(true, R.string.tile_tracking_pause, TrackingTileModel.Action.PAUSE), TrackingTileModel.of(running, true))
-        assertEquals(TrackingTileModel(true, R.string.tile_tracking_resume, TrackingTileModel.Action.RESUME), TrackingTileModel.of(running.copy(isPaused = true), true))
+        // Paused or resting: the toggle is off (review M5) and the tap resumes.
+        assertEquals(TrackingTileModel(false, R.string.tile_tracking_resume, TrackingTileModel.Action.RESUME), TrackingTileModel.of(running.copy(isPaused = true), true))
         assertEquals(TrackingTileModel.Action.RESUME, TrackingTileModel.of(running.copy(isResting = true), true).action)
-        // Running in memory but no open segment in the database (inconsistent): never send pause into the void.
-        assertEquals(TrackingTileModel.Action.OPEN_NEW_SESSION, TrackingTileModel.of(running, hasOpenSegment = false).action)
     }
 
     @Test

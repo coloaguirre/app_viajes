@@ -1,18 +1,24 @@
 package com.bitacoraviaje.app.quick
 
 import android.content.Intent
+import com.bitacoraviaje.app.R
 import com.bitacoraviaje.app.tracking.LiveTrackingState
 
-/** What the tracking tile shows and does for a given live state (pure, testable). */
+/**
+ * What the tracking tile shows and does for a given live state (pure, testable). [active] is the
+ * toggle's visual state: lit only while the recording is really running (review M5 of PR #14).
+ */
 data class TrackingTileModel(val active: Boolean, val labelRes: Int, val action: Action) {
-    enum class Action { OPEN_NEW_SESSION, PAUSE, RESUME }
+    enum class Action { OPEN_NEW_SESSION, OPEN_APP, PAUSE, RESUME }
 
     companion object {
         fun of(live: LiveTrackingState, hasOpenSegment: Boolean): TrackingTileModel = when {
-            // No recording (or the service is gone after a kill): the tile opens the app to start or resume one.
-            !live.isRunning || !hasOpenSegment -> TrackingTileModel(false, com.bitacoraviaje.app.R.string.tile_tracking_start, Action.OPEN_NEW_SESSION)
-            live.isPaused || live.isResting -> TrackingTileModel(true, com.bitacoraviaje.app.R.string.tile_tracking_resume, Action.RESUME)
-            else -> TrackingTileModel(true, com.bitacoraviaje.app.R.string.tile_tracking_pause, Action.PAUSE)
+            // The service is gone (killed, rebooted) but a stage is still open: back to the app, whose
+            // Home offers to resume it (DISENO §6.9). Never a new session on top of an open one.
+            !live.isRunning && hasOpenSegment -> TrackingTileModel(false, R.string.tile_tracking_back, Action.OPEN_APP)
+            !live.isRunning -> TrackingTileModel(false, R.string.tile_tracking_start, Action.OPEN_NEW_SESSION)
+            live.isPaused || live.isResting -> TrackingTileModel(false, R.string.tile_tracking_resume, Action.RESUME)
+            else -> TrackingTileModel(true, R.string.tile_tracking_pause, Action.PAUSE)
         }
     }
 }
