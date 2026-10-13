@@ -163,10 +163,24 @@ object TripJson {
     data class TextNoteDto(val id: String, val kind: String, val time: String, val time_utc_ms: Long, val lat: Double?, val lon: Double?, val text: String?)
 
     @Serializable
-    data class PlaceDto(val id: String, val name: String, val lat: Double, val lon: Double)
+    data class PlaceDto(
+        val id: String, val name: String, val lat: Double, val lon: Double,
+        val kind: String? = null, val country_code: String? = null, val admin1: String? = null, val admin2: String? = null, val locality: String? = null,
+        val osm_type: String? = null, val osm_id: Long? = null, val wikidata_id: String? = null, val wikipedia_title: String? = null, val wikipedia_lang: String? = null,
+        val source: String? = null,
+        /** Which segments saw this place and how it ranked there. */
+        val visits: List<PlaceVisitDto> = emptyList(),
+    )
 
     @Serializable
-    data class EnrichmentDto(val place_id: String, val source: String, val license: String, val text: String)
+    data class PlaceVisitDto(val segment_id: String, val first_seen: String, val first_seen_utc_ms: Long, val dwell_ms: Long?, val relevance: Double?)
+
+    @Serializable
+    data class EnrichmentDto(
+        val place_id: String, val source: String, val license: String, val text: String,
+        val id: String? = null, val lang: String? = null, val title: String? = null, val url: String? = null, val thumbnail_url: String? = null,
+        val original_text: String? = null, val llm_rewritten: Boolean = false, val user_approved: Boolean = false,
+    )
 
     @Serializable
     data class AttributionDto(val name: String, val license: String, val url: String)
@@ -219,6 +233,22 @@ object TripJson {
                         )
                     },
                     text_notes = se.textNotes.map { n -> TextNoteDto(n.id, n.kind.name, Iso.local(n.timeUtcMs, z), n.timeUtcMs, n.lat, n.lon, n.text) },
+                )
+            },
+            places = t.places.map { p ->
+                PlaceDto(
+                    id = p.id, name = p.name, lat = p.lat, lon = p.lon, kind = p.kind, country_code = p.countryCode, admin1 = p.admin1, admin2 = p.admin2, locality = p.locality,
+                    osm_type = p.osmType, osm_id = p.osmId, wikidata_id = p.wikidataId, wikipedia_title = p.wikipediaTitle, wikipedia_lang = p.wikipediaLang, source = p.source.name,
+                    visits = t.segmentPlaces.filter { it.placeId == p.id }.map { sp ->
+                        val z = t.segments.firstOrNull { it.segment.id == sp.segmentId }?.segment?.tzId ?: tz
+                        PlaceVisitDto(sp.segmentId, Iso.local(sp.firstSeenUtcMs, z), sp.firstSeenUtcMs, sp.dwellMs, sp.relevance)
+                    },
+                )
+            },
+            enrichments = t.enrichments.map { e ->
+                EnrichmentDto(
+                    place_id = e.placeId, source = e.sourceName, license = e.license ?: "", text = e.summary, id = e.id, lang = e.lang, title = e.title, url = e.sourceUrl,
+                    thumbnail_url = e.thumbnailUrl, original_text = e.originalSummary, llm_rewritten = e.llmRewritten, user_approved = e.userApproved,
                 )
             },
             attributions = t.attributions.map { AttributionDto(it.name, it.license, it.url) },

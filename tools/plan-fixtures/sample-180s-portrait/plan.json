@@ -1,0 +1,142 @@
+{
+    "schema_version": 1,
+    "output": {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30,
+        "format": "mp4-h264-aac"
+    },
+    "scenes": [
+        {
+            "type": "title",
+            "duration_ms": 5000,
+            "title": "Patagonia 2026 Café \"La Ñata\" & <amigos> · 'noche' 🙂 </script><script>alert(1)</script>",
+            "subtitle": "2025-10-09 — 2025-10-10",
+            "background_media": "m-1"
+        },
+        {
+            "type": "map_route",
+            "duration_ms": 12000,
+            "segments": [
+                "seg-1",
+                "seg-2"
+            ],
+            "style": "overview"
+        },
+        {
+            "type": "chapter",
+            "duration_ms": 2500,
+            "title": "Caminata inicial",
+            "date": "2025-10-09",
+            "segment": "seg-1"
+        },
+        {
+            "type": "map_route",
+            "duration_ms": 12000,
+            "segments": [
+                "seg-1"
+            ],
+            "style": "follow"
+        },
+        {
+            "type": "place_card",
+            "duration_ms": 8000,
+            "place": "wd-Q1",
+            "title": "Mirador Café \"La Ñata\" & <amigos> · 'noche' 🙂 </script><script>alert(1)</script>",
+            "text": "Altitud: 25 m",
+            "source": "Wikidata (CC0)",
+            "url": "https://www.wikidata.org/wiki/Q1"
+        },
+        {
+            "type": "photo",
+            "duration_ms": 5000,
+            "media": "m-1",
+            "kenburns": {
+                "from": [
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "to": [
+                    0.05,
+                    0.05,
+                    1.15
+                ]
+            },
+            "caption": "Café \"La Ñata\" & <amigos> · 'noche' 🙂 </script><script>alert(1)</script>"
+        },
+        {
+            "type": "video_clip",
+            "media": "m-2",
+            "trim_start_ms": 1000,
+            "trim_end_ms": 7000,
+            "keep_audio": true
+        },
+        {
+            "type": "photo",
+            "duration_ms": 5000,
+            "media": "m-3",
+            "kenburns": {
+                "from": [
+                    0.05,
+                    0.05,
+                    1.15
+                ],
+                "to": [
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "type": "voice_overlay",
+            "duration_ms": 7500,
+            "voice": "v-1",
+            "segment": "seg-1",
+            "text": "Llegamos al mirador, el viento es tremendo"
+        },
+        {
+            "type": "stats",
+            "duration_ms": 4000,
+            "segment": "seg-1",
+            "distance_m": 3500.0,
+            "moving_time_ms": 3000000,
+            "elevation_gain_m": 40.0,
+            "photos": 2
+        },
+        {
+            "type": "chapter",
+            "duration_ms": 2500,
+            "title": "Etapa",
+            "date": "2025-10-10",
+            "segment": "seg-2"
+        },
+        {
+            "type": "map_route",
+            "duration_ms": 12000,
+            "segments": [
+                "seg-2"
+            ],
+            "style": "follow"
+        },
+        {
+            "type": "stats",
+            "duration_ms": 4000,
+            "segment": "seg-2",
+            "distance_m": 51000.0,
+            "moving_time_ms": 6000000,
+            "photos": 0
+        },
+        {
+            "type": "credits",
+            "duration_ms": 6000,
+            "lines": [
+                "Datos del mapa © colaboradores de OpenStreetMap (ODbL)",
+                "Datos: Wikidata (CC0)",
+                "Hecho con Bitácora de Viaje"
+            ]
+        }
+    ],
+    "total_duration_ms": 91500
+}

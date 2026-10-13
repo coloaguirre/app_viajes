@@ -1,6 +1,9 @@
 package com.bitacoraviaje.core.export
 
+import com.bitacoraviaje.core.model.Enrichment
 import com.bitacoraviaje.core.model.MediaItem
+import com.bitacoraviaje.core.model.Place
+import com.bitacoraviaje.core.model.SegmentPlace
 import com.bitacoraviaje.core.model.Segment
 import com.bitacoraviaje.core.model.SegmentPause
 import com.bitacoraviaje.core.model.Stop
@@ -38,9 +41,20 @@ data class TripExport(
     val mediaFiles: Map<String, String> = emptyMap(),
     /** voice note id → path inside the ZIP (`audio/2026-10-02/nota_101732.m4a`); absent = not included. */
     val audioFiles: Map<String, String> = emptyMap(),
-    val attributions: List<Attribution> = DEFAULT_ATTRIBUTIONS,
+    /** Places visited (DISENO §11), their texts and which segment saw them. */
+    val places: List<Place> = emptyList(),
+    val enrichments: List<Enrichment> = emptyList(),
+    val segmentPlaces: List<SegmentPlace> = emptyList(),
+    /** Credits required by the sources used (OSM always; Wikipedia and Wikidata when a text came from them). */
+    val attributions: List<Attribution> = attributionsFor(enrichments),
     val includeFilteredPoints: Boolean = false,
 ) {
+    /** Places of one segment, best ranked first. */
+    fun placesOf(segmentId: String): List<Pair<Place, SegmentPlace>> = segmentPlaces.filter { it.segmentId == segmentId }
+        .sortedByDescending { it.relevance ?: 0.0 }.mapNotNull { sp -> places.firstOrNull { it.id == sp.placeId }?.let { it to sp } }
+
+    fun enrichmentsOf(placeId: String): List<Enrichment> = enrichments.filter { it.placeId == placeId }
+
     val allMedia: List<MediaItem> get() = segments.flatMap { it.media }
     val allVoiceNotes: List<VoiceNote> get() = segments.flatMap { it.voiceNotes }
     val allTextNotes: List<TextNote> get() = segments.flatMap { it.textNotes }
@@ -53,6 +67,15 @@ data class TripExport(
         val DEFAULT_ATTRIBUTIONS = listOf(
             Attribution("Datos del mapa © colaboradores de OpenStreetMap", "ODbL", "https://www.openstreetmap.org/copyright"),
         )
+
+        /** DISENO §11.5: every Wikipedia article used is cited with its URL (CC BY-SA 4.0); Wikidata once (CC0). */
+        fun attributionsFor(enrichments: List<Enrichment>): List<Attribution> = buildList {
+            addAll(DEFAULT_ATTRIBUTIONS)
+            enrichments.filter { it.sourceName == Enrichment.SOURCE_WIKIPEDIA }.distinctBy { it.sourceUrl }.forEach {
+                add(Attribution("Texto: Wikipedia — ${it.title ?: it.sourceUrl}", it.license ?: Enrichment.LICENSE_CC_BY_SA, it.sourceUrl))
+            }
+            if (enrichments.any { it.sourceName == Enrichment.SOURCE_WIKIDATA }) add(Attribution("Datos: Wikidata", Enrichment.LICENSE_CC0, "https://www.wikidata.org"))
+        }
     }
 }
 

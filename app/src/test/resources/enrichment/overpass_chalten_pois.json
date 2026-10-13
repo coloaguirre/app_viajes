@@ -1,0 +1,46 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-13T05:33:45Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 11069292796,
+  "lat": -49.3258825,
+  "lon": -72.8779563,
+  "tags": {
+    "ele": "642",
+    "name": "Cerro Paredón",
+    "natural": "peak"
+  }
+},
+{
+  "type": "node",
+  "id": 11611644905,
+  "lat": -49.3330456,
+  "lon": -72.8844981,
+  "tags": {
+    "historic": "wayside_shrine",
+    "name": "Virgen",
+    "panoramax": "aaea4703-cde2-48c5-b67d-d68d1ea576a8",
+    "religion": "christian"
+  }
+},
+{
+  "type": "node",
+  "id": 13593967755,
+  "lat": -49.3323283,
+  "lon": -72.8855271,
+  "tags": {
+    "historic": "memorial",
+    "memorial": "sculpture",
+    "panoramax": "02c9b699-42b3-49cc-988d-61b737b2deb6"
+  }
+}
+
+  ]
+}

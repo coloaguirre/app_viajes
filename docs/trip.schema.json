@@ -198,12 +198,29 @@
     "place": {
       "type": "object",
       "required": ["id", "name", "lat", "lon"],
-      "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "lat": { "$ref": "#/$defs/lat" }, "lon": { "$ref": "#/$defs/lon" } }
+      "properties": {
+        "id": { "type": "string" }, "name": { "type": "string" }, "lat": { "$ref": "#/$defs/lat" }, "lon": { "$ref": "#/$defs/lon" },
+        "kind": { "$ref": "#/$defs/nullableString" }, "country_code": { "$ref": "#/$defs/nullableString" }, "admin1": { "$ref": "#/$defs/nullableString" }, "admin2": { "$ref": "#/$defs/nullableString" }, "locality": { "$ref": "#/$defs/nullableString" },
+        "osm_type": { "$ref": "#/$defs/nullableString" }, "osm_id": { "type": ["integer", "null"] }, "wikidata_id": { "$ref": "#/$defs/nullableString" }, "wikipedia_title": { "$ref": "#/$defs/nullableString" }, "wikipedia_lang": { "$ref": "#/$defs/nullableString" },
+        "source": { "type": ["string", "null"], "enum": ["NOMINATIM", "ANDROID_GEOCODER", "WIKIPEDIA", "OVERPASS", "MANUAL", null] },
+        "visits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["segment_id", "first_seen_utc_ms"],
+            "properties": { "segment_id": { "type": "string" }, "first_seen": { "$ref": "#/$defs/localTime" }, "first_seen_utc_ms": { "type": "integer" }, "dwell_ms": { "type": ["integer", "null"] }, "relevance": { "type": ["number", "null"] } }
+          }
+        }
+      }
     },
     "enrichment": {
       "type": "object",
       "required": ["place_id", "source", "license", "text"],
-      "properties": { "place_id": { "type": "string" }, "source": { "type": "string" }, "license": { "type": "string" }, "text": { "type": "string" } }
+      "properties": {
+        "place_id": { "type": "string" }, "source": { "type": "string" }, "license": { "type": "string" }, "text": { "type": "string" },
+        "id": { "$ref": "#/$defs/nullableString" }, "lang": { "$ref": "#/$defs/nullableString" }, "title": { "$ref": "#/$defs/nullableString" }, "url": { "$ref": "#/$defs/nullableString" }, "thumbnail_url": { "$ref": "#/$defs/nullableString" }, "original_text": { "$ref": "#/$defs/nullableString" },
+        "llm_rewritten": { "type": "boolean" }, "user_approved": { "type": "boolean" }
+      }
     },
     "attribution": {
       "type": "object",

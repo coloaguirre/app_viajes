@@ -106,4 +106,19 @@ class TimelineTest {
         val tl = buildTimeline(TimelineInput(seg(), pts, nowUtcMs = pts.last().timeUtcMs + 10_000))
         assertTrue(tl.none { it is TimelineEvent.SegmentEnd })
     }
+
+    @Test
+    fun `places visited appear at first sight clamped to the segment and after a stop arrival`() {
+        val pts = walk(200)
+        val stop = Stop("st", "s", t0 + 100_000, t0 + 400_000, pts[20].lat, -58.4, 30.0)
+        val place = com.bitacoraviaje.core.model.Place("wd-Q1", "Pueblo", pts[20].lat, -58.4, kind = "town", source = com.bitacoraviaje.core.model.PlaceSource.WIKIPEDIA)
+        val visit = com.bitacoraviaje.core.model.SegmentPlace("s", "wd-Q1", t0 + 100_000, 300_000, 2.0)
+        val early = place.copy(id = "wd-Q2", name = "Antes") to com.bitacoraviaje.core.model.SegmentPlace("s", "wd-Q2", t0 - 999_999, null, 1.0)
+        val ev = buildTimeline(TimelineInput(seg(end = t0 + 1_000_000), pts, stops = listOf(stop), places = listOf(place to visit, early)))
+        val visited = ev.filterIsInstance<TimelineEvent.PlaceVisited>()
+        assertEquals(listOf("Antes", "Pueblo"), visited.map { it.place.name })
+        assertEquals(t0, visited[0].timeUtcMs, "a visit before the segment start is clamped to it")
+        assertTrue(ev.indexOfFirst { it is TimelineEvent.StopArrived } < ev.indexOf(visited[1]), "the place row follows the arrival at the stop")
+        assertEquals(pts[20].lat, visited[1].lat)
+    }
 }

@@ -65,7 +65,7 @@ class ExportLoaderTest {
         now = t0 + 200_000
         tracking.finishSegment(s.id)
 
-        val loader = ExportLoader(tracking, media, notes)
+        val loader = ExportLoader(tracking, media, notes, com.bitacoraviaje.data.repository.PlacesRepository(db))
         val export = assertNotNull(loader.load(s.tripId, ExportOptions(), nowUtcMs = now))
         assertEquals(1, export.segments.size)
         val se = export.segments.single()

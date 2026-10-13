@@ -207,6 +207,9 @@ class ImportWorker @AssistedInject constructor(
             mediaToInsert = t.allMedia,
             voiceNotesToInsert = t.allVoiceNotes,
             textNotesToInsert = t.allTextNotes,
+            placesToInsert = t.places,
+            enrichmentsToInsert = t.enrichments,
+            segmentPlacesToInsert = t.segmentPlaces,
         )
     }
 

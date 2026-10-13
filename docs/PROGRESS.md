@@ -3,7 +3,7 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **2 mergeada en `dev` (PR #5, 2026-10-13) con 2.8 abierto; Fase 3 iniciada en `feat/fase-3-exportacion`.** Los ítems de campo 1.7 y 2.8 siguen abiertos y cierran sus fases formalmente (1.7 parcial: salida de 46 min en auto, Full).
+- Fase: **3 mergeada en `dev` (PR #7, 2026-10-13) con 3.7 (usuario) y la medición de 3.4 abiertos; Fase 4 iniciada en `feat/fase-4-enriquecimiento`.** Siguen abiertos los ítems de campo 1.7, 2.8 y 3.7, que cierran sus fases formalmente.
 - Última actualización: 2026-10-13
 
 ## Fases
@@ -13,7 +13,7 @@
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | 🟨 3.1–3.3, 3.5 y 3.6 cerrados; 3.4 hecho salvo la medición con ≥10 notas; 3.7 (usuario) pendiente | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` · 3.5: `3.5-respaldo.md` · 3.6: `3.6-nombre-de-ruta.md` (+captura) |
-| 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
+| 4 — Enriquecimiento y video de escritorio | 🟨 4.1–4.5 cerrados; 4.6 pendiente | 4.1: `docs/notes/evidencia/fase-4/4.1-lugares.md` (+captura) · 4.2: `4.2-pantalla-lugares.md` (+captura) · 4.3: `4.3-reescritura-ia.md` · 4.4: `4.4-videoplan.md` · 4.5: `4.5-desktop-renderer.md` (+2 cuadros) · 4.2 captura `4.2-pestana-lugares.png` |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
 | 6 — Pulido y publicación | ⬜ Pendiente | |
 
@@ -62,6 +62,17 @@
 | 2026-10-13 | Revisión de código Fase 3 (PR #7) aplicada antes del merge: ids de archivos externos validados antes de volverse rutas; importación atómica (medios y notas en la misma transacción) y cola que no cancela una importación en curso; escritura SAF con truncado y limpieza de la fila pendiente de Descargas; parser GPX endurecido (sin DOCTYPE ni entidades); respaldo encadenado después de vincular fotos, comprimido (`.json.gz`) y restaurable desde Ajustes; extremos del recorrido (200 m) nunca se envían a OSM; staging en `noBackupFilesDir` con chequeo de espacio | PR #7 |
 | 2026-10-13 | Diferidos de la revisión del PR #7 con registro: avisos de importación como textos en `core` (pasarlos a códigos + `strings.xml` en Fase 6); documentos del staging no se invalidan si la base cambia entre reintentos; redondeo a ~1 km / zonas de privacidad para OSM (Fase 6, DISENO §15); `libwhisper.so` genérico de arm64 lleva ggml con fp16 (como el ejemplo upstream; afecta solo CPUs sin `fphp`, anteriores a 2017); el respaldo no se refresca tras editar textos (solo al cerrar etapa/viaje); medios se copian al staging antes del ZIP (duplica espacio; el chequeo previo lo cubre) | Revisión PR #7 (M3, M8, M15, M17, I3 parcial) |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
+| 2026-10-13 | Esquema v7: `place`, `enrichment`, `segment_place` (DISENO §5.2) con ids determinísticos (`wd-Q…`, `osm-N…`) y `@Upsert` (un `REPLACE` sobre `place` borraría en cascada textos y vínculos); un `enrichment` por fuente (Wikipedia CC BY-SA 4.0, Wikidata CC0); re-enriquecer conserva `user_approved` | PLAN 4.1; DISENO §11 |
+| 2026-10-13 | Wikipedia detrás de `WikipediaSource`: resumen por REST v1 con caída automática a la Action API (`prop=extracts`) por la migración anunciada de los endpoints REST de Wikimedia; GeoSearch por Action API; inglés como idioma de respaldo marcado en `lang` | PLAN 4.1; DISENO §11.2 |
+| 2026-10-13 | Ranking de lugares (`PlaceRanking`, puro): radios 5 km / 10 km / 300 m por clase, pesos 2·permanencia + 1,5·fotos + 1·notas + 0,5·ln(1+sitelinks) − 1·distancia, 5 por etapa. Qué sale del teléfono: paradas y 10 muestras a 4 decimales sin los 200 m de los extremos; opción de 2 decimales (~1 km) en Ajustes; tope de 45 llamadas por etapa | DISENO §11.3, §15 |
+| 2026-10-13 | `trip.json` suma `places[].visits[]` y campos opcionales de `enrichments[]` sin subir `schema_version` (solo agrega opcionales); `attributions[]` cita cada artículo usado; URLs de servicios aceptan `http` solo hacia loopback (instancia local de prueba) | DISENO §12.2, §11.5 |
+| 2026-10-13 | Pestaña Lugares: tarjetas por etapa con fuente y licencia; aprobar / editar / descartar / buscar de nuevo; evento `PlaceVisited` en la línea de tiempo; descartar solo desvincula (la caché queda) | PLAN 4.2; DISENO §9, §11.4, §14 |
+| 2026-10-13 | Reescritura con IA: clave del usuario en archivo cifrado AES-GCM con el Android Keystore (`files/secrets/`, fuera de respaldos; `security-crypto` está deprecada), modelo configurable (`claude-sonnet-5` por defecto), solo texto de Wikipedia + datos de Wikidata al modelo, validación numérica antes de aceptar; esquema v8 guarda el texto original bajo cualquier edición o reescritura | PLAN 4.3; DISENO §11.4, §15 |
+| 2026-10-13 | Al volver a enriquecer, un texto aprobado, editado o reescrito no se reemplaza: el nuevo texto de la fuente queda como "original" restaurable | Revisión propia del flujo de refresco |
+| 2026-10-13 | `VideoPlan` en módulo propio `core/videoplan` (no en `core/timeline`): contrato + planificador determinista; `docs/video-plan.schema.json`; conformidad Kotlin↔Python por fixtures en `tools/plan-fixtures/`; solo lugares `user_approved` entran al video; mapa general solo con más de una etapa; con poco contenido el video sale más corto en vez de repetir fotos | PLAN 4.4; DISENO §13.3; skill trip-video |
+| 2026-10-13 | Renderizador de escritorio: planificador portado a Python con conformidad por fixtures; teselas solo de proveedor con clave (`--tiles`), sin clave fondo liso; fuente DejaVu incluida (licencia Bitstream Vera); mapa por tubería a ffmpeg; SSIM global sobre miniaturas como regresión visual; `--dem` con OpenTopoData opcional | PLAN 4.5; skill trip-video |
+| 2026-10-13 | Revisión del PR #8 (1 bloqueante, 5 importantes, 16 menores, 7 nits) aplicada antes del merge: B1 `asplit` en la mezcla con atenuación (+ test con música); I1 desempate "gana la foto más tardía" igual en Kotlin y Python (+ tests espejo); I2 el enricher lanza si ninguna fuente respondió y el worker reintenta forzando tras un resultado parcial; I3 caché del DEM por SHA-1 + User-Agent; I4 refresco forzado por etapa, el global solo completa etapas sin lugares; I5 esquema v9 `segment_place.dismissed` (descartar es definitivo ante un refresco); M1 números exactos; M2 trabajos filtrados por etiqueta de etapa; M3 `shareIn`; M4 escape de rutas en filtros; M5 stderr de ffmpeg a archivo; M6 teselas fallidas avisan y abortan si ninguna llegó; M7 pHash a 64 bits; M8 título igual en ambos planificadores; M9 Keystore fuera del hilo principal; M10 test de reglas de respaldo para `secrets/`; M11 `.kotlin/` ignorado; M12 video sintético con la duración de la fixture; M13 crédito del proveedor de teselas en el render; M14 `keep_audio` sin expresión engañosa; M15 `stop.place_id` en la misma transacción; M16 poda de huérfanos al reemplazar un viaje; N1/N2/N7 limpieza | Informe persistido en la descripción del PR #8 |
+| 2026-10-13 | Diferidos de la revisión del PR #8: N3 (una sola copia de `trip.json` para las fixtures de plan), N4 (filtrar esquema de URL en el HTML exportado), N5 (verificar el id de modelo por defecto contra la lista de la API antes de publicar), N6 (contacto real en el User-Agent si el repo deja de ser público), test unitario de `KeystoreSecretStore` (el Keystore no existe en Robolectric: requiere cifrado inyectable) | Pendientes para un `fix/` posterior |
 
 ## Versiones fijadas
 | Componente | Versión | Verificada el |
@@ -84,6 +95,7 @@
 | CMake (SDK) | 4.1.2 | 2026-10-13 |
 | Modelos whisper (ggml, Hugging Face) | base 60ed5bc3…, small 1be3a9b2…, VAD silero v5.1.2 29940d98… (SHA-256 completos en `ModelCatalog`) | 2026-10-13 |
 | json-schema-validator (optimumcode, solo tests) | 0.5.5 | 2026-10-13 |
+| desktop-renderer (uv): pydantic / typer / Pillow / numpy / requests / pillow-heif; dev pytest / ruff / jsonschema | 2.14.1 / 0.27.3 / 12.3.0 / 2.4.6 / 2.34.2 / 1.8.1; ruff 0.17.0 (ver `uv.lock`) | 2026-10-13 |
 | androidx.test core-ktx / runner | 1.7.0 / 1.7.0 | 2026-10-12 |
 | Navigation Compose / Activity Compose / Lifecycle | 2.10.2 / 1.13.0 / 2.11.0 | 2026-10-11 |
 | WorkManager / DataStore / core-ktx | 2.12.0 / 1.2.1 / 1.19.1 | 2026-10-11 |
@@ -118,6 +130,14 @@ Observaciones de la verificación (ítem 0.1):
   pausa manual + excursión anidada; fuente única de altitud (MSL vs
   elipsoidal) por etapa; `ForegroundServiceStartNotAllowedException` a
   vigilar en el Pixel durante 1.7.
+- Room: `@Insert(onConflict = REPLACE)` sobre una tabla padre (por ejemplo `place`)
+  borra la fila vieja y dispara `ON DELETE CASCADE` en los hijos; para refrescar
+  filas compartidas usar `@Upsert`. Detectado en 4.1 (PlacesRepositoryTest).
+- Tests Robolectric: el delegado `preferencesDataStore` es un singleton del proceso,
+  así que los ajustes escritos por un caso se filtran al siguiente; cada test que los
+  use debe reponer sus valores en `setUp` (PlaceEnricherTest).
+- Emulador: FusedLocation entrega pocos fixes aun con `geo fix` cada 3 s (una excursión
+  en bici de 13 min dio 17 puntos); alcanza para enriquecer, no para medir filtros.
 - `adb shell am kill` no mata un proceso con servicio en primer plano; para
   simular una muerte por memoria usar `kill -9 <pid>` (con `adb root`).
 - Tras `adb reboot`, `persist.sys.timezone` del emulador vuelve a UTC; fijarla

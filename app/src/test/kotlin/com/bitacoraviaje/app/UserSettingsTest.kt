@@ -1,5 +1,6 @@
 package com.bitacoraviaje.app
 
+import com.bitacoraviaje.app.settings.DEFAULT_NOMINATIM_URL
 import com.bitacoraviaje.app.settings.DEFAULT_TRANSCRIPTION_LANGUAGE
 import com.bitacoraviaje.app.settings.UserSettings
 import com.bitacoraviaje.core.model.RecordingMode
@@ -48,5 +49,18 @@ class UserSettingsTest {
         val ok = UserSettings.from(null, null, null, transcriptionModel = "small", transcriptionEngine = "whisper")
         assertEquals("small", ok.transcriptionModel)
         assertEquals("whisper", ok.transcriptionEngine)
+    }
+
+    @Test
+    fun `service urls must be https unless they point at a loopback host and enrichment flags default on and off`() {
+        val invalid = mutableListOf<Pair<String, String>>()
+        val s = UserSettings.from(null, null, null, nominatimUrl = "http://nominatim.example.org", overpassUrl = "http://127.0.0.1:8080/api/interpreter") { k, v -> invalid += k to v }
+        assertEquals(DEFAULT_NOMINATIM_URL, s.nominatimUrl)
+        assertEquals("http://127.0.0.1:8080/api/interpreter", s.overpassUrl, "a local instance through loopback is allowed")
+        assertEquals(listOf("nominatim_url" to "http://nominatim.example.org"), invalid)
+        assertTrue(s.enrichPlaces)
+        assertTrue(!s.roundEnrichmentCoords)
+        val off = UserSettings.from(null, null, null, enrichPlaces = false, roundEnrichmentCoords = true)
+        assertTrue(!off.enrichPlaces && off.roundEnrichmentCoords)
     }
 }

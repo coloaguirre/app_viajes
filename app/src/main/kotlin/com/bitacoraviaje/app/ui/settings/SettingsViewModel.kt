@@ -24,7 +24,15 @@ data class ModelState(val model: WhisperModel, val installed: Boolean, val downl
 class SettingsViewModel @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val prefs: UserPreferences,
+    private val secrets: com.bitacoraviaje.app.settings.Secrets,
 ) : ViewModel() {
+    val hasLlmKey: StateFlow<Boolean> = secrets.has(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY)
+
+    /** Keystore + file I/O off the main thread (review M9). */
+    fun setLlmKey(key: String?) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { secrets.set(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY, key) }
+
+    fun setLlmModel(model: String) = viewModelScope.launch { prefs.setLlmModel(model) }
+
     val settings: StateFlow<UserSettings> =
         prefs.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSettings())
 
@@ -74,6 +82,10 @@ class SettingsViewModel @Inject constructor(
     fun refreshBackups() { refresh.value++ }
 
     fun setOverpassUrl(url: String) = viewModelScope.launch { prefs.setOverpassUrl(url) }
+
+    fun setEnrichPlaces(value: Boolean) = viewModelScope.launch { prefs.setEnrichPlaces(value) }
+
+    fun setRoundEnrichmentCoords(value: Boolean) = viewModelScope.launch { prefs.setRoundEnrichmentCoords(value) }
 
     fun setUnits(units: Units) = viewModelScope.launch { prefs.setUnits(units) }
 

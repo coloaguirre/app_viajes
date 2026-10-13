@@ -334,29 +334,39 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: captura de My Maps y del HTML en `docs/notes/evidencia/fase-3/`.
 
 ### Fase 4 — Enriquecimiento, video de escritorio y minivideo  (est: 13 días)
-- [ ] 4.1 Clientes Nominatim, Wikipedia (detrás de abstracción por la
+- [x] 4.1 Clientes Nominatim, Wikipedia (detrás de abstracción por la
       transición de su API), Wikidata y Overpass; caché; ranking;
       `EnrichWorker`; redondeo opcional de coordenadas.  (est: 2.5)
       Aceptación: tests con respuestas grabadas; etapa de ejemplo
       produce ≤ 5 lugares rankeados con atribución.
-- [ ] 4.2 Pantalla de lugares con aprobación/descarte y atribuciones.  (est: 1)
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.1-lugares.md`.
+- [x] 4.2 Pantalla de lugares con aprobación/descarte y atribuciones.  (est: 1)
       Aceptación: prueba de Compose; capturas.
-- [ ] 4.3 Reescritura opcional con modelo de lenguaje (clave del usuario
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.2-pantalla-lugares.md`.
+- [x] 4.3 Reescritura opcional con modelo de lenguaje (clave del usuario
       en DataStore cifrado, restringida al texto fuente, desactivada por
       default).  (est: 0.5)
       Aceptación: sin clave, la función no aparece; con clave, el texto
       conserva URL y licencia de origen (test con cliente simulado).
-- [ ] 4.4 `core/videoplan`: planificador puro con preset "rápido 1 min"
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.3-reescritura-ia.md`
+      (la clave vive en un archivo cifrado con el Keystore, no en DataStore:
+      las reglas de respaldo no lo incluyen).
+- [x] 4.4 `core/videoplan`: planificador puro con preset "rápido 1 min"
       y duraciones 1/3/5/10 min, selección por favorita > destacada >
       nitidez, sin duplicados.  (est: 1.5)
       Aceptación: tests; el plan de 1 min para el viaje de ejemplo entra
       en ±5 %.
-- [ ] 4.5 `desktop-renderer` (uv): CLI `plan` y `render`, mapa animado
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.4-videoplan.md`
+      (pHash y nitidez llegan nulos hasta que la Fase 5 los calcule).
+- [x] 4.5 `desktop-renderer` (uv): CLI `plan` y `render`, mapa animado
       con teselas de MapTiler, Ken Burns, clips, tarjetas, subtítulos de
       voz, música con atenuación, créditos, HEIC, corrección de altitud
       con modelo de elevación.  (est: 5)
       Aceptación: `uv run pytest` verde; MP4 de duración ±5 %, 1080p, con
       audio según ffprobe; cuadros clave comparados por SSIM.
+      Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.5-desktop-renderer.md`
+      (59,0 s / 60 s objetivo, 1920×1080, h264+aac; teselas de MapTiler
+      opcionales por `--tiles`, pendiente de probar con la clave del usuario).
 - [ ] 4.6 Minivideo de 1 min en el teléfono: motor Media3 mínimo
       (título, fotos con Ken Burns, mapa estático por etapa, subtítulos,
       música, créditos) desde la pantalla de fin de etapa.  (est: 2.5)

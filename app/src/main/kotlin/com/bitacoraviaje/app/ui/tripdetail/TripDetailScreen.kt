@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -81,6 +83,7 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
         onEvent = { e -> if (e is TimelineEvent.Voice) onVoiceNote(e.note.id) else viewModel.focusOn(e) },
         onReview = { onReview(viewModel.tripId) },
         onExport = { showExport = true },
+        onPlaceAction = viewModel::onPlaceAction,
         map = { s, m -> mapRenderer.TrackMap(s, m) },
     )
     if (showExport) {
@@ -120,9 +123,10 @@ fun TripDetailScreen(
     onEvent: (TimelineEvent) -> Unit,
     onReview: () -> Unit,
     onExport: () -> Unit = {},
+    onPlaceAction: (PlaceAction) -> Unit = {},
     map: @Composable (TrackMapState, Modifier) -> Unit = { _, m -> Box(m) },
 ) {
-    val titles = listOf(R.string.tab_timeline, R.string.tab_map, R.string.tab_photos)
+    val titles = listOf(R.string.tab_timeline, R.string.tab_map, R.string.tab_photos, R.string.tab_places)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -141,7 +145,8 @@ fun TripDetailScreen(
             when (state.selectedTab) {
                 0 -> TimelineTab(state, onEvent)
                 1 -> map(state.map, Modifier.fillMaxSize().testTag("trip_map"))
-                else -> PhotosTab(state, onReview)
+                2 -> PhotosTab(state, onReview)
+                else -> PlacesTab(state, onPlaceAction)
             }
         }
     }
@@ -197,6 +202,7 @@ private fun EventRow(e: TimelineEvent, zone: ZoneId, selected: Boolean, onClick:
         is TimelineEvent.Highlight -> "⭐" to stringResource(R.string.ev_highlight)
         is TimelineEvent.TransportChange -> "🔀" to stringResource(R.string.ev_transport_change, e.transport?.let { stringResource(transportLabelRes(it)) } ?: (e.note.text ?: ""))
         is TimelineEvent.DayChange -> "📅" to DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", APP_LOCALE).format(e.localDate)
+        is TimelineEvent.PlaceVisited -> "🏛" to stringResource(R.string.ev_place, e.place.name)
         is TimelineEvent.Summary -> "↝" to stringResource(R.string.ev_summary, TrackingNotificationFactory.formatKm(e.distanceM), TrackingNotificationFactory.formatElapsed(e.durationMs))
     }
     ListItem(
@@ -237,6 +243,137 @@ private fun PhotoCell(m: MediaItem) {
         AsyncImage(model = m.contentUri, contentDescription = m.displayName, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         if (m.needsReview || m.linkMethod == com.bitacoraviaje.core.model.LinkMethod.NONE) {
             Badge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) { Text("?") }
+        }
+    }
+}
+
+/** DISENO §14 "Lugares": cards with the text, its source and license; approve for the video, discard, edit (DISENO §11.4). */
+@Composable
+private fun PlacesTab(state: TripDetailUiState, onAction: (PlaceAction) -> Unit) {
+    var editing by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var editText by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                state.placesMessage ?: when (state.placesWork) {
+                    PlacesWork.RUNNING -> stringResource(R.string.places_searching)
+                    PlacesWork.WAITING_NETWORK -> stringResource(R.string.places_waiting_network)
+                    PlacesWork.IDLE -> if (state.placesEnabled) "" else stringResource(R.string.places_disabled)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f).testTag("places_status"),
+            )
+            androidx.compose.material3.OutlinedButton(onClick = { onAction(PlaceAction.Refresh()) }, enabled = state.placesEnabled && state.placesWork == PlacesWork.IDLE, modifier = Modifier.testTag("places_refresh")) {
+                Text(stringResource(R.string.places_refresh))
+            }
+        }
+        if (state.places.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) { Text(stringResource(R.string.places_empty), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("places_empty")) }
+            return@Column
+        }
+        LazyColumn(Modifier.fillMaxSize().testTag("places_list"), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            state.places.groupBy { it.segment.id }.forEach { (_, cards) ->
+                item(key = "seg-${cards.first().segment.id}") {
+                    val seg = cards.first().segment
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(seg.displayName ?: DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(Instant.ofEpochMilli(seg.startedUtcMs).atZone(ZoneId.of(seg.tzId))), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp).weight(1f))
+                        // Forced refresh is per segment: up to ~45 requests to public instances each (review I4).
+                        androidx.compose.material3.TextButton(onClick = { onAction(PlaceAction.Refresh(seg.id)) }, enabled = state.placesEnabled && state.placesWork == PlacesWork.IDLE, modifier = Modifier.testTag("places_refresh_${seg.id}")) { Text(stringResource(R.string.places_refresh_segment)) }
+                    }
+                }
+                items(cards, key = { "${it.segment.id}-${it.place.id}" }) { card ->
+                    PlaceCardView(
+                        card = card,
+                        llmAvailable = state.llmAvailable,
+                        rewriting = state.rewriting,
+                        onApprove = { e, v -> onAction(PlaceAction.Approve(e.id, v)) },
+                        onDiscard = { onAction(PlaceAction.Discard(card.segment.id, card.place.id)) },
+                        onEdit = { e -> editing = e.id; editText = e.summary },
+                        onRewrite = { e -> onAction(PlaceAction.Rewrite(e.id)) },
+                        onRestore = { e -> onAction(PlaceAction.Restore(e.id)) },
+                        onOpen = { url -> runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, url.toUri())) } },
+                    )
+                }
+            }
+        }
+    }
+    editing?.let { id ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text(stringResource(R.string.places_edit_title)) },
+            text = {
+                Column {
+                    androidx.compose.material3.OutlinedTextField(value = editText, onValueChange = { editText = it }, modifier = Modifier.fillMaxWidth().testTag("place_edit_text"), minLines = 3)
+                    Text(stringResource(R.string.places_edit_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                }
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { onAction(PlaceAction.Edit(id, editText)); editing = null }, enabled = editText.isNotBlank(), modifier = Modifier.testTag("place_edit_save")) { Text(stringResource(R.string.places_save)) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { editing = null }) { Text(stringResource(R.string.places_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun PlaceCardView(
+    card: PlaceCard,
+    llmAvailable: Boolean,
+    rewriting: Set<String>,
+    onApprove: (com.bitacoraviaje.core.model.Enrichment, Boolean) -> Unit,
+    onDiscard: () -> Unit,
+    onEdit: (com.bitacoraviaje.core.model.Enrichment) -> Unit,
+    onRewrite: (com.bitacoraviaje.core.model.Enrichment) -> Unit,
+    onRestore: (com.bitacoraviaje.core.model.Enrichment) -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    val p = card.place
+    val wiki = card.texts.firstOrNull { it.sourceName == com.bitacoraviaje.core.model.Enrichment.SOURCE_WIKIPEDIA }
+    androidx.compose.material3.Card(Modifier.fillMaxWidth().testTag("place_${p.id}")) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                wiki?.thumbnailUrl?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(72.dp).clip(MaterialTheme.shapes.small)) }
+                Column(Modifier.weight(1f)) {
+                    Text(p.name, style = MaterialTheme.typography.titleMedium)
+                    val sub = listOfNotNull(p.kind, p.locality?.takeIf { it != p.name }, p.admin1, card.visit.dwellMs?.takeIf { it > 0 }?.let { stringResource(R.string.places_dwell, TrackingNotificationFactory.formatElapsed(it)) }).joinToString(" · ")
+                    if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (card.texts.isEmpty()) Text(stringResource(R.string.places_no_text), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            card.texts.forEach { e ->
+                Column(Modifier.padding(top = 4.dp)) {
+                    Text(e.summary, style = MaterialTheme.typography.bodyMedium)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            stringResource(R.string.places_source_line, e.sourceName, e.license ?: "") + if (e.llmRewritten) " · " + stringResource(R.string.places_rewritten) else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f).then(if (e.sourceUrl.isNotBlank()) Modifier.clickable { onOpen(e.sourceUrl) } else Modifier),
+                        )
+                        androidx.compose.material3.TextButton(onClick = { onEdit(e) }, modifier = Modifier.testTag("place_edit_${e.id}")) { Text(stringResource(R.string.places_edit)) }
+                    }
+                    // PLAN 4.3: the rewrite exists only with a configured key, and only for Wikipedia texts (facts are literal).
+                    if (e.sourceName == com.bitacoraviaje.core.model.Enrichment.SOURCE_WIKIPEDIA && (llmAvailable || e.originalSummary != null)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (llmAvailable) {
+                                androidx.compose.material3.TextButton(onClick = { onRewrite(e) }, enabled = e.id !in rewriting, modifier = Modifier.testTag("place_rewrite_${e.id}")) {
+                                    Text(stringResource(if (e.id in rewriting) R.string.places_rewriting else R.string.places_rewrite))
+                                }
+                            }
+                            if (e.originalSummary != null) {
+                                androidx.compose.material3.TextButton(onClick = { onRestore(e) }, modifier = Modifier.testTag("place_restore_${e.id}")) { Text(stringResource(R.string.places_restore)) }
+                            }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Switch(checked = e.userApproved, onCheckedChange = { onApprove(e, it) }, modifier = Modifier.testTag("place_approve_${e.id}"))
+                        Text(stringResource(if (e.userApproved) R.string.places_used_in_video else R.string.places_use_in_video), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                androidx.compose.material3.TextButton(onClick = onDiscard, modifier = Modifier.testTag("place_discard_${p.id}")) { Text(stringResource(R.string.places_discard)) }
+            }
         }
     }
 }

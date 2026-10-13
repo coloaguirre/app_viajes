@@ -156,6 +156,8 @@ object LeemeWriter {
             r.audioMissing.forEach { appendLine("- $it") }
         }
         appendLine()
+        if (trip.places.isNotEmpty()) appendLine("Lugares con información de internet: ${trip.places.size} (textos en tablas/lugares.csv y en la bitácora, cada uno con su fuente y licencia).")
+        appendLine()
         appendLine("ATRIBUCIONES")
         trip.attributions.forEach { appendLine("- ${it.name} (${it.license}) ${it.url}") }
     }

@@ -4,7 +4,11 @@ import com.bitacoraviaje.core.model.LinkMethod
 import com.bitacoraviaje.core.model.MediaItem
 import com.bitacoraviaje.core.model.MediaKind
 import com.bitacoraviaje.core.model.MediaSource
+import com.bitacoraviaje.core.model.Enrichment
 import com.bitacoraviaje.core.model.PauseKind
+import com.bitacoraviaje.core.model.Place
+import com.bitacoraviaje.core.model.PlaceSource
+import com.bitacoraviaje.core.model.SegmentPlace
 import com.bitacoraviaje.core.model.RecordingMode
 import com.bitacoraviaje.core.model.Segment
 import com.bitacoraviaje.core.model.SegmentPause
@@ -67,6 +71,15 @@ object Fixture {
             exportedUtcMs = T0 + 3 * 86_400_000,
             mediaFiles = mapOf("m-1" to "media/fotos/2025-10-09/IMG_0001.jpg", "m-2" to "media/videos/2025-10-09/VID_0002.mp4", "m-3" to "media/fotos/2025-10-09/IMG_0003.jpg"),
             audioFiles = mapOf("v-1" to "audio/2025-10-09/nota_061500_v-1.m4a", "v-2" to "audio/2025-10-09/nota_063320_v-2.m4a"),
+            places = listOf(
+                Place("wd-Q1", "Mirador $TRICKY", -34.59, -58.4, kind = "viewpoint", countryCode = "ar", admin1 = "Buenos Aires", locality = "Palermo", wikidataId = "Q1", wikipediaTitle = "Mirador", wikipediaLang = "es", source = PlaceSource.WIKIPEDIA, fetchedUtcMs = T0),
+                Place("osm-N5", "Cerro sin texto", -34.58, -58.41, kind = "peak", source = PlaceSource.OVERPASS, osmType = "node", osmId = 5, fetchedUtcMs = T0),
+            ),
+            enrichments = listOf(
+                Enrichment("wd-Q1-wikipedia-es", "wd-Q1", "es", "Mirador", "Un mirador $TRICKY con vista al río.", Enrichment.SOURCE_WIKIPEDIA, "https://es.wikipedia.org/wiki/Mirador", Enrichment.LICENSE_CC_BY_SA, "https://thumb.example/x.jpg", fetchedUtcMs = T0),
+                Enrichment("wd-Q1-wikidata", "wd-Q1", "es", "Mirador", "Altitud: 25 m", Enrichment.SOURCE_WIKIDATA, "https://www.wikidata.org/wiki/Q1", Enrichment.LICENSE_CC0, fetchedUtcMs = T0, userApproved = true),
+            ),
+            segmentPlaces = listOf(SegmentPlace("seg-1", "wd-Q1", T0 + 1_200_000, 300_000, 3.2), SegmentPlace("seg-1", "osm-N5", T0 + 600_000, null, 0.4)),
         )
     }
 

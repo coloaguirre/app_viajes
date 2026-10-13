@@ -219,3 +219,66 @@ data class StopEntity(
     @ColumnInfo(name = "place_id") val placeId: String?,
     @ColumnInfo(name = "user_label") val userLabel: String?,
 )
+
+// ---- Phase 4: places and enrichment (DISENO §5.2 "Lugares", §11) ----
+
+@Entity(tableName = "place")
+data class PlaceEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+    val kind: String?,
+    @ColumnInfo(name = "country_code") val countryCode: String?,
+    val admin1: String?,
+    val admin2: String?,
+    val locality: String?,
+    @ColumnInfo(name = "osm_type") val osmType: String?,
+    @ColumnInfo(name = "osm_id") val osmId: Long?,
+    @ColumnInfo(name = "wikidata_id") val wikidataId: String?,
+    @ColumnInfo(name = "wikipedia_title") val wikipediaTitle: String?,
+    @ColumnInfo(name = "wikipedia_lang") val wikipediaLang: String?,
+    val source: String,
+    @ColumnInfo(name = "fetched_utc_ms") val fetchedUtcMs: Long?,
+)
+
+@Entity(
+    tableName = "enrichment",
+    foreignKeys = [ForeignKey(entity = PlaceEntity::class, parentColumns = ["id"], childColumns = ["place_id"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["place_id"], name = "idx_enrichment_place")],
+)
+data class EnrichmentEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "place_id") val placeId: String,
+    val lang: String,
+    val title: String?,
+    val summary: String,
+    @ColumnInfo(name = "source_name") val sourceName: String,
+    @ColumnInfo(name = "source_url") val sourceUrl: String,
+    val license: String?,
+    @ColumnInfo(name = "thumbnail_url") val thumbnailUrl: String?,
+    /** The source text as fetched, kept when the user or the model rewrites [summary] (DISENO §11.4). */
+    @ColumnInfo(name = "original_summary") val originalSummary: String?,
+    @ColumnInfo(name = "llm_rewritten", defaultValue = "0") val llmRewritten: Boolean,
+    @ColumnInfo(name = "user_approved", defaultValue = "0") val userApproved: Boolean,
+    @ColumnInfo(name = "fetched_utc_ms") val fetchedUtcMs: Long,
+)
+
+@Entity(
+    tableName = "segment_place",
+    primaryKeys = ["segment_id", "place_id"],
+    foreignKeys = [
+        ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = PlaceEntity::class, parentColumns = ["id"], childColumns = ["place_id"], onDelete = ForeignKey.CASCADE),
+    ],
+    indices = [Index(value = ["place_id"], name = "idx_segment_place_place")],
+)
+data class SegmentPlaceEntity(
+    @ColumnInfo(name = "segment_id") val segmentId: String,
+    @ColumnInfo(name = "place_id") val placeId: String,
+    @ColumnInfo(name = "first_seen_utc_ms") val firstSeenUtcMs: Long,
+    @ColumnInfo(name = "dwell_ms") val dwellMs: Long?,
+    val relevance: Double?,
+    /** "Descartar": the user removed this place from the segment; a re-run must not bring it back (review I5). */
+    @ColumnInfo(defaultValue = "0") val dismissed: Boolean = false,
+)

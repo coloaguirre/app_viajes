@@ -15,7 +15,7 @@ import okhttp3.Request
 import okhttp3.Response
 
 /**
- * One HTTP client for the OSM services (skill place-enrichment): identifiable User-Agent,
+ * One HTTP client for the OSM and Wikimedia services (skill place-enrichment): identifiable User-Agent,
  * 15 s timeouts, a 10 MB cache, one request per second per host (Nominatim's policy)
  * and backoff on 429/5xx. Everything that talks to the internet goes through here, so
  * the resilience policy of PLAN 3.6 lives in one place.
@@ -39,7 +39,11 @@ class OsmHttp @Inject constructor(@ApplicationContext context: Context) {
 
         override fun intercept(chain: Interceptor.Chain): Response {
             val host = chain.request().url.host
-            val interval = if (chain.request().url.encodedPath.endsWith("/interpreter")) 2_000L else 1_000L // Overpass endpoint, whatever the host
+            val interval = when {
+                chain.request().url.encodedPath.endsWith("/interpreter") -> 2_000L // Overpass endpoint, whatever the host
+                host.endsWith("wikipedia.org") || host.endsWith("wikidata.org") -> 200L // Wikimedia: 5/s is fine for a client
+                else -> 1_000L // Nominatim policy
+            }
             val wait = synchronized(last) {
                 val now = System.currentTimeMillis()
                 val due = (last[host] ?: 0L) + interval
