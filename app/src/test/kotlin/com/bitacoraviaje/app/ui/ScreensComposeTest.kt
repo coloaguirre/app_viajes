@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) // Media3 Transformer API (PLAN 4.6)
+
 package com.bitacoraviaje.app.ui
 
 import androidx.compose.material3.SnackbarHostState
