@@ -134,7 +134,13 @@ class RenderWorker @AssistedInject constructor(
 
     /** Duration of the produced MP4 as the container declares it. */
     private fun measuredDurationMs(file: File): Long? = runCatching {
-        android.media.MediaMetadataRetriever().use { r -> r.setDataSource(file.absolutePath); r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() }
+        val r = android.media.MediaMetadataRetriever() // AutoCloseable only from API 29: release by hand (minSdk 26)
+        try {
+            r.setDataSource(file.absolutePath)
+            r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        } finally {
+            r.release()
+        }
     }.getOrNull()
 
     /** Transformer wants the main looper; progress is polled every 500 ms into setProgress and the notification. */
