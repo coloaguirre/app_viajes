@@ -63,6 +63,7 @@
     <string name="places_empty">Todavía no hay lugares. Al cerrar una etapa con conexión, la app busca información de las paradas y localidades en Wikipedia, Wikidata y OpenStreetMap.</string>
     <string name="places_disabled">La búsqueda de lugares está desactivada en Ajustes.</string>
     <string name="places_refresh">Buscar lugares</string>
+    <string name="places_refresh_segment">Buscar de nuevo</string>
     <string name="places_searching">Buscando lugares…</string>
     <string name="places_waiting_network">Esperando conexión para buscar lugares</string>
     <string name="places_use_in_video">Usar en el video</string>

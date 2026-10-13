@@ -76,6 +76,9 @@ class TileSource:
         self.cache = cache_dir
         self.attribution = attribution
         self._session = session
+        self.hits = 0
+        self.failures = 0
+        self.first_error: str | None = None
 
     def tile(self, z: int, x: int, y: int) -> Image.Image | None:
         n = 2**z
@@ -85,24 +88,36 @@ class TileSource:
         key = hashlib.sha1(f"{self.template}|{z}|{x}|{y}".encode()).hexdigest()
         f = self.cache / key[:2] / f"{key}.png"
         if f.exists():
+            self.hits += 1
             return Image.open(f).convert("RGB")
-        url = self.template.format(z=z, x=x, y=y)
+        try:
+            url = self.template.format(z=z, x=x, y=y)
+        except (KeyError, IndexError, ValueError) as e:
+            self._fail(f"plantilla inválida: {e}")
+            return None
         try:
             import requests  # noqa: PLC0415
 
             s = self._session or requests.Session()
-            r = s.get(
-                url,
-                timeout=20,
-                headers={"User-Agent": "BitacoraViaje-render/0.1 (https://github.com/coloaguirre/app_viajes)"},
-            )
+            r = s.get(url, timeout=20, headers={"User-Agent": "BitacoraViaje-render/0.1 (https://github.com/coloaguirre/app_viajes)"})
             if r.status_code != 200:
+                self._fail(f"HTTP {r.status_code}")  # a wrong key shows up here instead of a silently plain map (review M6)
                 return None
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(r.content)
+            self.hits += 1
             return Image.open(f).convert("RGB")
-        except Exception:
+        except Exception as e:  # network errors: keep rendering, report once
+            self._fail(repr(e))
             return None
+
+    def _fail(self, why: str) -> None:
+        self.failures += 1
+        if self.first_error is None:
+            self.first_error = why
+            import sys  # noqa: PLC0415
+
+            print(f"aviso: tesela no disponible ({why}); el mapa puede salir sin fondo", file=sys.stderr)
 
 
 def basemap(bbox: BBox, w: int, h: int, tiles: TileSource | None) -> tuple[Image.Image, Projector]:

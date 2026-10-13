@@ -280,13 +280,13 @@ interface PlaceDao {
     @Query("SELECT * FROM place WHERE id = :id")
     suspend fun getById(id: String): com.bitacoraviaje.data.db.entity.PlaceEntity?
 
-    @Query("SELECT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id WHERE sp.segment_id = :segmentId ORDER BY sp.relevance DESC, sp.first_seen_utc_ms")
+    @Query("SELECT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id WHERE sp.segment_id = :segmentId AND sp.dismissed = 0 ORDER BY sp.relevance DESC, sp.first_seen_utc_ms")
     suspend fun getBySegment(segmentId: String): List<com.bitacoraviaje.data.db.entity.PlaceEntity>
 
-    @Query("SELECT DISTINCT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId")
+    @Query("SELECT DISTINCT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId AND sp.dismissed = 0")
     suspend fun getByTrip(tripId: String): List<com.bitacoraviaje.data.db.entity.PlaceEntity>
 
-    @Query("SELECT DISTINCT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId")
+    @Query("SELECT DISTINCT p.* FROM place p JOIN segment_place sp ON sp.place_id = p.id JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId AND sp.dismissed = 0")
     fun observeByTrip(tripId: String): Flow<List<com.bitacoraviaje.data.db.entity.PlaceEntity>>
 
     /** Places no segment references any more (after a trip is deleted) are garbage. */
@@ -302,10 +302,10 @@ interface EnrichmentDao {
     @Query("SELECT * FROM enrichment WHERE place_id = :placeId ORDER BY source_name")
     suspend fun getByPlace(placeId: String): List<com.bitacoraviaje.data.db.entity.EnrichmentEntity>
 
-    @Query("SELECT e.* FROM enrichment e WHERE e.place_id IN (SELECT sp.place_id FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId)")
+    @Query("SELECT e.* FROM enrichment e WHERE e.place_id IN (SELECT sp.place_id FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId AND sp.dismissed = 0)")
     suspend fun getByTrip(tripId: String): List<com.bitacoraviaje.data.db.entity.EnrichmentEntity>
 
-    @Query("SELECT e.* FROM enrichment e WHERE e.place_id IN (SELECT sp.place_id FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId)")
+    @Query("SELECT e.* FROM enrichment e WHERE e.place_id IN (SELECT sp.place_id FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId AND sp.dismissed = 0)")
     fun observeByTrip(tripId: String): Flow<List<com.bitacoraviaje.data.db.entity.EnrichmentEntity>>
 
     @Query("UPDATE enrichment SET user_approved = :approved WHERE id = :id")
@@ -328,21 +328,25 @@ interface SegmentPlaceDao {
     @Upsert
     suspend fun upsertAll(rows: List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>)
 
-    @Query("SELECT * FROM segment_place WHERE segment_id = :segmentId ORDER BY relevance DESC")
+    @Query("SELECT * FROM segment_place WHERE segment_id = :segmentId AND dismissed = 0 ORDER BY relevance DESC")
     suspend fun getBySegment(segmentId: String): List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>
 
-    @Query("SELECT sp.* FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId ORDER BY sp.relevance DESC")
+    @Query("SELECT place_id FROM segment_place WHERE segment_id = :segmentId AND dismissed = 1")
+    suspend fun dismissedPlaceIds(segmentId: String): List<String>
+
+    @Query("SELECT sp.* FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId AND sp.dismissed = 0 ORDER BY sp.relevance DESC")
     suspend fun getByTrip(tripId: String): List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>
 
-    @Query("SELECT sp.* FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId ORDER BY sp.relevance DESC")
+    @Query("SELECT sp.* FROM segment_place sp JOIN segment s ON s.id = sp.segment_id WHERE s.trip_id = :tripId AND sp.dismissed = 0 ORDER BY sp.relevance DESC")
     fun observeByTrip(tripId: String): Flow<List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>>
 
-    @Query("SELECT COUNT(*) FROM segment_place WHERE segment_id = :segmentId")
+    @Query("SELECT COUNT(*) FROM segment_place WHERE segment_id = :segmentId AND dismissed = 0")
     suspend fun countBySegment(segmentId: String): Int
 
-    @Query("DELETE FROM segment_place WHERE segment_id = :segmentId")
+    /** A re-run rewrites the live links; the user's tombstones stay (review I5). */
+    @Query("DELETE FROM segment_place WHERE segment_id = :segmentId AND dismissed = 0")
     suspend fun deleteBySegment(segmentId: String)
 
-    @Query("DELETE FROM segment_place WHERE segment_id = :segmentId AND place_id = :placeId")
-    suspend fun delete(segmentId: String, placeId: String)
+    @Query("UPDATE segment_place SET dismissed = 1 WHERE segment_id = :segmentId AND place_id = :placeId")
+    suspend fun dismiss(segmentId: String, placeId: String)
 }

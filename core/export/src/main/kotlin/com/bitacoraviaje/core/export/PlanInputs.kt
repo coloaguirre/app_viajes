@@ -20,7 +20,7 @@ object PlanInputs {
             val s = se.segment
             PlanSegment(
                 id = s.id,
-                title = Diary.segmentTitle(se).substringBefore(" · ").ifBlank { s.displayName ?: s.type.name },
+                title = s.displayName ?: when (s.type.name) { "TREKKING" -> "Trekking"; "EXCURSION" -> "Excursión"; else -> "Etapa" }, // same rule as planner.py (review M8)
                 date = Iso.localDate(s.startedUtcMs, s.tzId),
                 startedUtcMs = s.startedUtcMs,
                 endedUtcMs = s.endedUtcMs,

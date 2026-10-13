@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
 Provider = Callable[[Sequence[tuple[float, float]]], list[float | None]]
+USER_AGENT = "BitacoraViaje-render/0.1 (https://github.com/coloaguirre/app_viajes)"
 
 
 def moving_average(values: Sequence[float], window: int = 5) -> list[float]:
@@ -56,11 +58,13 @@ class OpenTopoData:
         for i in range(0, len(points), 100):
             chunk = points[i : i + 100]
             locs = "|".join(f"{lat:.5f},{lon:.5f}" for lat, lon in chunk)
-            f = self.cache / (self.dataset + "-" + str(abs(hash(locs))) + ".json")
+            f = self.cache / (self.dataset + "-" + hashlib.sha1(locs.encode()).hexdigest() + ".json")  # stable across runs (review I3)
             if f.exists():
                 data = json.loads(f.read_text())
             else:
-                r = s.get(f"https://api.opentopodata.org/v1/{self.dataset}", params={"locations": locs}, timeout=30)
+                r = s.get(
+                    f"https://api.opentopodata.org/v1/{self.dataset}", params={"locations": locs}, timeout=30, headers={"User-Agent": USER_AGENT}
+                )
                 r.raise_for_status()
                 data = r.json()
                 f.write_text(json.dumps(data))

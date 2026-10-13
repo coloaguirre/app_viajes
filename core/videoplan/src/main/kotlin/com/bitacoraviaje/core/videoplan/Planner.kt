@@ -94,7 +94,7 @@ object Planner {
                     val d = c.media.durationMs ?: CLIP_MAX_MS
                     val len = min(CLIP_MAX_MS, max(CLIP_MIN_MS, d))
                     val start = max(0L, (d - len) / 2)
-                    scenes += VideoPlan.VideoClip(c.media.id, start, start + len, keep_audio = params.voice != VoiceMode.SUBTITLES || true, caption = c.media.caption)
+                    scenes += VideoPlan.VideoClip(c.media.id, start, start + len, keep_audio = true, caption = c.media.caption) // clip audio always kept; VoiceMode governs voice notes
                 } else {
                     val voiceId = c.voice?.takeIf { params.voice != VoiceMode.AUDIO && usedVoices.add(it.id) }?.id
                     val photo = VideoPlan.Photo(photoMs, c.media.id, kenBurns(kenIndex++), c.media.caption, voiceId)
@@ -152,6 +152,7 @@ object Planner {
         for (w in 0 until n) {
             val from = start + w * windowMs
             val to = if (w == n - 1) Long.MAX_VALUE else from + windowMs
+            // Ties (the norm while sharpness is unknown) go to the later photo; planner.py mirrors this (review I1).
             candidates.filter { it.media.takenUtcMs >= from && it.media.takenUtcMs < to && it !in chosen }.maxWithOrNull(compareBy<Candidate> { it.score }.thenBy { it.media.takenUtcMs })?.let { chosen += it }
         }
         for (c in candidates.sortedWith(compareByDescending<Candidate> { it.score }.thenBy { it.media.takenUtcMs })) {

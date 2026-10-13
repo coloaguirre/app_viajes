@@ -279,4 +279,6 @@ data class SegmentPlaceEntity(
     @ColumnInfo(name = "first_seen_utc_ms") val firstSeenUtcMs: Long,
     @ColumnInfo(name = "dwell_ms") val dwellMs: Long?,
     val relevance: Double?,
+    /** "Descartar": the user removed this place from the segment; a re-run must not bring it back (review I5). */
+    @ColumnInfo(defaultValue = "0") val dismissed: Boolean = false,
 )

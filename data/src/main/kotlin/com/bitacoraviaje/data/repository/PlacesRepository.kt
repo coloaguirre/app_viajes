@@ -44,8 +44,10 @@ class PlacesRepository @Inject constructor(private val db: BitacoraDatabase) {
      * (shared with other segments), the segment's links are rewritten. Re-running the
      * enrichment never leaves a half-written segment.
      */
-    suspend fun replaceSegmentPlaces(segmentId: String, newPlaces: List<Place>, newEnrichments: List<Enrichment>, newLinks: List<SegmentPlace>) = db.withTransaction {
+    suspend fun replaceSegmentPlaces(segmentId: String, newPlaces: List<Place>, newEnrichments: List<Enrichment>, newLinks: List<SegmentPlace>, stopPlaces: Map<String, String> = emptyMap()) = db.withTransaction {
         if (newPlaces.isNotEmpty()) places.upsertAll(newPlaces.map { it.toEntity() })
+        // The stop → place link belongs to the same write: no dangling stop.place_id if interrupted (review M15).
+        for ((stopId, placeId) in stopPlaces) db.stopDao().setPlace(stopId, placeId)
         // Keep the user's approvals and edits when the same text comes back (idempotence, DISENO §11.4).
         val existing = newEnrichments.map { it.placeId }.distinct().flatMap { enrichments.getByPlace(it) }.associateBy { it.id }
         val merged = newEnrichments.map { e ->
@@ -59,8 +61,10 @@ class PlacesRepository @Inject constructor(private val db: BitacoraDatabase) {
             }
         }
         if (merged.isNotEmpty()) enrichments.upsertAll(merged.map { it.toEntity() })
+        val dismissed = links.dismissedPlaceIds(segmentId).toSet()
         links.deleteBySegment(segmentId)
-        if (newLinks.isNotEmpty()) links.upsertAll(newLinks.map { it.toEntity() })
+        val live = newLinks.filter { it.placeId !in dismissed } // a discarded place does not come back (review I5)
+        if (live.isNotEmpty()) links.upsertAll(live.map { it.toEntity() })
     }
 
     /** Import path: rows arrive already linked; nothing is deleted. */
@@ -78,8 +82,8 @@ class PlacesRepository @Inject constructor(private val db: BitacoraDatabase) {
 
     suspend fun restoreSummary(enrichmentId: String) = enrichments.restoreSummary(enrichmentId)
 
-    /** "Descartar": the place leaves this segment; the cached rows stay for other segments or a re-run. */
-    suspend fun discard(segmentId: String, placeId: String) = links.delete(segmentId, placeId)
+    /** "Descartar": the place leaves this segment for good (tombstone); the cached rows stay for other segments. */
+    suspend fun discard(segmentId: String, placeId: String) = links.dismiss(segmentId, placeId)
 
     suspend fun pruneOrphans(): Int = places.deleteOrphans()
 }

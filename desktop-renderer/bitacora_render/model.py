@@ -293,10 +293,6 @@ Scene = Annotated[
 ]
 
 
-def scene_duration_ms(scene) -> int:
-    return scene.duration_ms
-
-
 class VideoPlan(_Strict):
     schema_version: int = 1
     output: Output

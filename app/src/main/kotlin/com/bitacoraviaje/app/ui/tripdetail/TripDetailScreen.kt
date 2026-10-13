@@ -265,7 +265,7 @@ private fun PlacesTab(state: TripDetailUiState, onAction: (PlaceAction) -> Unit)
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f).testTag("places_status"),
             )
-            androidx.compose.material3.OutlinedButton(onClick = { onAction(PlaceAction.Refresh) }, enabled = state.placesEnabled && state.placesWork == PlacesWork.IDLE, modifier = Modifier.testTag("places_refresh")) {
+            androidx.compose.material3.OutlinedButton(onClick = { onAction(PlaceAction.Refresh()) }, enabled = state.placesEnabled && state.placesWork == PlacesWork.IDLE, modifier = Modifier.testTag("places_refresh")) {
                 Text(stringResource(R.string.places_refresh))
             }
         }
@@ -276,7 +276,12 @@ private fun PlacesTab(state: TripDetailUiState, onAction: (PlaceAction) -> Unit)
         LazyColumn(Modifier.fillMaxSize().testTag("places_list"), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             state.places.groupBy { it.segment.id }.forEach { (_, cards) ->
                 item(key = "seg-${cards.first().segment.id}") {
-                    Text(cards.first().segment.displayName ?: DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(Instant.ofEpochMilli(cards.first().segment.startedUtcMs).atZone(ZoneId.of(cards.first().segment.tzId))), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
+                    val seg = cards.first().segment
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(seg.displayName ?: DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(Instant.ofEpochMilli(seg.startedUtcMs).atZone(ZoneId.of(seg.tzId))), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp).weight(1f))
+                        // Forced refresh is per segment: up to ~45 requests to public instances each (review I4).
+                        androidx.compose.material3.TextButton(onClick = { onAction(PlaceAction.Refresh(seg.id)) }, enabled = state.placesEnabled && state.placesWork == PlacesWork.IDLE, modifier = Modifier.testTag("places_refresh_${seg.id}")) { Text(stringResource(R.string.places_refresh_segment)) }
+                    }
                 }
                 items(cards, key = { "${it.segment.id}-${it.place.id}" }) { card ->
                     PlaceCardView(

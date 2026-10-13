@@ -28,7 +28,8 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     val hasLlmKey: StateFlow<Boolean> = secrets.has(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY)
 
-    fun setLlmKey(key: String?) = secrets.set(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY, key)
+    /** Keystore + file I/O off the main thread (review M9). */
+    fun setLlmKey(key: String?) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { secrets.set(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY, key) }
 
     fun setLlmModel(model: String) = viewModelScope.launch { prefs.setLlmModel(model) }
 

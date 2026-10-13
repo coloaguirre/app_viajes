@@ -235,7 +235,10 @@ class TrackingRepository @Inject constructor(
         enrichmentsToInsert: List<com.bitacoraviaje.core.model.Enrichment> = emptyList(),
         segmentPlacesToInsert: List<com.bitacoraviaje.core.model.SegmentPlace> = emptyList(),
     ) = db.withTransaction {
-        if (replace) trips.delete(trip.id)
+        if (replace) {
+            trips.delete(trip.id)
+            db.placeDao().deleteOrphans() // places the replaced trip alone referenced (review M16)
+        }
         trips.insert(trip.toEntity())
         // Parents first: a nested excursion references its parent segment.
         for (s in segmentsToInsert.sortedBy { if (it.parentSegmentId == null) 0 else 1 }) segments.insert(s.toEntity())

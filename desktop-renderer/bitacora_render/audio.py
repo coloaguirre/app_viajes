@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,7 +21,7 @@ def mix(video: Path, out: Path, voices: list[VoiceCue], music: Path | None, musi
     voices = [v for v in voices if v.file.exists()]
     if not voices and music is None:
         if video != out:
-            out.write_bytes(video.read_bytes())
+            shutil.copyfile(video, out)
         return out
     inputs = ["-i", str(video)]
     filters = []
@@ -43,8 +44,10 @@ def mix(video: Path, out: Path, voices: list[VoiceCue], music: Path | None, musi
         inputs += ["-stream_loop", "-1", "-i", str(music)]
         filters.append(f"[{idx}:a]volume={music_volume},aformat=sample_rates=48000:channel_layouts=stereo[m]")
         if duck:
-            filters.append(f"[m]{voice_mix}sidechaincompress=threshold=0.05:ratio=8:attack=20:release=400[duck]")
-            filters.append(f"[duck]{voice_mix}amix=inputs=2:duration=first:normalize=0[a]")
+            # A filter pad feeds one consumer: split the voices for the sidechain and for the mix (review B1).
+            filters.append(f"{voice_mix}asplit[vside][vmix]")
+            filters.append("[m][vside]sidechaincompress=threshold=0.05:ratio=8:attack=20:release=400[duck]")
+            filters.append("[duck][vmix]amix=inputs=2:duration=first:normalize=0[a]")
         else:
             filters.append(f"[m]{voice_mix}amix=inputs=2:duration=first:normalize=0[a]")
         final = "[a]"

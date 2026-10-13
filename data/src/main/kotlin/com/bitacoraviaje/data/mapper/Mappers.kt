@@ -175,6 +175,6 @@ fun com.bitacoraviaje.core.model.Enrichment.toEntity() = com.bitacoraviaje.data.
     thumbnailUrl = thumbnailUrl, originalSummary = originalSummary, llmRewritten = llmRewritten, userApproved = userApproved, fetchedUtcMs = fetchedUtcMs,
 )
 
-fun com.bitacoraviaje.data.db.entity.SegmentPlaceEntity.toDomain() = com.bitacoraviaje.core.model.SegmentPlace(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance)
+fun com.bitacoraviaje.data.db.entity.SegmentPlaceEntity.toDomain() = com.bitacoraviaje.core.model.SegmentPlace(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance, dismissed)
 
-fun com.bitacoraviaje.core.model.SegmentPlace.toEntity() = com.bitacoraviaje.data.db.entity.SegmentPlaceEntity(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance)
+fun com.bitacoraviaje.core.model.SegmentPlace.toEntity() = com.bitacoraviaje.data.db.entity.SegmentPlaceEntity(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance, dismissed)

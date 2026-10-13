@@ -53,6 +53,7 @@ class PlaceEnricherTest {
     private lateinit var segmentId: String
     private val requests = ArrayList<RecordedRequest>()
     private var failOverpass = false
+    private var failAll = false
 
     private fun fixture(name: String) = javaClass.getResourceAsStream("/enrichment/$name")!!.readBytes().toString(Charsets.UTF_8)
 
@@ -70,6 +71,7 @@ class PlaceEnricherTest {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 synchronized(requests) { requests += request }
+                if (failAll) return MockResponse(code = 500) // not a retry code: fails fast
                 val path = request.url.encodedPath
                 return when {
                     path.endsWith("/reverse") -> MockResponse(body = fixture(if (request.url.queryParameter("zoom") == "16") "nominatim_reverse_z16_road.json" else "nominatim_reverse_z14.json"))
@@ -165,6 +167,14 @@ class PlaceEnricherTest {
             assertTrue(coords.isNotEmpty() && coords.all { it.substringAfter('.').length <= 2 }, "coords: $coords")
         }
         assertTrue(places.placesOf(segmentId).none { it.source == PlaceSource.OVERPASS })
+    }
+
+    @Test
+    fun `when no source answers nothing is written and the error propagates for a retry`() = runTest {
+        failAll = true
+        val e = runCatching { enricher.enrich(segmentId) }.exceptionOrNull()
+        assertTrue(e is java.io.IOException, "got $e")
+        assertTrue(!places.hasPlaces(segmentId))
     }
 
     @Test

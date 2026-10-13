@@ -57,7 +57,7 @@ def export_dir(tmp_path_factory) -> Path:
                             "-i",
                             "sine=frequency=440:sample_rate=48000",
                             "-t",
-                            "4",
+                            f"{(m.get('duration_ms') or 4000) / 1000:.2f}",
                             "-c:v",
                             "libx264",
                             "-pix_fmt",

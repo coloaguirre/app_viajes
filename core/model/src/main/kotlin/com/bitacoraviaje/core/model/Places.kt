@@ -63,4 +63,6 @@ data class SegmentPlace(
     val firstSeenUtcMs: Long,
     val dwellMs: Long? = null,
     val relevance: Double? = null,
+    /** The user discarded this place for the segment; kept as a tombstone so a refresh does not bring it back. */
+    val dismissed: Boolean = false,
 )

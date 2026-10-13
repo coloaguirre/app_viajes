@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -54,7 +55,8 @@ sealed interface PlaceAction {
     data class Edit(val enrichmentId: String, val text: String) : PlaceAction
     data class Rewrite(val enrichmentId: String) : PlaceAction
     data class Restore(val enrichmentId: String) : PlaceAction
-    data object Refresh : PlaceAction
+    /** Look again: one segment (forced), or only the closed segments that have no places yet when null (review I4). */
+    data class Refresh(val segmentId: String? = null) : PlaceAction
 }
 
 /** Enrichment work of this trip as the tab shows it. */
@@ -129,7 +131,7 @@ class TripDetailViewModel @Inject constructor(
     /** Places of the whole trip joined with their visit rows and texts, best ranked first within each segment. */
     private val placesFlow = combine(places.observePlacesOfTrip(tripId), places.observeEnrichmentsOfTrip(tripId), places.observeSegmentPlacesOfTrip(tripId)) { pl, en, links ->
         links.mapNotNull { sp -> pl.firstOrNull { it.id == sp.placeId }?.let { p -> Triple(sp, p, en.filter { it.placeId == p.id }) } }
-    }
+    }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1) // one Room observer set for N segments (review M3)
 
     private class SegmentData(
         val pts: List<com.bitacoraviaje.core.model.TrackPoint>, val media: List<MediaItem>, val voice: List<com.bitacoraviaje.core.model.VoiceNote>,
@@ -150,10 +152,13 @@ class TripDetailViewModel @Inject constructor(
         SegmentTimeline(s, events, d.pts.map { MapPoint(it.lat, it.lon) })
     }.flowOn(kotlinx.coroutines.Dispatchers.Default) // timeline building off the main thread (review M5)
 
-    private val placesWorkFlow = androidx.work.WorkManager.getInstance(context).getWorkInfosByTagFlow(com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.TAG_WORK).map { infos ->
+    /** Only this trip's enrichment jobs (tagged per segment), not every trip's (review M2). */
+    private val placesWorkFlow = combine(androidx.work.WorkManager.getInstance(context).getWorkInfosByTagFlow(com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.TAG_WORK), tracking.observeSegments(tripId)) { infos, segs ->
+        val mine = segs.map { com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.segmentTag(it.id) }.toSet()
+        val own = infos.filter { info -> info.tags.any { it in mine } }
         when {
-            infos.any { it.state == androidx.work.WorkInfo.State.RUNNING } -> PlacesWork.RUNNING
-            infos.any { it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.BLOCKED } -> PlacesWork.WAITING_NETWORK
+            own.any { it.state == androidx.work.WorkInfo.State.RUNNING } -> PlacesWork.RUNNING
+            own.any { it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.BLOCKED } -> PlacesWork.WAITING_NETWORK
             else -> PlacesWork.IDLE
         }
     }
@@ -204,7 +209,15 @@ class TripDetailViewModel @Inject constructor(
                 is PlaceAction.Edit -> places.editSummary(a.enrichmentId, a.text.trim())
                 is PlaceAction.Restore -> places.restoreSummary(a.enrichmentId)
                 is PlaceAction.Rewrite -> rewrite(a.enrichmentId)
-                PlaceAction.Refresh -> tracking.segmentsOf(tripId).filter { it.endedUtcMs != null }.forEach { com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.enqueue(appContext, it.id, force = true) }
+                is PlaceAction.Refresh -> {
+                    val closed = tracking.segmentsOf(tripId).filter { it.endedUtcMs != null }
+                    if (a.segmentId != null) {
+                        com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.enqueue(appContext, a.segmentId, force = true)
+                    } else {
+                        // Whole-trip button: only what is missing; a forced refresh is per segment (public instances, review I4).
+                        closed.filter { !places.hasPlaces(it.id) }.forEach { com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.enqueue(appContext, it.id, force = false) }
+                    }
+                }
             }
         }
     }
@@ -219,7 +232,7 @@ class TripDetailViewModel @Inject constructor(
 
     /** DISENO §11.4: only the fetched text and the Wikidata facts go to the model; the result replaces the summary, the original stays. */
     private suspend fun rewrite(enrichmentId: String) {
-        val key = secrets.get(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY) ?: return
+        val key = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { secrets.get(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY) } ?: return
         val all = places.enrichmentsOfTrip(tripId)
         val e = all.firstOrNull { it.id == enrichmentId } ?: return
         val facts = all.filter { it.placeId == e.placeId && it.sourceName == com.bitacoraviaje.core.model.Enrichment.SOURCE_WIKIDATA }.flatMap { it.summary.split(" · ") }

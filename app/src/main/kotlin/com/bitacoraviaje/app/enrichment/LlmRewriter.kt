@@ -39,7 +39,7 @@ object RewriteGuard {
 
     fun isFaithful(result: String, source: String, facts: List<String> = emptyList()): Boolean {
         val allowed = numbers(source + " " + facts.joinToString(" "))
-        return numbers(result).all { n -> allowed.any { a -> a == n || a.startsWith(n) || n.startsWith(a) } }
+        return numbers(result).all { it in allowed } // exact after normalisation: "198" is not "1985" (review M1)
     }
 
     fun clean(raw: String): String? {

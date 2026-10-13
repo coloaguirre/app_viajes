@@ -38,8 +38,19 @@ def run(args: list[str], *, stdin: bytes | None = None, cwd: Path | None = None)
         raise FfmpegError(f"ffmpeg falló ({r.returncode}): {' '.join(cmd[:12])}…\n{r.stderr.decode(errors='replace')[-2000:]}")
 
 
-def start_rawvideo_pipe(out: Path, width: int, height: int, fps: int, extra: list[str] | None = None) -> subprocess.Popen:
-    """ffmpeg reading RGB frames from stdin (map frames are streamed, never saved as PNG)."""
+def escape_filter_path(p: Path | str) -> str:
+    """Escapes a path for use inside an ffmpeg filter option value (`'`, `:` , `,`, `\\`, `[`, `]`), review M4."""
+    s = str(p).replace("\\", "/")
+    for ch in ("'", ":", ",", "[", "]", ";"):
+        s = s.replace(ch, "\\" + ch)
+    return s
+
+
+def start_rawvideo_pipe(out: Path, width: int, height: int, fps: int, log: Path | None = None, extra: list[str] | None = None) -> subprocess.Popen:
+    """ffmpeg reading RGB frames from stdin (map frames are streamed, never saved as PNG).
+
+    stderr goes to `log` (or is discarded): reading it only at the end could deadlock the pipe (review M5).
+    """
     cmd = [
         ffmpeg_path(), "-hide_banner", "-loglevel", "error", "-y",
         "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
@@ -47,7 +58,8 @@ def start_rawvideo_pipe(out: Path, width: int, height: int, fps: int, extra: lis
         *(extra or []),
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(out),
     ]  # fmt: skip
-    return subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    err = open(log, "wb") if log else subprocess.DEVNULL  # noqa: SIM115 - closed by the caller via proc.stderr
+    return subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=err)
 
 
 @dataclass

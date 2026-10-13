@@ -99,6 +99,14 @@ class PlannerTest {
     }
 
     @Test
+    fun `equal scores in one window pick the later photo (shared rule with the python planner)`() {
+        val seg = PlanSegment("s", "Etapa", "2026-01-01", t0, t0 + 3_600_000, media = listOf(photo("early", t0 + 60_000), photo("late", t0 + 120_000), photo("far", t0 + 3_000_000)))
+        val plan = Planner.plan(PlanInput("t", "T", null, listOf(seg)), PlanParams(60, includeMap = false, includePlaces = false))
+        val photos = plan.scenes.filterIsInstance<VideoPlan.Photo>().map { it.media }
+        assertTrue(photos.size >= 2 && "late" in photos && "far" in photos, photos.toString())
+    }
+
+    @Test
     fun `a segment without photos still gets its fixed scenes and the plan stays near the budget`() {
         val empty = PlanInput("t", "Vacío", null, listOf(PlanSegment("s", "Etapa", "2026-01-01", t0, t0 + 3_600_000, hasTrack = false)))
         val plan = Planner.plan(empty, PlanParams(60))

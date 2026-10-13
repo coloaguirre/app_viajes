@@ -206,7 +206,9 @@ def _eligible(s: PlanSegment, params: PlanParams) -> list[PlanMedia]:
     )
     kept: list[PlanMedia] = []
     for m in base:
-        dup = m.phash is not None and any(k.phash is not None and bin(k.phash ^ m.phash).count("1") <= PHASH_DUPLICATE_BITS for k in kept)
+        dup = m.phash is not None and any(
+            k.phash is not None and bin((k.phash ^ m.phash) & 0xFFFFFFFFFFFFFFFF).count("1") <= PHASH_DUPLICATE_BITS for k in kept
+        )  # 64-bit two's complement like Long.bitCount (review M7)
         if not dup:
             kept.append(m)
     return kept
@@ -241,7 +243,8 @@ def _pick(candidates: list[_Candidate], slots: int, s: PlanSegment) -> list[_Can
         hi = float("inf") if w == n - 1 else lo + window
         pool = [c for c in candidates if lo <= c.media.taken_utc_ms < hi and c not in chosen]
         if pool:
-            chosen.append(max(pool, key=lambda c: (c.score, -c.media.taken_utc_ms)))
+            # Kotlin: maxWithOrNull(compareBy { score }.thenBy { takenUtcMs }) → on a tie the later photo wins (review I1).
+            chosen.append(max(pool, key=lambda c: (c.score, c.media.taken_utc_ms)))
     for c in sorted(candidates, key=lambda c: (-c.score, c.media.taken_utc_ms)):
         if len(chosen) >= n:
             break

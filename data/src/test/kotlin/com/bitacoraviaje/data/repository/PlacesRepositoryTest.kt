@@ -54,15 +54,25 @@ class PlacesRepositoryTest {
     }
 
     @Test
-    fun `discarding unlinks without deleting the cache and deleting the trip cascades`() = runTest {
+    fun `discarding is a tombstone a re-run respects and deleting the trip cascades`() = runTest {
         repo.replaceSegmentPlaces("s1", listOf(place), listOf(wiki("v1")), listOf(SegmentPlace("s1", "wd-Q1", Fixtures.T0, null, 1.0)))
         repo.discard("s1", "wd-Q1")
         assertEquals(0, repo.placesOf("s1").size)
-        assertEquals(1, repo.enrichmentsOf("wd-Q1").size)
-        assertEquals(1, repo.pruneOrphans())
-        assertEquals(0, repo.enrichmentsOf("wd-Q1").size, "enrichment cascades with its place")
-        repo.replaceSegmentPlaces("s1", listOf(place), listOf(wiki("v1")), listOf(SegmentPlace("s1", "wd-Q1", Fixtures.T0, null, 1.0)))
+        assertTrue(!repo.hasPlaces("s1"))
+        assertEquals(1, repo.enrichmentsOf("wd-Q1").size, "the cache stays")
+        val other = place.copy(id = "wd-Q2", name = "Otro", wikidataId = "Q2")
+        repo.replaceSegmentPlaces("s1", listOf(place, other), emptyList(), listOf(SegmentPlace("s1", "wd-Q1", Fixtures.T0, null, 3.0), SegmentPlace("s1", "wd-Q2", Fixtures.T0, null, 1.0)))
+        assertEquals(listOf("wd-Q2"), repo.placesOf("s1").map { it.id }, "the discarded place does not come back (review I5)")
+        assertEquals(0, repo.pruneOrphans(), "a tombstoned place is still referenced")
         db.tripDao().delete("t1")
         assertEquals(0, repo.segmentPlacesOfTrip("t1").size)
+        assertEquals(2, repo.pruneOrphans(), "orphans after the trip is gone")
+    }
+
+    @Test
+    fun `stop place links are written in the same transaction`() = runTest {
+        db.stopDao().insertAll(listOf(com.bitacoraviaje.data.db.entity.StopEntity("st", "s1", Fixtures.T0, Fixtures.T0 + 1, 0.0, 0.0, 1.0, null, null)))
+        repo.replaceSegmentPlaces("s1", listOf(place), emptyList(), listOf(SegmentPlace("s1", "wd-Q1", Fixtures.T0, null, 1.0)), stopPlaces = mapOf("st" to "wd-Q1"))
+        assertEquals("wd-Q1", db.stopDao().getBySegment("s1").single().placeId)
     }
 }

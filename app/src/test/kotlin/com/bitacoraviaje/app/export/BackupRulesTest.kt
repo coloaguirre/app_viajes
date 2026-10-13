@@ -57,6 +57,7 @@ class BackupRulesTest {
                 assertTrue(includes.isNotEmpty(), "$s lists includes (everything else is excluded)")
                 assertTrue(includes.none { it.domain == "database" }, "$s never includes the database")
                 assertTrue(includes.none { it.domain == "file" && it.path.startsWith("models") }, "$s never includes models")
+                assertTrue(includes.none { it.domain == "file" && it.path.startsWith("secrets") }, "$s never includes the encrypted API key (PLAN 4.3)")
                 assertTrue(includes.any { it.domain == "file" && it.path == "backup/" }, "$s includes backup/")
                 if (s != "device-transfer") assertTrue(includes.none { it.domain == "file" && it.path.startsWith("audio") }, "$s leaves audio out of the cloud")
             }

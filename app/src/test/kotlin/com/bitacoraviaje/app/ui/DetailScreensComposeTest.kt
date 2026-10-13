@@ -214,12 +214,15 @@ class DetailScreensComposeTest {
         rule.onNodeWithText("Sin texto en internet; solo el nombre del mapa.").assertIsDisplayed()
         rule.onNodeWithTag("place_discard_osm-N5").performScrollTo().performClick()
         rule.onNodeWithTag("places_refresh").performClick()
+        rule.onNodeWithTag("places_list").performScrollToNode(hasTestTag("places_refresh_s1"))
+        rule.onNodeWithTag("places_refresh_s1").performClick()
         assertEquals(
             listOf(
                 com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Approve("wd-Q1-wikipedia-es", true),
                 com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Edit("wd-Q1-wikipedia-es", "Texto corregido"),
                 com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Discard("s1", "osm-N5"),
-                com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Refresh,
+                com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Refresh(),
+                com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Refresh("s1"),
             ),
             actions,
         )

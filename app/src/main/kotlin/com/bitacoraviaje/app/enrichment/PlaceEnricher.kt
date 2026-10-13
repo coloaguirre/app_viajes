@@ -146,6 +146,7 @@ class PlaceEnricher @Inject constructor(
         val outPlaces = ArrayList<Place>()
         val outEnrich = ArrayList<Enrichment>()
         val outLinks = ArrayList<SegmentPlace>()
+        val stopPlaces = HashMap<String, String>()
         for (rp in ranked) {
             val rs = resolved.filter { it.candidate.key == rp.candidate.key }
             val best = rs.minByOrNull { it.candidate.distM }!!
@@ -177,10 +178,12 @@ class PlaceEnricher @Inject constructor(
             }
             val a = best.proposal.anchor
             outLinks += SegmentPlace(segmentId, placeId, a.timeUtcMs, a.dwellMs.takeIf { it > 0 }, rp.score)
-            // The stop that found a Nominatim place gets it as its name (stop.place_id).
-            a.stop?.takeIf { best.proposal.osm != null && best.proposal.distM == 0.0 }?.let { tracking.setStopPlace(it.id, placeId) }
+            // The stop that found a Nominatim place gets it as its name (stop.place_id), written in the same transaction.
+            a.stop?.takeIf { best.proposal.osm != null && best.proposal.distM == 0.0 }?.let { stopPlaces[it.id] = placeId }
         }
-        places.replaceSegmentPlaces(segmentId, outPlaces, outEnrich, outLinks)
+        // Every source failed and nothing is known: leave no empty links behind and let the worker retry (review I2).
+        if (partial && outPlaces.isEmpty() && lookups > 0) throw IOException("place enrichment: no source answered (lookups=$lookups)")
+        places.replaceSegmentPlaces(segmentId, outPlaces, outEnrich, outLinks, stopPlaces)
         Log.i(TAG, "places enriched segment=$segmentId found=${outPlaces.size} proposals=${proposals.size} lookups=$lookups partial=$partial")
         return Outcome(outPlaces.size, skipped = false, lookups = lookups, partial = partial)
     }

@@ -39,6 +39,7 @@ import com.bitacoraviaje.data.db.entity.TripEntity
  *  6 — item 3.6: segment.auto_name; camera_clock_offset gets its FK to trip; voice_note.media_item_id indexed.
  *  7 — item 4.1: place, enrichment and segment_place (internet enrichment cache, DISENO §11).
  *  8 — item 4.3: enrichment.original_summary (source text kept under an edit or LLM rewrite).
+ *  9 — PR #8 review: segment_place.dismissed (a discarded place stays discarded across re-runs).
  */
 @Database(
     entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class, PlaceEntity::class, EnrichmentEntity::class, SegmentPlaceEntity::class],
@@ -59,7 +60,7 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun segmentPlaceDao(): SegmentPlaceDao
 
     companion object {
-        const val VERSION = 8
+        const val VERSION = 9
         const val NAME = "bitacora.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -213,6 +214,12 @@ abstract class BitacoraDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE segment_place ADD COLUMN dismissed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
     }
 }

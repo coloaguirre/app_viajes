@@ -50,10 +50,8 @@ def render_photo(
         overlay = out.with_suffix(".caption.png")
         base = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         cap = cards.caption_overlay(Image.new("RGB", (w, h), (0, 0, 0)), caption)
-        alpha = Image.new("L", (w, h), 0)
-        mask = cards.caption_overlay(Image.new("RGB", (w, h), (0, 0, 0)), caption).convert("L").point(lambda v: 255 if v > 8 else 0)
+        mask = cap.convert("L").point(lambda v: 255 if v > 8 else 0)
         base.paste(cap, (0, 0), mask)
-        del alpha
         base.save(overlay)
         ffmpeg.run([
             "-loop", "1", "-i", str(still), "-i", str(overlay), "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", f"{duration_ms / 1000:.3f}",

@@ -141,8 +141,21 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 8 to 9 adds dismissed defaulting to false`() {
+        helper.createDatabase(DB_NAME, 8).use { v8 ->
+            v8.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v8.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'FINISHED')")
+            v8.execSQL("INSERT INTO place (id,name,lat,lon,source) VALUES ('wd-Q1','Pueblo',-49.3,-72.9,'WIKIPEDIA')")
+            v8.execSQL("INSERT INTO segment_place (segment_id,place_id,first_seen_utc_ms) VALUES ('s','wd-Q1',2)")
+        }
+        val v9 = helper.runMigrationsAndValidate(DB_NAME, 9, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v9.query("SELECT dismissed FROM segment_place").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+        v9.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(8, BitacoraDatabase.VERSION)
+        assertEquals(9, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

@@ -141,3 +141,57 @@ def test_plan_json_validates_against_schema(export_dir: Path):
         assert p.total_duration_ms <= secs * 1000 * 1.05
     with pytest.raises(ValueError):
         planner.plan(planner.plan_input_of(trip), planner.PlanParams(0))
+
+
+@needs_ffmpeg
+def test_music_with_ducking_and_without_voices(export_dir: Path, tmp_path: Path):
+    """Review B1: the ducking graph used the voices pad twice and ffmpeg refused it."""
+    import subprocess
+
+    music = tmp_path / "musica.mp3"
+    subprocess.run(
+        [
+            ffmpeg.ffmpeg_path(),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=220:sample_rate=48000",
+            "-t",
+            "8",
+            "-c:a",
+            "libmp3lame",
+            str(music),
+        ],
+        check=True,
+    )
+    trip = Trip.model_validate_json((export_dir / "trip.json").read_text(encoding="utf-8"))
+    plan = planner.plan(planner.plan_input_of(trip), planner.PlanParams(60, voice="both", music_file=str(music)))
+    for voice_mode in ("both", "subtitles"):
+        out = tmp_path / f"con_musica_{voice_mode}.mp4"
+        render.Renderer(export_dir, trip, plan, render.RenderOptions(preview_scale=0.1, jobs=2), tmp_path / f"work_{voice_mode}").render(
+            out, voice_mode=voice_mode
+        )
+        info = ffmpeg.probe(out)
+        assert info.has_audio and abs(info.duration_s - plan.total_duration_ms / 1000) <= 3.5
+
+
+def test_tie_break_matches_kotlin_and_helpers():
+    from bitacora_render.planner import PlanInput, PlanMedia, PlanSegment
+
+    t0 = 1_760_000_000_000
+    seg = PlanSegment(
+        "s",
+        "Etapa",
+        "2026-01-01",
+        t0,
+        t0 + 3_600_000,
+        media=[PlanMedia("early", False, t0 + 60_000), PlanMedia("late", False, t0 + 120_000), PlanMedia("far", False, t0 + 3_000_000)],
+    )
+    p = planner.plan(PlanInput("t", "T", None, [seg]), planner.PlanParams(60, include_map=False, include_places=False))
+    photos = [sc.media for sc in p.scenes if sc.type == "photo"]
+    assert "late" in photos and "far" in photos, photos
+    assert ffmpeg.escape_filter_path("/tmp/a'b:c,d.ass") == "/tmp/a\\'b\\:c\\,d.ass"

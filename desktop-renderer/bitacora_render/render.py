@@ -105,7 +105,11 @@ class Renderer:
             ]
             return self.still_clip(cards.stats_card(w, h, title, rows), out, scene.duration_ms)
         if isinstance(scene, Credits):
-            return self.still_clip(cards.credits_card(w, h, scene.lines), out, scene.duration_ms)
+            # The tile provider is a render-time choice, so its credit is added here (review M13).
+            lines = list(scene.lines)
+            if self.tiles is not None and not any(self.opts.tiles_attribution in ln for ln in lines):
+                lines.insert(1, f"Mapa: {self.opts.tiles_attribution}")
+            return self.still_clip(cards.credits_card(w, h, lines), out, scene.duration_ms)
         if isinstance(scene, Photo):
             src = self.media_path(scene.media)
             if src is None:
@@ -174,7 +178,8 @@ class Renderer:
             return out
         if isinstance(scene, MapRoute):
             frames = max(1, round(scene.duration_ms / 1000 * self.fps))
-            proc = ffmpeg.start_rawvideo_pipe(out, w, h, self.fps)
+            log = self.work / f"scene_{i:03d}.ffmpeg.log"
+            proc = ffmpeg.start_rawvideo_pipe(out, w, h, self.fps, log=log)
             try:
                 mapframes.route_frames(
                     self.tracks_of(scene.segments),
@@ -188,9 +193,13 @@ class Renderer:
                 )
             finally:
                 proc.stdin.close()
-                err = proc.stderr.read().decode(errors="replace")
-                if proc.wait() != 0:
-                    raise ffmpeg.FfmpegError(f"ffmpeg (mapa) falló: {err[-1500:]}")
+                code = proc.wait()
+                if proc.stderr is not None and hasattr(proc.stderr, "close"):
+                    proc.stderr.close()
+                if code != 0:
+                    raise ffmpeg.FfmpegError(f"ffmpeg (mapa) falló: {log.read_text(errors='replace')[-1500:] if log.exists() else code}")
+            if self.tiles is not None and self.tiles.failures and self.tiles.hits == 0:
+                raise ffmpeg.FfmpegError(f"ninguna tesela pudo descargarse (primer error: {self.tiles.first_error}); revisá --tiles y la clave")
             return out
         if isinstance(scene, VoiceOverlay):
             last = mapframes.route_frames(
@@ -238,13 +247,13 @@ class Renderer:
             ass = self.work / "voces.ass"
             ass.write_text(subtitles.ass(cues, self.w, self.h), encoding="utf-8")
             with_subs = self.work / "video_subtitulado.mp4"
-            fonts_dir = str(cards.FONTS).replace("\\", "/")
+            fonts_dir = ffmpeg.escape_filter_path(cards.FONTS)  # review M4
             ffmpeg.run(
                 [
                     "-i",
                     str(joined),
                     "-vf",
-                    f"subtitles='{ass.as_posix()}':fontsdir='{fonts_dir}'",
+                    f"subtitles='{ffmpeg.escape_filter_path(ass)}':fontsdir='{fonts_dir}'",
                     "-c:v",
                     "libx264",
                     "-preset",
