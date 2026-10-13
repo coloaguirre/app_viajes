@@ -2,4 +2,5 @@
 <paths>
     <!-- Export ZIPs built for the share sheet (ExportWorker, destination SHARE). -->
     <cache-path name="export" path="export/" />
+    <cache-path name="render" path="render/" />
 </paths>

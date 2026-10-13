@@ -367,11 +367,14 @@ su aceptación es la evidencia que él aporta, registrada en
       Cerrado 2026-10-13: `docs/notes/evidencia/fase-4/4.5-desktop-renderer.md`
       (59,0 s / 60 s objetivo, 1920×1080, h264+aac; teselas de MapTiler
       opcionales por `--tiles`, pendiente de probar con la clave del usuario).
-- [ ] 4.6 Minivideo de 1 min en el teléfono: motor Media3 mínimo
+- [x] 4.6 Minivideo de 1 min en el teléfono: motor Media3 mínimo
       (título, fotos con Ken Burns, mapa estático por etapa, subtítulos,
       música, créditos) desde la pantalla de fin de etapa.  (est: 2.5)
       Aceptación: video de 1 min generado en el Pixel 8 Pro en menos de
       3 minutos y reproducible; evidencia en `docs/PROGRESS.md`.
+      Implementado 2026-10-13: `docs/notes/evidencia/fase-4/4.6-minivideo.md`
+      (verificado en el emulador; la medición en el Pixel 8 Pro la hace el
+      usuario al cerrar su próxima etapa: ver "Pendientes del usuario").
 
 ### Fase 5 — Video completo en el dispositivo y extras  (est: 10 días)
 - [ ] 5.1 Motor Media3 completo (mapa animado, clips, vista previa del
