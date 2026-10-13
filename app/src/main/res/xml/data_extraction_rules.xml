@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup rules (PLAN 3.5). Once any <include> is listed, everything else is
+  left out: the database is NOT backed up (a trip can hold hundreds of thousands of
+  points and the cloud backup caps at 25 MB, a partial copy would be worse than none),
+  nor are audio, models or caches. The real backup is trip.json, written on every
+  segment close under files/backup/ and restorable through import.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="." />
+        <include domain="file" path="datastore/" />
+        <include domain="file" path="backup/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="." />
+        <include domain="file" path="datastore/" />
+        <include domain="file" path="backup/" />
+        <include domain="file" path="audio/" />
+    </device-transfer>
+</data-extraction-rules>

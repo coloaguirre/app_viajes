@@ -38,9 +38,19 @@ class LinkMediaWorker @AssistedInject constructor(
         const val KEY_SEGMENT_ID = "segment_id"
 
         fun enqueue(context: Context, tripId: String, segmentId: String? = null) {
-            val data = Data.Builder().putString(KEY_TRIP_ID, tripId).apply { if (segmentId != null) putString(KEY_SEGMENT_ID, segmentId) }.build()
-            val req = OneTimeWorkRequestBuilder<LinkMediaWorker>().setInputData(data).build()
-            WorkManager.getInstance(context).enqueueUniqueWork("link-$tripId", ExistingWorkPolicy.APPEND_OR_REPLACE, req)
+            WorkManager.getInstance(context).enqueueUniqueWork("link-$tripId", ExistingWorkPolicy.APPEND_OR_REPLACE, request(tripId, segmentId))
         }
+
+        /** Segment/trip close: link, then write the trip.json backup with the result (PLAN 3.5, review I9). */
+        fun enqueueThenBackup(context: Context, tripId: String, segmentId: String? = null) {
+            WorkManager.getInstance(context)
+                .beginUniqueWork("link-$tripId", ExistingWorkPolicy.APPEND_OR_REPLACE, request(tripId, segmentId))
+                .then(com.bitacoraviaje.app.export.BackupWorker.request(tripId))
+                .enqueue()
+        }
+
+        private fun request(tripId: String, segmentId: String?) = OneTimeWorkRequestBuilder<LinkMediaWorker>()
+            .setInputData(Data.Builder().putString(KEY_TRIP_ID, tripId).apply { if (segmentId != null) putString(KEY_SEGMENT_ID, segmentId) }.build())
+            .build()
     }
 }

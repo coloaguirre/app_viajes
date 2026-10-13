@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Export ZIPs built for the share sheet (ExportWorker, destination SHARE). -->
+    <cache-path name="export" path="export/" />
+</paths>

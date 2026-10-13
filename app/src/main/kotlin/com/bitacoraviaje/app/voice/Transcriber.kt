@@ -2,7 +2,7 @@ package com.bitacoraviaje.app.voice
 
 import java.io.File
 
-data class TranscriptSegment(val startMs: Long, val endMs: Long, val text: String)
+data class TranscriptSegment(val startMs: Long, val endMs: Long, val text: String, val confidence: Float? = null)
 
 data class TranscriptResult(val text: String, val segments: List<TranscriptSegment>, val language: String?)
 

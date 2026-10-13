@@ -1,6 +1,7 @@
 // Pure Kotlin/JVM module: no Android dependencies, tests run without emulator.
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 java {
@@ -15,8 +16,20 @@ kotlin {
     }
 }
 
+sourceSets {
+    // docs/trip.schema.json is the contract with the desktop renderer: the writer is validated against it.
+    test {
+        resources.srcDir(rootProject.file("docs"))
+        resources.srcDir(rootProject.file("tools/sample-trips")) // external GPX fixtures
+    }
+}
+
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:geo"))
+    implementation(project(":core:timeline"))
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.json.schema.validator)
 }

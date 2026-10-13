@@ -36,4 +36,17 @@ class UserSettingsTest {
         assertEquals(5, s.restAfterMin)
         assertEquals(listOf("units" to "FURLONGS", "recording_mode" to "TURBO", "rest_after_min" to "999"), invalid)
     }
+
+    @Test
+    fun `invalid transcription model and engine fall back to the defaults with a report`() {
+        val invalid = mutableListOf<Pair<String, String>>()
+        val s = UserSettings.from(null, null, null, transcriptionModel = "huge", transcribeOnlyCharging = true, transcriptionEngine = "cloud") { k, v -> invalid += k to v }
+        assertEquals("base", s.transcriptionModel)
+        assertEquals("auto", s.transcriptionEngine)
+        assertTrue(s.transcribeOnlyCharging)
+        assertEquals(listOf("transcription_model" to "huge", "transcription_engine" to "cloud"), invalid)
+        val ok = UserSettings.from(null, null, null, transcriptionModel = "small", transcriptionEngine = "whisper")
+        assertEquals("small", ok.transcriptionModel)
+        assertEquals("whisper", ok.transcriptionEngine)
+    }
 }

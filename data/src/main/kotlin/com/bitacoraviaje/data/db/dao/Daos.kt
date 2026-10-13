@@ -53,6 +53,9 @@ interface SegmentDao {
     @Query("SELECT * FROM segment WHERE id = :id")
     suspend fun getById(id: String): SegmentEntity?
 
+    @Query("UPDATE segment SET auto_name = :autoName WHERE id = :id")
+    suspend fun setAutoName(id: String, autoName: String?)
+
     @Query("SELECT * FROM segment WHERE trip_id = :tripId ORDER BY started_utc_ms")
     fun observeByTrip(tripId: String): Flow<List<SegmentEntity>>
 
@@ -192,6 +195,9 @@ interface VoiceNoteDao {
     @Query("SELECT * FROM voice_note WHERE segment_id = :segmentId ORDER BY started_utc_ms")
     fun observeBySegment(segmentId: String): Flow<List<VoiceNoteEntity>>
 
+    @Query("SELECT * FROM voice_note WHERE segment_id = :segmentId ORDER BY started_utc_ms")
+    suspend fun getBySegment(segmentId: String): List<VoiceNoteEntity>
+
     @Query("SELECT v.* FROM voice_note v JOIN segment s ON s.id = v.segment_id WHERE s.trip_id = :tripId ORDER BY v.started_utc_ms")
     fun observeByTrip(tripId: String): Flow<List<VoiceNoteEntity>>
 
@@ -212,6 +218,9 @@ interface TextNoteDao {
 
     @Query("SELECT * FROM text_note WHERE segment_id = :segmentId ORDER BY time_utc_ms")
     fun observeBySegment(segmentId: String): Flow<List<TextNoteEntity>>
+
+    @Query("SELECT * FROM text_note WHERE segment_id = :segmentId ORDER BY time_utc_ms")
+    suspend fun getBySegment(segmentId: String): List<TextNoteEntity>
 
     @Query("SELECT t.* FROM text_note t JOIN segment s ON s.id = t.segment_id WHERE s.trip_id = :tripId ORDER BY t.time_utc_ms")
     fun observeByTrip(tripId: String): Flow<List<TextNoteEntity>>

@@ -103,6 +103,30 @@ class DetailScreensComposeTest {
     }
 
     @Test
+    fun `export dialog starts with the chosen options and destination and shows the result`() {
+        val started = mutableListOf<Pair<com.bitacoraviaje.app.export.ExportOptions, com.bitacoraviaje.app.export.ExportDestination>>()
+        rule.setContent {
+            var status by remember { mutableStateOf(com.bitacoraviaje.app.export.ExportStatus()) }
+            BitacoraTheme {
+                com.bitacoraviaje.app.ui.tripdetail.ExportDialog(
+                    status = status,
+                    onDismiss = {},
+                    onStart = { o, d -> started += o to d; status = com.bitacoraviaje.app.export.ExportStatus(finished = true, folder = "Viaje_2026-10-13", mediaWritten = 4, mediaTotal = 5, audioWritten = 2, audioTotal = 2, missing = 1) },
+                    onShareResult = {},
+                    onReset = {},
+                )
+            }
+        }
+        rule.onNodeWithTag("export_opt_filtered").performClick()
+        rule.onNodeWithTag("export_opt_audio").performClick()
+        rule.onNodeWithTag("export_downloads").performClick()
+        assertEquals(listOf(com.bitacoraviaje.app.export.ExportOptions(includeMedia = true, includeAudio = false, includeFilteredPoints = true) to com.bitacoraviaje.app.export.ExportDestination.DOWNLOADS), started)
+        rule.onNodeWithTag("export_done").assertIsDisplayed()
+        rule.onNodeWithText("Fotos y videos: 4 de 5 · Audios: 2 de 2").assertIsDisplayed()
+        rule.onNodeWithTag("export_share_result").assertIsDisplayed()
+    }
+
+    @Test
     fun `media review exposes the three actions and the camera fix only with a suggestion`() {
         var useTrack = 0
         var excluded = 0

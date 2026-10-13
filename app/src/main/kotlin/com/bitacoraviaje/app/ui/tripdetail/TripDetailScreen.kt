@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,16 +32,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.bitacoraviaje.app.R
+import com.bitacoraviaje.app.export.ExportDestination
+import com.bitacoraviaje.app.export.ExportOptions
 import com.bitacoraviaje.app.map.MapRenderer
 import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.tracking.TrackingNotificationFactory
@@ -60,14 +65,50 @@ private val APP_LOCALE: Locale = Locale.forLanguageTag("es-AR")
 @Composable
 fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (String) -> Unit, onVoiceNote: (String) -> Unit, viewModel: TripDetailViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val export by viewModel.export.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showExport by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var pendingMedia by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
+    var pendingAudio by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
+    var pendingFiltered by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val createZip = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        uri?.let { viewModel.startExport(ExportOptions(pendingMedia, pendingAudio, pendingFiltered), ExportDestination.SAF, it) }
+    }
     TripDetailScreen(
         state = state,
         onBack = onBack,
         onTab = viewModel::selectTab,
         onEvent = { e -> if (e is TimelineEvent.Voice) onVoiceNote(e.note.id) else viewModel.focusOn(e) },
         onReview = { onReview(viewModel.tripId) },
+        onExport = { showExport = true },
         map = { s, m -> mapRenderer.TrackMap(s, m) },
     )
+    if (showExport) {
+        ExportDialog(
+            status = export,
+            onDismiss = { showExport = false },
+            onStart = { opts, dest ->
+                when (dest) {
+                    ExportDestination.SAF -> {
+                        pendingMedia = opts.includeMedia
+                        pendingAudio = opts.includeAudio
+                        pendingFiltered = opts.includeFilteredPoints
+                        createZip.launch(com.bitacoraviaje.core.export.Names.packageFolder(state.trip?.title ?: "viaje", System.currentTimeMillis(), state.segments.firstOrNull()?.segment?.tzId ?: "UTC") + ".zip")
+                    }
+                    else -> viewModel.startExport(opts, dest)
+                }
+            },
+            onShareResult = { export.resultUri?.let { shareExport(context, it) } },
+            onReset = viewModel::dismissExport,
+        )
+    }
+}
+
+/** Share sheet for a finished export: a cache file goes through the FileProvider, a MediaStore/SAF uri as is. */
+private fun shareExport(context: android.content.Context, result: String) {
+    val uri = if (result.startsWith("content://")) result.toUri() else androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".files", java.io.File(result))
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("application/zip").putExtra(android.content.Intent.EXTRA_STREAM, uri).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(android.content.Intent.createChooser(send, context.getString(R.string.export_share)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,6 +119,7 @@ fun TripDetailScreen(
     onTab: (Int) -> Unit,
     onEvent: (TimelineEvent) -> Unit,
     onReview: () -> Unit,
+    onExport: () -> Unit = {},
     map: @Composable (TrackMapState, Modifier) -> Unit = { _, m -> Box(m) },
 ) {
     val titles = listOf(R.string.tab_timeline, R.string.tab_map, R.string.tab_photos)
@@ -86,6 +128,7 @@ fun TripDetailScreen(
             TopAppBar(
                 title = { Text(state.trip?.title ?: "") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
+                actions = { IconButton(onClick = onExport, modifier = Modifier.testTag("trip_export")) { Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.export_title)) } },
             )
         },
     ) { padding ->
@@ -135,7 +178,7 @@ private fun segmentTitle(st: SegmentTimeline): String {
         else -> stringResource(R.string.type_stage)
     }
     val dist = s.stats.distanceM?.let { " · " + TrackingNotificationFactory.formatKm(it) } ?: ""
-    return "${DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(date)} · ${s.title ?: kind}$dist"
+    return "${DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(date)} · ${s.displayName ?: kind}$dist"
 }
 
 @Composable

@@ -87,8 +87,29 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 5 to 6 adds auto_name, keeps camera offsets of existing trips and drops orphans`() {
+        helper.createDatabase(DB_NAME, 5).use { v5 ->
+            v5.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v5.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'FINISHED')")
+            v5.execSQL("INSERT INTO camera_clock_offset (trip_id,camera,offset_ms) VALUES ('t','Cam',60000)")
+            v5.execSQL("INSERT INTO camera_clock_offset (trip_id,camera,offset_ms) VALUES ('gone','Cam',1)")
+        }
+        val v6 = helper.runMigrationsAndValidate(DB_NAME, 6, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v6.query("SELECT auto_name FROM segment WHERE id='s'").use { c -> c.moveToFirst(); assertEquals(null, c.getString(0)) }
+        v6.execSQL("UPDATE segment SET auto_name='Sendero' WHERE id='s'")
+        v6.query("SELECT COUNT(*) FROM camera_clock_offset").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0), "orphan offset of a missing trip dropped") }
+        // The rebuilt table carries the foreign key (cascade itself is Room's open callback, as in DaoTest).
+        v6.query("PRAGMA foreign_key_list(camera_clock_offset)").use { c -> assertTrue(c.moveToFirst()); assertEquals("trip", c.getString(c.getColumnIndexOrThrow("table"))) }
+        v6.query("PRAGMA index_list(voice_note)").use { c ->
+            val names = generateSequence { if (c.moveToNext()) c.getString(c.getColumnIndexOrThrow("name")) else null }.toList()
+            assertTrue("idx_voice_media" in names, "voice_note.media_item_id indexed: $names")
+        }
+        v6.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(5, BitacoraDatabase.VERSION)
+        assertEquals(6, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

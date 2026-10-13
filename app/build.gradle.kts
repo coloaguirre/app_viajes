@@ -49,6 +49,11 @@ android {
         buildConfig = true
     }
 
+    sourceSets {
+        // Sample trips (GPX) are shared fixtures with core/geo and the emulator replay.
+        getByName("test").resources.srcDir(rootProject.file("tools/sample-trips"))
+    }
+
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
@@ -65,6 +70,9 @@ dependencies {
     implementation(project(":core:geo"))
     implementation(project(":core:timeline"))
     implementation(project(":core:export"))
+    implementation(project(":whisper"))
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json) // OSM answers (enrichment)
     implementation(project(":data"))
 
     implementation(libs.androidx.core.ktx)
@@ -101,6 +109,7 @@ dependencies {
     // In-memory Room for the linker tests (review M10); the data module exposes it as implementation only.
     testImplementation(libs.androidx.room.runtime)
     testImplementation(libs.androidx.room.ktx)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.compose.ui.test.manifest)

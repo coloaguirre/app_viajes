@@ -64,7 +64,8 @@ class NotesController @Inject constructor(
             lat = pos.lat, lon = pos.lon, hAccuracyM = pos.accuracyM, audioPath = VoiceRecorder.relativePath(tripId, noteId), mediaItemId = mediaItemId,
         )
         notes.addVoiceNote(note)
-        TranscribeWorker.enqueue(context, noteId, prefs.settings.first().transcriptionLanguage)
+        val s = prefs.settings.first()
+        TranscribeWorker.enqueue(context, noteId, s.transcriptionLanguage, onlyWhenCharging = s.transcribeOnlyCharging)
         return note
     }
 

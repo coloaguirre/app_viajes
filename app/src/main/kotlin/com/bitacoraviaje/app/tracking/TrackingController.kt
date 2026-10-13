@@ -119,7 +119,11 @@ class TrackingController @Inject constructor(
         stopServiceAndAwaitFlush()
         val done = repository.finishSegment(segmentId, SegmentStatus.FINISHED)
         stateHolder.reset()
-        done?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, it.tripId, it.id) }
+        done?.let {
+            // Link photos first, then the backup (review I9): the trip.json must hold the last linked photos.
+            com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, it.tripId, it.id)
+            com.bitacoraviaje.app.enrichment.EnrichRouteWorker.enqueue(context, it.id) // PLAN 3.6: name from the map when online
+        }
         val parentId = done?.parentSegmentId ?: return null
         val parent = repository.getSegment(parentId)?.takeIf { it.status == SegmentStatus.PAUSED } ?: return null
         repository.resume(parent.id)
@@ -131,7 +135,7 @@ class TrackingController @Inject constructor(
         stopServiceAndAwaitFlush()
         repository.finishTrip(tripId)
         stateHolder.reset()
-        com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, tripId)
+        com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, tripId)
     }
 
     suspend fun pauseInDb(segmentId: String, kind: PauseKind) = repository.pause(segmentId, kind)

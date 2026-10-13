@@ -30,6 +30,7 @@ import com.bitacoraviaje.data.db.entity.TripEntity
  *  3 — item 2.2: media_item (photos and videos linked to the trip).
  *  4 — items 2.4/2.5: voice_note and text_note.
  *  5 — item 2.7: camera_clock_offset (per-camera clock fix that survives rescans).
+ *  6 — item 3.6: segment.auto_name; camera_clock_offset gets its FK to trip; voice_note.media_item_id indexed.
  */
 @Database(
     entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class],
@@ -47,7 +48,7 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun cameraClockOffsetDao(): CameraClockOffsetDao
 
     companion object {
-        const val VERSION = 5
+        const val VERSION = 6
         const val NAME = "bitacora.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -147,6 +148,24 @@ abstract class BitacoraDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE segment ADD COLUMN auto_name TEXT DEFAULT NULL")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_voice_media ON voice_note (media_item_id)")
+                // SQLite cannot add a foreign key in place: rebuild the small table.
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS camera_clock_offset_new (
+                        trip_id TEXT NOT NULL, camera TEXT NOT NULL, offset_ms INTEGER NOT NULL,
+                        PRIMARY KEY(trip_id, camera),
+                        FOREIGN KEY(trip_id) REFERENCES trip(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )""",
+                )
+                db.execSQL("INSERT OR IGNORE INTO camera_clock_offset_new (trip_id, camera, offset_ms) SELECT c.trip_id, c.camera, c.offset_ms FROM camera_clock_offset c JOIN trip t ON t.id = c.trip_id")
+                db.execSQL("DROP TABLE camera_clock_offset")
+                db.execSQL("ALTER TABLE camera_clock_offset_new RENAME TO camera_clock_offset")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
     }
 }

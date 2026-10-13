@@ -49,7 +49,12 @@ data class Segment(
     val autoCreated: Boolean = false,
     val status: SegmentStatus,
     val stats: SegmentStats = SegmentStats(),
-)
+    /** Name derived from the map (road, localities or trail), PLAN 3.6; the user's [title] wins when set. */
+    val autoName: String? = null,
+) {
+    /** What to show: the user's title, else the derived name. */
+    val displayName: String? get() = title ?: autoName
+}
 
 data class SegmentPause(
     val id: String,

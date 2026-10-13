@@ -237,7 +237,9 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: consumo de batería por hora y captura de las
       estadísticas registrados en `docs/PROGRESS.md`; si Full supera el
       8 %/h se abre un ítem de ajuste de perfiles.
-
+      Estado 2026-10-12: salida de 46 min en auto, modo Full, con 5 fotos y 2
+      notas de voz (`docs/notes/evidencia/fase-1/1.7-prueba-de-campo.md`);
+      falta la medición de batería con pantalla apagada en Económico (y Full).
 ### Fase 2 — Fotos, voz y línea de tiempo (MVP 2)  (est: 12.5 días)
 - [x] 2.1 Permisos de medios en contexto (Android 13/14+, acceso parcial,
       `ACCESS_MEDIA_LOCATION` con original) con pantallas explicativas y
@@ -257,16 +259,16 @@ su aceptación es la evidencia que él aporta, registrada en
       medio de transporte, desfase de reloj de cámara automático (GPS
       UTC) y manual, confianza por método.  (est: 1.5)
       Aceptación: un test por caso de §7.6, todos verdes.
-- [ ] 2.4 Notas de voz: grabación AAC, `VoiceNoteActivity` desde la
+- [x] 2.4 Notas de voz: grabación AAC, `VoiceNoteActivity` desde la
       notificación y la pantalla bloqueada, posición al grabar;
       transcripción con el reconocedor del sistema desde archivo (API
       33+, con detección de soporte y stub de respaldo) detrás de
       `Transcriber`.  (est: 2.5)
       Aceptación: nota grabada en el emulador aparece en la línea de
       tiempo con ubicación; tests de la interfaz con stub.
-      Estado 2026-10-12: aceptación cumplida en el emulador (nota en la línea
-      de tiempo con ubicación, detalle editable, reintento); queda la prueba
-      con micrófono real y transcripción en el Pixel, que se hace junto con 2.8.
+      Cerrado 2026-10-13: además del emulador, dos notas reales del usuario
+      grabadas en el Pixel 8 Pro se transcribieron completas sin internet
+      (PR #6; evidencia en `2.4-2.5-notas.md`).
 - [x] 2.5 Notas de texto, marcadores y destacados.  (est: 0.5)
       Aceptación: tests de DAO; aparecen en la línea de tiempo.
 - [x] 2.6 `core/timeline`: `buildTimeline` puro con agrupación de
@@ -288,34 +290,45 @@ su aceptación es la evidencia que él aporta, registrada en
       vehículo en el emulador hace que el filtro acepte 20 m/s sin rechazar.
 
 ### Fase 3 — Exportación, transcripción local y tareas largas  (est: 12 días)
-- [ ] 3.1 `core/export`: `trip.json` + JSON Schema, GPX 1.1 con
+- [x] 3.1 `core/export`: `trip.json` + JSON Schema, GPX 1.1 con
       extensiones propias y de Garmin validado contra XSD, KML/KMZ
       particionado por capa dentro de los límites de My Maps, GeoJSON,
       CSV UTF-8 con BOM, Markdown, HTML autocontenido con Leaflet, SRT.  (est: 4)
       Aceptación: tests validan cada formato; test de conciliación de
       conteos base = ZIP con faltantes listados en `LEEME.txt`.
-- [ ] 3.2 Gestor de tareas largas (servicios `dataSync` /
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.1-export.md`); sin
+      extensiones de Garmin: la app no tiene los datos de sensores que llevan.
+- [x] 3.2 Gestor de tareas largas (servicios `dataSync` /
       `mediaProcessing` con tiempo límite y reanudación por checkpoint);
       `ExportWorker` con ZIP y destinos (SAF, compartir, Download).  (est: 2)
       Aceptación: exporta un viaje sintético de 30 días; una interrupción
       simulada reanuda sin duplicar.
-- [ ] 3.3 Importación de `trip.json` y de GPX externo.  (est: 1)
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.2-export-worker.md`);
+      `mediaProcessing` queda para el render de video (Fase 5).
+- [x] 3.3 Importación de `trip.json` y de GPX externo.  (est: 1)
       Aceptación: exportar e importar un viaje da la misma base (test).
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.3-import.md`).
 - [ ] 3.4 whisper.cpp con NDK (alineado a 16 KB), descarga de modelo,
       VAD obligatorio, confianza por segmento, `TranscribeWorker`;
       medición `base` vs `small` con notas reales del usuario.  (est: 3)
       Aceptación: transcribe una nota de prueba en español; tasa de
       error medida sobre al menos 10 notas reales en `docs/PROGRESS.md`
       y default elegido con ese dato.
-- [ ] 3.5 Respaldo: base excluida del Auto Backup; `trip.json`
+      Estado 2026-10-13: módulo nativo, VAD, confianza, descarga verificada
+      y motor configurable hechos; transcribe notas reales en español
+      (`docs/notes/evidencia/fase-3/3.4-whisper.md`). Falta la medición
+      sobre ≥10 notas (salida 2.8) para fijar el default con datos.
+- [x] 3.5 Respaldo: base excluida del Auto Backup; `trip.json`
       automático al cerrar cada etapa.  (est: 0.5)
       Aceptación: reglas de extracción verificadas en test; archivo
       generado al cerrar una etapa en el emulador.
-- [ ] 3.6 Nombre de ruta y detección de senderos (Nominatim, Overpass)
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.5-respaldo.md`).
+- [x] 3.6 Nombre de ruta y detección de senderos (Nominatim, Overpass)
       con política de resiliencia (User-Agent, caché, backoff, instancia
       cambiable en Ajustes).  (est: 1)
       Aceptación: el trekking de ejemplo recibe nombre de sendero (test
       con respuestas grabadas).
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.6-nombre-de-ruta.md`).
 - [ ] 3.7 **(usuario)** Importar el KML en Google My Maps y abrir el
       HTML en la PC.  (est: 0.5)
       Aceptación: captura de My Maps y del HTML en `docs/notes/evidencia/fase-3/`.
