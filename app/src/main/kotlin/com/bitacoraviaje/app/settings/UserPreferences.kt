@@ -18,6 +18,11 @@ import kotlinx.coroutines.flow.map
 
 const val DEFAULT_TRANSCRIPTION_LANGUAGE: String = "es-AR"
 const val DEFAULT_REST_AFTER_MIN: Int = 5
+const val DEFAULT_TRANSCRIPTION_MODEL: String = "base"
+
+/** "auto" = best engine available (system on-device recognizer, then whisper); "whisper"; "system". */
+const val DEFAULT_TRANSCRIPTION_ENGINE: String = "auto"
+val TRANSCRIPTION_ENGINES: List<String> = listOf("auto", "whisper", "system")
 val REST_AFTER_OPTIONS_MIN: List<Int> = listOf(3, 5, 10, 15)
 
 data class UserSettings(
@@ -26,6 +31,10 @@ data class UserSettings(
     val transcriptionLanguage: String = DEFAULT_TRANSCRIPTION_LANGUAGE,
     /** Minutes still before the automatic rest state kicks in (adenda 1). */
     val restAfterMin: Int = DEFAULT_REST_AFTER_MIN,
+    /** whisper model id ("base" | "small"), PLAN 3.4. */
+    val transcriptionModel: String = DEFAULT_TRANSCRIPTION_MODEL,
+    val transcribeOnlyCharging: Boolean = false,
+    val transcriptionEngine: String = DEFAULT_TRANSCRIPTION_ENGINE,
 ) {
     companion object {
         /**
@@ -38,6 +47,9 @@ data class UserSettings(
             recordingMode: String?,
             transcriptionLanguage: String?,
             restAfterMin: Int? = null,
+            transcriptionModel: String? = null,
+            transcribeOnlyCharging: Boolean? = null,
+            transcriptionEngine: String? = null,
             onInvalid: (key: String, value: String) -> Unit = { _, _ -> },
         ): UserSettings = UserSettings(
             units = parseEnum<Units>(units, Units.METRIC) { onInvalid("units", it) },
@@ -47,6 +59,17 @@ data class UserSettings(
                 restAfterMin == null -> DEFAULT_REST_AFTER_MIN
                 restAfterMin in 1..120 -> restAfterMin
                 else -> { onInvalid("rest_after_min", restAfterMin.toString()); DEFAULT_REST_AFTER_MIN }
+            },
+            transcriptionModel = when (transcriptionModel) {
+                null -> DEFAULT_TRANSCRIPTION_MODEL
+                "base", "small" -> transcriptionModel
+                else -> { onInvalid("transcription_model", transcriptionModel); DEFAULT_TRANSCRIPTION_MODEL }
+            },
+            transcribeOnlyCharging = transcribeOnlyCharging ?: false,
+            transcriptionEngine = when (transcriptionEngine) {
+                null -> DEFAULT_TRANSCRIPTION_ENGINE
+                in TRANSCRIPTION_ENGINES -> transcriptionEngine
+                else -> { onInvalid("transcription_engine", transcriptionEngine); DEFAULT_TRANSCRIPTION_ENGINE }
             },
         )
 
@@ -67,6 +90,9 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
         val RECORDING_MODE = stringPreferencesKey("recording_mode")
         val TRANSCRIPTION_LANGUAGE = stringPreferencesKey("transcription_language")
         val REST_AFTER_MIN = intPreferencesKey("rest_after_min")
+        val TRANSCRIPTION_MODEL = stringPreferencesKey("transcription_model")
+        val TRANSCRIBE_ONLY_CHARGING = androidx.datastore.preferences.core.booleanPreferencesKey("transcribe_only_charging")
+        val TRANSCRIPTION_ENGINE = stringPreferencesKey("transcription_engine")
     }
 
     val settings: Flow<UserSettings> = context.settingsStore.data.map { p ->
@@ -76,6 +102,9 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
             transcriptionLanguage = p[Keys.TRANSCRIPTION_LANGUAGE],
             restAfterMin = p[Keys.REST_AFTER_MIN],
             onInvalid = { key, value -> Log.w(TAG, "Ignoring invalid stored setting $key=$value, using default") },
+            transcriptionModel = p[Keys.TRANSCRIPTION_MODEL],
+            transcribeOnlyCharging = p[Keys.TRANSCRIBE_ONLY_CHARGING],
+            transcriptionEngine = p[Keys.TRANSCRIPTION_ENGINE],
         )
     }
 
@@ -88,6 +117,12 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
         context.settingsStore.edit { it[Keys.TRANSCRIPTION_LANGUAGE] = tag }
 
     suspend fun setRestAfterMin(minutes: Int) = context.settingsStore.edit { it[Keys.REST_AFTER_MIN] = minutes }
+
+    suspend fun setTranscriptionModel(id: String) = context.settingsStore.edit { it[Keys.TRANSCRIPTION_MODEL] = id }
+
+    suspend fun setTranscribeOnlyCharging(value: Boolean) = context.settingsStore.edit { it[Keys.TRANSCRIBE_ONLY_CHARGING] = value }
+
+    suspend fun setTranscriptionEngine(id: String) = context.settingsStore.edit { it[Keys.TRANSCRIPTION_ENGINE] = id }
 
     private companion object {
         const val TAG = "Bitacora"

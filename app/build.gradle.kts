@@ -65,6 +65,7 @@ dependencies {
     implementation(project(":core:geo"))
     implementation(project(":core:timeline"))
     implementation(project(":core:export"))
+    implementation(project(":whisper"))
     implementation(project(":data"))
 
     implementation(libs.androidx.core.ktx)

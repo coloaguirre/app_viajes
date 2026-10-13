@@ -12,7 +12,7 @@
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
-| 3 — Exportación y transcripción local | 🟨 3.1–3.3 cerrados | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` (+capturas) |
+| 3 — Exportación y transcripción local | 🟨 3.1–3.3 cerrados; 3.4 hecho salvo la medición con ≥10 notas | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` (+capturas) |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
 | 6 — Pulido y publicación | ⬜ Pendiente | |
@@ -54,6 +54,8 @@
 | 2026-10-13 | Exportación (3.1): `core/export` puro con un escritor por formato y ZIP en streaming; `trip.json` con esquema en `docs/trip.schema.json` (versión 1) validado en tests; GPX validado contra el XSD oficial; sin extensiones de Garmin (sin datos de sensores); límites de My Maps como constantes | DISENO §12; skill trip-export |
 | 2026-10-13 | Exportación (3.2): staging con manifiesto como checkpoint (cada entrada un archivo en caché; el ZIP se arma al final), worker `dataSync` único por viaje con política KEEP, destinos SAF / Descargas (MediaStore, API 29+) / compartir (FileProvider); en API 26–28 Descargas cae a compartir. Presupuesto `dataSync` de 6 h/día en Android 15+ anotado | DISENO §12.4; skill trip-export |
 | 2026-10-13 | Importación (3.3): ZIP / trip.json / GPX por el selector del sistema; conflicto de id → reemplazar o copia con ids regenerados; medios copiados a `Pictures/BitacoraViaje/<viaje>/` con su id de MediaStore guardado (evita que el barrido los duplique); GPX con SAX (StAX no existe en Android); GPX sin horas → horas ficticias + aviso. En API 26–28 los medios del ZIP no se copian (permiso heredado) | DISENO §12.5 |
+| 2026-10-13 | whisper.cpp v1.9.5 como submódulo, NDK r29 + CMake 4.1.2, solo CPU, `-O3` en debug, 16 KB; VAD Silero obligatorio; modelos `base`/`small` descargados y verificados por SHA-256, nunca en el APK | DISENO §8.3; PLAN 3.4 |
+| 2026-10-13 | Motor de transcripción por defecto **Automático** (reconocedor del sistema primero, whisper de respaldo) en lugar de whisper primero: con 2 notas reales el sistema no tuvo errores y whisper `base` tuvo ~20–40 % de palabras mal (emulador). Se revisa con ≥10 notas en el Pixel (`3.4-whisper.md`) | Dato manda sobre la doctrina de DISENO §8.3 |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -71,6 +73,10 @@
 | Hilt | 2.60.1 | 2026-10-11 |
 | Room | 2.8.5 (plugin `androidx.room`, esquemas en `data/schemas/`) | 2026-10-11 |
 | kotlinx-serialization-json | 1.11.0 (misma que serialization-core) | 2026-10-13 |
+| whisper.cpp (submódulo) | v1.9.5 | 2026-10-13 |
+| NDK | 29.0.14206865 | 2026-10-13 |
+| CMake (SDK) | 4.1.2 | 2026-10-13 |
+| Modelos whisper (ggml, Hugging Face) | base 60ed5bc3…, small 1be3a9b2…, VAD silero v5.1.2 29940d98… (SHA-256 completos en `ModelCatalog`) | 2026-10-13 |
 | json-schema-validator (optimumcode, solo tests) | 0.5.5 | 2026-10-13 |
 | androidx.test core-ktx / runner | 1.7.0 / 1.7.0 | 2026-10-12 |
 | Navigation Compose / Activity Compose / Lifecycle | 2.10.2 / 1.13.0 / 2.11.0 | 2026-10-11 |

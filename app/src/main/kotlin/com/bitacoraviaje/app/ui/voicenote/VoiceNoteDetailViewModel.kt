@@ -89,7 +89,8 @@ class VoiceNoteDetailViewModel @Inject constructor(
     fun retryTranscription() {
         viewModelScope.launch {
             notes.setTranscriptStatus(noteId, TranscriptStatus.PENDING)
-            TranscribeWorker.enqueue(context, noteId, prefs.settings.first().transcriptionLanguage, replace = true)
+            val s = prefs.settings.first()
+            TranscribeWorker.enqueue(context, noteId, s.transcriptionLanguage, replace = true, onlyWhenCharging = s.transcribeOnlyCharging)
         }
     }
 
