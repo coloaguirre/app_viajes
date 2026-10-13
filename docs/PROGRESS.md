@@ -3,7 +3,7 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **2 — Fotos, voz y línea de tiempo, en curso** (iniciada el 2026-10-12 por decisión del usuario con el ítem 1.7 de la Fase 1 todavía abierto: la prueba de campo de 1 h se hace en paralelo y cierra la Fase 1 formalmente; la Fase 1 ya está mergeada en `dev`)..
+- Fase: **2 mergeada en `dev` (PR #5, 2026-10-13) con 2.8 abierto; Fase 3 iniciada en `feat/fase-3-exportacion`.** Los ítems de campo 1.7 y 2.8 siguen abiertos y cierran sus fases formalmente (1.7 parcial: salida de 46 min en auto, Full).
 - Última actualización: 2026-10-12
 
 ## Fases
@@ -135,4 +135,5 @@ Observaciones de la verificación (ítem 0.1):
 ## Pendientes del usuario
 - [x] Definir nombre y `applicationId` (D1) — default confirmado 2026-10-11
 - [x] Crear clave gratuita de MapTiler y ponerla en `local.properties` — hecho 2026-10-12
-- [ ] Ítem 1.7: prueba real de 1 h caminando con el Pixel 8 Pro (Full y Económico), registrar batería por hora
+- [ ] Ítem 1.7: hecha una salida de 46 min en auto en Full (2026-10-12, ver evidencia); falta 1 h con pantalla apagada en Económico (y Full), anotando batería al inicio y al final
+- [ ] Ítem 2.8: las 5 fotos de la salida quedaron vinculadas solas; reintentar la transcripción de las 2 notas de voz desde el detalle con la build nueva y avisar si falla

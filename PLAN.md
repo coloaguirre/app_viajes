@@ -237,7 +237,9 @@ su aceptación es la evidencia que él aporta, registrada en
       Aceptación: consumo de batería por hora y captura de las
       estadísticas registrados en `docs/PROGRESS.md`; si Full supera el
       8 %/h se abre un ítem de ajuste de perfiles.
-
+      Estado 2026-10-12: salida de 46 min en auto, modo Full, con 5 fotos y 2
+      notas de voz (`docs/notes/evidencia/fase-1/1.7-prueba-de-campo.md`);
+      falta la medición de batería con pantalla apagada en Económico (y Full).
 ### Fase 2 — Fotos, voz y línea de tiempo (MVP 2)  (est: 12.5 días)
 - [x] 2.1 Permisos de medios en contexto (Android 13/14+, acceso parcial,
       `ACCESS_MEDIA_LOCATION` con original) con pantallas explicativas y
