@@ -3,7 +3,7 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **2 mergeada en `dev` (PR #5, 2026-10-13) con 2.8 abierto; Fase 3 iniciada en `feat/fase-3-exportacion`.** Los ítems de campo 1.7 y 2.8 siguen abiertos y cierran sus fases formalmente (1.7 parcial: salida de 46 min en auto, Full).
+- Fase: **3 mergeada en `dev` (PR #7, 2026-10-13) con 3.7 (usuario) y la medición de 3.4 abiertos; Fase 4 iniciada en `feat/fase-4-enriquecimiento`.** Siguen abiertos los ítems de campo 1.7, 2.8 y 3.7, que cierran sus fases formalmente.
 - Última actualización: 2026-10-13
 
 ## Fases
