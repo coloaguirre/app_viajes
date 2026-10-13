@@ -54,13 +54,15 @@ fun FinishSegmentRoute(onCancel: () -> Unit, onDone: () -> Unit, onResumeParent:
 /** Plays or shares the finished MP4 (a MediaStore uri; a cache file goes through the FileProvider). */
 private fun openVideo(context: android.content.Context, result: String, share: Boolean) {
     val parsed = android.net.Uri.parse(result)
-    val uri = if (result.startsWith("content://")) parsed else androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".files", java.io.File(parsed.path ?: result))
+    // cache/render/ is a declared FileProvider root (review I4); any failure shows a toast instead of crashing.
+    val uri = runCatching { if (result.startsWith("content://")) parsed else androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".files", java.io.File(parsed.path ?: result)) }
+        .getOrElse { android.widget.Toast.makeText(context, R.string.finish_video_open_failed, android.widget.Toast.LENGTH_SHORT).show(); return }
     val intent = if (share) {
         android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("video/mp4").putExtra(android.content.Intent.EXTRA_STREAM, uri).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION), context.getString(R.string.finish_video_share))
     } else {
         android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, "video/mp4").addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure { android.widget.Toast.makeText(context, R.string.finish_video_open_failed, android.widget.Toast.LENGTH_SHORT).show() }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,7 +121,10 @@ private fun VideoBlock(render: com.bitacoraviaje.app.video.RenderStatus, onCreat
                     androidx.compose.material3.LinearProgressIndicator(progress = { render.progress / 100f }, modifier = Modifier.fillMaxWidth())
                 }
                 render.finished && render.resultUri != null -> {
-                    Text(stringResource(R.string.finish_video_done, render.durationMs / 1000, render.elapsedMs / 1000), modifier = Modifier.testTag("video_done"))
+                    Text(
+                        stringResource(R.string.finish_video_done, render.durationMs / 1000, render.elapsedMs / 1000) + if (render.skipped > 0) " · " + androidx.compose.ui.res.pluralStringResource(R.plurals.finish_video_skipped, render.skipped, render.skipped) else "",
+                        modifier = Modifier.testTag("video_done"),
+                    )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(onClick = { onOpen(render.resultUri) }, modifier = Modifier.weight(1f).testTag("video_open")) { Text(stringResource(R.string.finish_video_open)) }
                         OutlinedButton(onClick = { onShare(render.resultUri) }, modifier = Modifier.weight(1f).testTag("video_share")) { Text(stringResource(R.string.finish_video_share)) }

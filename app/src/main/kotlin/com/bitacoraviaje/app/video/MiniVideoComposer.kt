@@ -3,7 +3,10 @@ package com.bitacoraviaje.app.video
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.RectF
 import android.net.Uri
 import androidx.core.net.toUri
 import androidx.exifinterface.media.ExifInterface
@@ -12,7 +15,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.Presentation
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -25,13 +27,16 @@ import com.bitacoraviaje.core.videoplan.PlanInput
 import com.bitacoraviaje.core.videoplan.VideoPlan
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.max
 
 /**
- * Turns a [VideoPlan] into a Media3 [Composition] (DISENO §13.6, skill trip-video §4):
- * cards are drawn to JPEG files and enter as image items; photos get a Ken Burns
- * [MatrixTransformation] and a caption/subtitle [BitmapOverlay]; an optional music
- * sequence loops under the video. Every item is scaled to the output size with
- * [Presentation], so the sequence has one format.
+ * Turns a [VideoPlan] into a Media3 [Composition] (DISENO §13.6, skill trip-video §4).
+ * Every scene becomes a frame-sized JPEG "still" (cards drawn with Canvas; photos scaled to
+ * cover the frame, vertical ones over their own blurred copy like the desktop renderer,
+ * review I5) so the sequence has one format and no Presentation effect is needed. Photos get a
+ * Ken Burns [MatrixTransformation] timed from the item's start inside the composition
+ * (review B1) and a subtitle [BitmapOverlay] the size of its panel (review M8). Music is a
+ * Fase 5 feature (full engine); the preset never asks for it.
  */
 @UnstableApi
 class MiniVideoComposer(
@@ -43,54 +48,67 @@ class MiniVideoComposer(
 ) {
     data class Built(val composition: Composition, val durationMs: Long, val skipped: List<String>)
 
-    fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, points: List<TrackPoint>, mapBase: Bitmap?): Built {
+    fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, points: List<TrackPoint>, mapBase: RouteSnapshotter.RouteBase?): Built {
         workDir.mkdirs()
         val items = ArrayList<EditedMediaItem>()
         val skipped = ArrayList<String>()
-        var total = 0L
+        var startUs = 0L
         val segment = input.segments.firstOrNull()
-        var kenIndex = 0
+        val mapAttribution = "© OpenStreetMap contributors"
         for ((i, scene) in plan.scenes.withIndex()) {
+            val durationMs = scene.durationMs
             val item: EditedMediaItem? = when (scene) {
-                is VideoPlan.Title -> image(card("title_$i", Cards.title(width, height, scene.title, scene.subtitle, media[scene.background_media ?: ""]?.let(::decode))), scene.duration_ms)
-                is VideoPlan.Chapter -> image(card("chapter_$i", Cards.chapter(width, height, scene.title, scene.date)), scene.duration_ms)
-                is VideoPlan.PlaceCard -> image(card("place_$i", Cards.place(width, height, scene.title, scene.text, scene.source)), scene.duration_ms)
+                is VideoPlan.Title -> {
+                    val cover = media[scene.background_media ?: ""]?.let(::decode)
+                    image(card("title_$i", Cards.title(width, height, scene.title, scene.subtitle, cover)), durationMs).also { cover?.recycle() }
+                }
+                is VideoPlan.Chapter -> image(card("chapter_$i", Cards.chapter(width, height, scene.title, scene.date)), durationMs)
+                is VideoPlan.PlaceCard -> image(card("place_$i", Cards.place(width, height, scene.title, scene.text, scene.source)), durationMs)
                 is VideoPlan.Stats -> image(
                     card(
                         "stats_$i",
                         Cards.stats(
-                            width, height, segment?.title ?: "Estadísticas",
-                            listOf("distancia" to Cards.fmtKm(scene.distance_m), "en movimiento" to Cards.fmtDur(scene.moving_time_ms), "desnivel +" to Cards.fmtM(scene.elevation_gain_m), "altura máx." to Cards.fmtM(scene.max_alt_m), "fotos" to (scene.photos?.toString() ?: "—")),
+                            width, height, segment?.title ?: context.getString(com.bitacoraviaje.app.R.string.video_stats_title),
+                            listOf(
+                                context.getString(com.bitacoraviaje.app.R.string.video_stat_distance) to Cards.fmtKm(scene.distance_m),
+                                context.getString(com.bitacoraviaje.app.R.string.video_stat_moving) to Cards.fmtDur(scene.moving_time_ms),
+                                context.getString(com.bitacoraviaje.app.R.string.video_stat_gain) to Cards.fmtM(scene.elevation_gain_m),
+                                context.getString(com.bitacoraviaje.app.R.string.video_stat_max_alt) to Cards.fmtM(scene.max_alt_m),
+                                context.getString(com.bitacoraviaje.app.R.string.video_stat_photos) to (scene.photos?.toString() ?: "—"),
+                            ),
                         ),
                     ),
-                    scene.duration_ms,
+                    durationMs,
                 )
-                is VideoPlan.Credits -> image(card("credits_$i", Cards.credits(width, height, scene.lines)), scene.duration_ms)
-                is VideoPlan.MapRoute -> image(card("map_$i", Cards.route(width, height, points, mapBase, if (mapBase != null) MiniVideoPlanner.TILES_CREDIT.removePrefix("Mapa: ") else "© OpenStreetMap contributors")), scene.duration_ms)
-                is VideoPlan.VoiceOverlay -> image(card("voice_$i", Cards.route(width, height, points, mapBase, "© OpenStreetMap contributors").also { b -> scene.text?.let { overlayOn(b, Cards.caption(width, height, it)) } }), scene.duration_ms)
+                is VideoPlan.Credits -> {
+                    // The tile provider is credited only when its map was actually used (review M1).
+                    val lines = if (mapBase == null) scene.lines.filterNot { it == MiniVideoPlanner.TILES_CREDIT } else scene.lines
+                    image(card("credits_$i", Cards.credits(width, height, lines)), durationMs)
+                }
+                is VideoPlan.MapRoute -> image(card("map_$i", Cards.route(width, height, points, mapBase?.bitmap, mapAttribution, mapBase?.projected)), durationMs)
+                is VideoPlan.VoiceOverlay -> image(
+                    card("voice_$i", Cards.route(width, height, points, mapBase?.bitmap, mapAttribution, mapBase?.projected).also { b -> scene.text?.let { overlayOn(b, Cards.caption(width, height, it)) } }),
+                    durationMs,
+                )
                 is VideoPlan.Photo -> {
                     val m = media[scene.media]
-                    val uri = m?.contentUri?.toUri()
-                    if (uri == null) { skipped += scene.media; null } else {
+                    val still = m?.let { still("photo_$i", it) }
+                    if (still == null) { skipped += scene.media; null } else {
                         val subtitle = scene.subtitle_from_voice?.let { voices[it]?.displayText } ?: scene.caption
-                        photo(uri, scene.duration_ms, scene.kenburns, subtitle, kenIndex++)
+                        photo(still, durationMs, scene.kenburns, subtitle, startUs)
                     }
                 }
                 is VideoPlan.VideoClip -> {
-                    val uri = media[scene.media]?.contentUri?.toUri()
-                    if (uri == null) { skipped += scene.media; null } else clip(uri, scene.trim_start_ms, scene.trim_end_ms)
+                    val m = media[scene.media]
+                    val uri = m?.contentUri?.toUri()
+                    if (uri == null) { skipped += scene.media; null } else clip(uri, m.mimeType, scene.trim_start_ms, scene.trim_end_ms)
                 }
             }
-            if (item != null) { items += item; total += scene.durationMs }
+            if (item != null) { items += item; startUs += durationMs * 1000 }
         }
-        require(items.isNotEmpty()) { "plan sin escenas renderizables" }
+        require(items.isNotEmpty()) { context.getString(com.bitacoraviaje.app.R.string.video_error_no_scenes) }
         val video = EditedMediaItemSequence.Builder(items).build()
-        val sequences = ArrayList<EditedMediaItemSequence>().apply { add(video) }
-        plan.music?.let { music ->
-            val f = File(music.file)
-            if (f.exists()) sequences += EditedMediaItemSequence.Builder(EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(f))).setRemoveVideo(true).build()).setIsLooping(true).build()
-        }
-        return Built(Composition.Builder(sequences).build(), total, skipped)
+        return Built(Composition.Builder(listOf(video)).build(), startUs / 1000, skipped)
     }
 
     private fun card(name: String, bitmap: Bitmap): Uri {
@@ -101,50 +119,73 @@ class MiniVideoComposer(
     }
 
     private fun overlayOn(base: Bitmap, overlay: Bitmap) {
-        android.graphics.Canvas(base).drawBitmap(overlay, 0f, 0f, null)
+        Canvas(base).drawBitmap(overlay, 0f, 0f, null)
         overlay.recycle()
     }
 
-    private fun presentation() = Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP)
+    /** A photo as a frame-sized still: cover-fit, or a vertical photo centred on its blurred, darkened copy (review I5). */
+    private fun still(name: String, m: TripMedia): Uri? {
+        val src = decode(m) ?: return null
+        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        val frameRatio = width.toFloat() / height
+        val ratio = src.width.toFloat() / src.height
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        if (ratio < frameRatio - 0.2f) {
+            val bg = cover(src, width, height)
+            val darken = Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = android.graphics.ColorMatrixColorFilter(android.graphics.ColorMatrix().apply { setScale(0.5f, 0.5f, 0.5f, 1f) }) }
+            // Cheap blur: draw a tiny downscale back up.
+            val tiny = Bitmap.createScaledBitmap(bg, max(8, width / 40), max(8, height / 40), true)
+            c.drawBitmap(tiny, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), darken)
+            tiny.recycle(); bg.recycle()
+            val scale = height.toFloat() / src.height
+            val dw = src.width * scale
+            c.drawBitmap(src, null, RectF((width - dw) / 2, 0f, (width + dw) / 2, height.toFloat()), paint)
+        } else {
+            val scale = max(width.toFloat() / src.width, height.toFloat() / src.height)
+            val dw = src.width * scale; val dh = src.height * scale
+            c.drawBitmap(src, null, RectF((width - dw) / 2, (height - dh) / 2, (width + dw) / 2, (height + dh) / 2), paint)
+        }
+        src.recycle()
+        return card(name, out)
+    }
+
+    private fun cover(src: Bitmap, w: Int, h: Int): Bitmap {
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val scale = max(w.toFloat() / src.width, h.toFloat() / src.height)
+        val dw = src.width * scale; val dh = src.height * scale
+        Canvas(out).drawBitmap(src, null, RectF((w - dw) / 2, (h - dh) / 2, (w + dw) / 2, (h + dh) / 2), Paint(Paint.FILTER_BITMAP_FLAG))
+        return out
+    }
 
     private fun image(uri: Uri, durationMs: Long): EditedMediaItem =
-        EditedMediaItem.Builder(MediaItem.Builder().setUri(uri).setImageDurationMs(durationMs).build())
-            .setFrameRate(fps)
-            .setEffects(Effects(emptyList(), listOf(presentation())))
-            .build()
+        EditedMediaItem.Builder(MediaItem.Builder().setUri(uri).setMimeType("image/jpeg").setImageDurationMs(durationMs).build()).setFrameRate(fps).build()
 
-    /** Ken Burns: scale/translate interpolated over the item's duration (plan values are fractions of the frame; zoom 1.0–1.15). */
-    private fun photo(uri: Uri, durationMs: Long, kb: VideoPlan.KenBurns, caption: String?, index: Int): EditedMediaItem {
+    /** Ken Burns timed from [startUs] (composition time, review B1) over a frame-sized still; subtitle panel anchored at the bottom. */
+    private fun photo(still: Uri, durationMs: Long, kb: VideoPlan.KenBurns, caption: String?, startUs: Long): EditedMediaItem {
         val durationUs = durationMs * 1000
-        val (x0, y0, z0) = kb.from
-        val (x1, y1, z1) = kb.to
-        val kenBurns = MatrixTransformation { presentationTimeUs ->
-            val t = (presentationTimeUs.toDouble() / durationUs).coerceIn(0.0, 1.0)
-            val z = (z0 + (z1 - z0) * t).toFloat()
-            // Pan: the plan's x/y are offsets of the visible window as a fraction of the frame; NDC spans 2 units.
-            val tx = (-(x0 + (x1 - x0) * t) * 2 / 0.15 * (z - 1).coerceAtLeast(0f)).toFloat()
-            val ty = ((y0 + (y1 - y0) * t) * 2 / 0.15 * (z - 1).coerceAtLeast(0f)).toFloat()
-            Matrix().apply { postScale(z, z); postTranslate(tx.coerceIn(-(z - 1), z - 1), ty.coerceIn(-(z - 1), z - 1)) }
-        }
+        val kenBurns = MatrixTransformation { presentationTimeUs -> KenBurnsMath.matrix(kb, startUs, durationUs, presentationTimeUs) }
         val effects = ArrayList<androidx.media3.common.Effect>()
-        effects += presentation()
         effects += kenBurns
         caption?.takeIf { it.isNotBlank() }?.let {
-            val overlay = BitmapOverlay.createStaticBitmapOverlay(Cards.caption(width, height, it), StaticOverlaySettings.Builder().build())
-            effects += OverlayEffect(listOf(overlay))
+            val panel = Cards.captionPanel(width, height, it)
+            // Anchor the panel's bottom-centre to the frame's bottom-centre, slightly up (NDC: y up).
+            val settings = StaticOverlaySettings.Builder().setBackgroundFrameAnchor(0f, -0.88f).setOverlayFrameAnchor(0f, -1f).build()
+            effects += OverlayEffect(listOf(BitmapOverlay.createStaticBitmapOverlay(panel, settings)))
         }
-        return EditedMediaItem.Builder(MediaItem.Builder().setUri(uri).setImageDurationMs(durationMs).build())
+        return EditedMediaItem.Builder(MediaItem.Builder().setUri(still).setMimeType("image/jpeg").setImageDurationMs(durationMs).build())
             .setFrameRate(fps)
             .setEffects(Effects(emptyList(), effects))
             .build()
     }
 
-    private fun clip(uri: Uri, startMs: Long, endMs: Long): EditedMediaItem =
+    private fun clip(uri: Uri, mimeType: String?, startMs: Long, endMs: Long): EditedMediaItem =
         EditedMediaItem.Builder(
-            MediaItem.Builder().setUri(uri).setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs).setEndPositionMs(endMs).build()).build(),
-        ).setEffects(Effects(emptyList(), listOf(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT)))).build()
+            MediaItem.Builder().setUri(uri).also { b -> mimeType?.let(b::setMimeType) }
+                .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs).setEndPositionMs(endMs).build()).build(),
+        ).setEffects(Effects(emptyList(), listOf(androidx.media3.effect.Presentation.createForWidthAndHeight(width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT)))).build()
 
-    /** Decodes a photo for a card background at a modest size, honouring EXIF orientation. */
+    /** Decodes a photo near the frame size, honouring EXIF orientation; the intermediate bitmap is recycled (review N2). */
     private fun decode(m: TripMedia): Bitmap? {
         val uri = m.contentUri?.toUri() ?: return null
         return runCatching {
@@ -153,7 +194,7 @@ class MiniVideoComposer(
             val sample = maxOf(1, minOf(opts.outWidth / width, opts.outHeight / height))
             val bmp = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) } ?: return null
             val rotation = context.contentResolver.openInputStream(uri)?.use { ExifInterface(it).rotationDegrees } ?: 0
-            if (rotation == 0) bmp else Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, Matrix().apply { postRotate(rotation.toFloat()) }, true)
+            if (rotation == 0) bmp else Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, Matrix().apply { postRotate(rotation.toFloat()) }, true).also { bmp.recycle() }
         }.getOrNull()
     }
 }

@@ -133,11 +133,32 @@ object Cards {
         return b
     }
 
-    /** Static map of the stage: the route over [base] (a MapLibre snapshot) or a plain ground, with a start/end marker and attribution. */
-    fun route(w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String): Bitmap {
+    /** Only the subtitle panel (not a full transparent frame, review M8): overlay it anchored at the bottom. */
+    fun captionPanel(w: Int, h: Int, text: String): Bitmap {
+        val p = paint(h * 0.034f, PAPER)
+        val l = layout(text, p, (w * 0.8).toInt(), 3)
+        val pw = (w * 0.88f).toInt()
+        val ph = (l.height + h * 0.03f).toInt()
+        val b = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+        c.drawRoundRect(RectF(0f, 0f, pw.toFloat(), ph.toFloat()), 24f, 24f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 20, 24, 36) })
+        c.save(); c.translate(w * 0.03f, h * 0.015f); l.draw(c); c.restore()
+        return b
+    }
+
+    /**
+     * Static map of the stage: the route over [base] (a MapLibre snapshot, with the points already
+     * projected by its camera, review I2) or over a plain ground with an equirectangular fit.
+     */
+    fun route(w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>? = null): Bitmap {
         val (b, c) = bitmap(w, h, GROUND)
         if (base != null) drawCover(c, base, w, h, darken = 1f)
-        if (points.size >= 2) {
+        val pixels: List<Pair<Float, Float>> = if (base != null && projected != null && projected.size == points.size) {
+            // Snapshot pixels → frame pixels (the snapshot may have been clamped to MAX_SIDE, drawCover scales it to cover).
+            val scale = max(w.toFloat() / base.width, h.toFloat() / base.height)
+            val offX = (w - base.width * scale) / 2; val offY = (h - base.height * scale) / 2
+            projected.map { (x, y) -> (offX + x * scale) to (offY + y * scale) }
+        } else if (points.size >= 2) {
             val lat0 = points.sumOf { it.lat } / points.size
             val kx = cos(Math.toRadians(lat0))
             val xs = points.map { it.lon * kx }
@@ -146,16 +167,17 @@ object Cards {
             val spanX = max(1e-9, maxX - minX); val spanY = max(1e-9, maxY - minY)
             val scale = min((w * 0.8) / spanX, (h * 0.8) / spanY)
             val ox = (w - spanX * scale) / 2; val oy = (h - spanY * scale) / 2
+            points.indices.map { i -> (ox + (xs[i] - minX) * scale).toFloat() to (oy + (ys[i] - minY) * scale).toFloat() }
+        } else {
+            emptyList()
+        }
+        if (pixels.size >= 2) {
             val path = android.graphics.Path()
-            points.forEachIndexed { i, _ ->
-                val px = (ox + (xs[i] - minX) * scale).toFloat(); val py = (oy + (ys[i] - minY) * scale).toFloat()
-                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
-            }
+            pixels.forEachIndexed { i, (px, py) -> if (i == 0) path.moveTo(px, py) else path.lineTo(px, py) }
             val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
             c.drawPath(path, stroke.apply { color = Color.WHITE; strokeWidth = h * 0.012f })
             c.drawPath(path, stroke.apply { color = NAVY; strokeWidth = h * 0.007f })
-            val end = points.last()
-            val ex = (ox + (end.lon * kx - minX) * scale).toFloat(); val ey = (oy + (-end.lat - minY) * scale).toFloat()
+            val (ex, ey) = pixels.last()
             c.drawCircle(ex, ey, h * 0.014f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
             c.drawCircle(ex, ey, h * 0.01f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(212, 63, 31) })
         }

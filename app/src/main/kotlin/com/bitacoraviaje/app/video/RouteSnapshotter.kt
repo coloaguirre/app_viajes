@@ -21,13 +21,17 @@ import kotlin.coroutines.resume
  * route is drawn over a plain ground: the mini video never depends on the network.
  */
 class RouteSnapshotter(private val context: Context) {
-    suspend fun snapshot(points: List<TrackPoint>, width: Int, height: Int): Bitmap? {
+    /** The base map and the track projected with the snapshot's own camera (review I2), in bitmap pixels. */
+    class RouteBase(val bitmap: Bitmap, val projected: List<Pair<Float, Float>>)
+
+    suspend fun snapshot(points: List<TrackPoint>, width: Int, height: Int): RouteBase? {
         if (BuildConfig.MAPTILER_KEY.isBlank() || points.size < 2) return null
         return withTimeoutOrNull(TIMEOUT_MS) {
             withContext(Dispatchers.Main) {
                 runCatching {
-                    suspendCancellableCoroutine<Bitmap?> { cont ->
-                        val b = LatLngBounds.Builder().also { bb -> points.forEach { bb.include(LatLng(it.lat, it.lon)) } }.build()
+                    suspendCancellableCoroutine<RouteBase?> { cont ->
+                        val raw = LatLngBounds.Builder().also { bb -> points.forEach { bb.include(LatLng(it.lat, it.lon)) } }.build()
+                        val b = padded(raw, PADDING)
                         val options = MapSnapshotter.Options(width.coerceAtMost(MAX_SIDE), height.coerceAtMost(MAX_SIDE))
                             .withStyle(STYLE)
                             .withRegion(b)
@@ -35,16 +39,34 @@ class RouteSnapshotter(private val context: Context) {
                             .withLogo(false)
                         val snapshotter = MapSnapshotter(context, options)
                         cont.invokeOnCancellation { runCatching { snapshotter.cancel() } }
-                        snapshotter.start({ snap -> if (cont.isActive) cont.resume(snap.bitmap) }, { err -> Log.w(TAG, "map snapshot failed: $err"); if (cont.isActive) cont.resume(null) })
+                        snapshotter.start(
+                            { snap ->
+                                val projected = points.map { p -> snap.pixelForLatLng(LatLng(p.lat, p.lon)).let { it.x to it.y } }
+                                if (cont.isActive) cont.resume(RouteBase(snap.bitmap, projected))
+                            },
+                            { err ->
+                                // The style url carries the MapTiler key: never echo the raw error (review M4).
+                                Log.w(TAG, "map snapshot failed (${err?.length ?: 0} chars); drawing the route on a plain ground")
+                                if (cont.isActive) cont.resume(null)
+                            },
+                        )
                     }
-                }.getOrElse { Log.w(TAG, "map snapshot unavailable: ${it.message}"); null }
+                }.getOrElse { Log.w(TAG, "map snapshot unavailable: ${it.javaClass.simpleName}"); null }
             }
         }
+    }
+
+    /** Bounds grown by [fraction] on every side so the route does not touch the frame. */
+    private fun padded(b: LatLngBounds, fraction: Double): LatLngBounds {
+        val dLat = maxOf(1e-4, b.latitudeSpan * fraction)
+        val dLon = maxOf(1e-4, b.longitudeSpan * fraction)
+        return LatLngBounds.from(b.latitudeNorth + dLat, b.longitudeEast + dLon, b.latitudeSouth - dLat, b.longitudeWest - dLon)
     }
 
     companion object {
         private const val TAG = "Bitacora"
         const val TIMEOUT_MS = 15_000L
+        const val PADDING = 0.15
         const val MAX_SIDE = 2048
         val STYLE = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
     }

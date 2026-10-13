@@ -68,10 +68,8 @@ class FinishSegmentViewModel @Inject constructor(
 
     fun createVideo() = com.bitacoraviaje.app.video.RenderWorker.enqueue(appContext, segmentId)
 
-    fun retryVideo() {
-        androidx.work.WorkManager.getInstance(appContext).pruneWork()
-        createVideo()
-    }
+    /** KEEP only keeps pending or running work: a finished job is simply replaced by a new request (review N9). */
+    fun retryVideo() = createVideo()
 
     fun closeSegment() = close(trip = false)
 

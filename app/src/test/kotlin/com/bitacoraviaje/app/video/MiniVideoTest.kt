@@ -67,7 +67,7 @@ class MiniVideoTest {
         tracking.insertPoints((0 until 120).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = t0 + i * 30_000L, lat = -49.33 + i * 1e-4, lon = -72.9 + i * 5e-5, altM = 400.0 + i) })
         MediaRepository(db).upsertAll(
             (0 until 10).map { i ->
-                MediaItem("m$i", s.tripId, s.id, MediaKind.PHOTO, MediaSource.MEDIASTORE, "content://media/$i", i.toLong(), "IMG_$i.jpg", "image/jpeg", 1, 4000, 3000, null, 0, t0 + i * 330_000L, TakenTimeSource.EXIF_WITH_OFFSET, null, null, null, null, -49.33, -72.9, LinkMethod.TRACK_NEAREST, 0.7, 0, false, null, null, i == 3)
+                MediaItem("m$i", s.tripId, s.id, MediaKind.PHOTO, MediaSource.MEDIASTORE, "content://media/$i", i.toLong(), "IMG_$i.jpg", "image/jpeg", 1, 4000, 3000, null, 0, t0 + i * 330_000L, TakenTimeSource.EXIF_WITH_OFFSET, null, null, null, null, -49.33, -72.9, LinkMethod.TRACK_NEAREST, 0.7, 0, false, null, null, i == 3 || i == 0)
             },
         )
         NotesRepository(db).addVoiceNote(VoiceNote("v1", s.id, t0 + 1_000_000, 5_000, -49.33, -72.9, null, "audio/t/v1.m4a", transcript = "Qué viento", transcriptStatus = com.bitacoraviaje.core.model.TranscriptStatus.DONE))
@@ -123,13 +123,40 @@ class MiniVideoTest {
         val id = stage()
         val p = assertNotNull(planner.prepare(id))
         val work = File(ApplicationProvider.getApplicationContext<Context>().cacheDir, "render-test").apply { mkdirs() }
+        // m0 is a favourite, so the plan includes it; without a content uri it must be reported as skipped (review N8).
+        assertTrue(p.plan.scenes.any { it is VideoPlan.Photo && it.media == "m0" })
         val media = MediaRepository(db).allOfTrip(tracking.getSegment(id)!!.tripId).associateBy { it.id }.mapValues { (_, m) -> if (m.id == "m0") m.copy(contentUri = null) else m }
         val built = MiniVideoComposer(ApplicationProvider.getApplicationContext(), work, 384, 216).build(p.plan, p.input, media, emptyMap(), tracking.validPoints(id), null)
         val photos = p.plan.scenes.count { it is VideoPlan.Photo }
-        val expectedSkipped = if (p.plan.scenes.any { it is VideoPlan.Photo && it.media == "m0" }) 1 else 0
-        assertEquals(expectedSkipped, built.skipped.size)
-        assertEquals(p.plan.scenes.size - expectedSkipped, built.composition.sequences.first().editedMediaItems.size)
-        assertTrue(built.durationMs > 50_000 && photos > 0)
+        // Every other photo has a content uri the test resolver cannot open: those are skipped too, counted, never silent.
+        assertTrue(built.skipped.size >= 1 && "m0" in built.skipped)
+        assertEquals(p.plan.scenes.size - built.skipped.size, built.composition.sequences.first().editedMediaItems.size)
+        assertTrue(built.durationMs > 20_000 && photos > 0)
+        assertTrue(built.composition.sequences.first().editedMediaItems.all { it.mediaItem.localConfiguration?.mimeType == "image/jpeg" }, "cards and stills share one format")
         assertTrue(work.listFiles()!!.any { it.name.startsWith("title_") && it.length() > 1000 }, "cards are written as JPEG files")
     }
+
+    @Test
+    fun `ken burns is timed from the item start and pans like the desktop renderer`() {
+        val kb = VideoPlan.KenBurns(listOf(0.0, 0.0, 1.0), listOf(0.05, 0.05, 1.15))
+        // Second item of the sequence: starts at 10 s; the composition clock keeps running (review B1).
+        assertEquals(0.0, KenBurnsMath.progress(10_000_000, 10_000_000, 4_000_000))
+        assertEquals(0.5, KenBurnsMath.progress(12_000_000, 10_000_000, 4_000_000))
+        assertEquals(1.0, KenBurnsMath.progress(99_000_000, 10_000_000, 4_000_000))
+        val (z0, tx0, ty0) = KenBurnsMath.transform(kb, 0.0)
+        assertEquals(1.0f, z0); assertTrue(abs(tx0) < 1e-6 && abs(ty0) < 1e-6)
+        val (z1, _, _) = KenBurnsMath.transform(kb, 1.0)
+        assertTrue(abs(z1 - 1.15f) < 1e-6)
+        // Pan pattern 2 (x 0 → 0.1 at zoom 1.1): the window moves from the left edge towards the right, never saturating before t = 1 (review I1).
+        val pan = VideoPlan.KenBurns(listOf(0.0, 0.02, 1.1), listOf(0.1, 0.02, 1.1))
+        val (_, txA, _) = KenBurnsMath.transform(pan, 0.0)
+        val (_, txB, _) = KenBurnsMath.transform(pan, 0.75)
+        val (_, txC, _) = KenBurnsMath.transform(pan, 1.0)
+        assertTrue(abs(txA - 0.1f) < 1e-6, "x = 0 → content shifted right by z−1: $txA")
+        assertTrue(txB > txC && txA > txB, "monotonic pan: $txA > $txB > $txC")
+        val m = KenBurnsMath.matrix(kb, 0, 4_000_000, 2_000_000)
+        val v = FloatArray(9).also { m.getValues(it) }
+        assertTrue(abs(v[0] - 1.075f) < 1e-5, "scale at half time")
+    }
 }
+

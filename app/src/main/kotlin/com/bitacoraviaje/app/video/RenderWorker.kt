@@ -58,13 +58,13 @@ class RenderWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo(0)
 
     override suspend fun doWork(): Result {
-        val segmentId = inputData.getString(KEY_SEGMENT_ID) ?: return Result.failure(workDataOf(KEY_ERROR to "sin etapa"))
+        val segmentId = inputData.getString(KEY_SEGMENT_ID) ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
         val started = System.currentTimeMillis()
         runCatching { setForeground(foregroundInfo(0)) }.onFailure { Log.w(TAG, "foreground not allowed: ${it.message}") }
         val work = File(appContext.cacheDir, "render/$segmentId").apply { deleteRecursively(); mkdirs() }
         return try {
-            val prepared = withContext(Dispatchers.IO) { planner.prepare(segmentId, inputData.getString(KEY_MUSIC)) } ?: return Result.failure(workDataOf(KEY_ERROR to "etapa inexistente"))
-            val segment = tracking.getSegment(segmentId)!!
+            val prepared = withContext(Dispatchers.IO) { planner.prepare(segmentId) } ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
+            val segment = prepared.segment
             val points = withContext(Dispatchers.IO) { tracking.validPoints(segmentId) }
             val mediaById = withContext(Dispatchers.IO) { media.allOfTrip(segment.tripId).associateBy { it.id } }
             val voices = withContext(Dispatchers.IO) { notes.voiceNotesOf(segmentId).associateBy { it.id } }
@@ -72,7 +72,9 @@ class RenderWorker @AssistedInject constructor(
             val built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, WIDTH, HEIGHT).build(prepared.plan, prepared.input, mediaById, voices, points, base) }
             val out = File(work, "resumen.mp4")
             export(built.composition, out)
-            val uri = withContext(Dispatchers.IO) { publish(out, segment.displayName ?: "etapa") } ?: Uri.fromFile(out)
+            val published = withContext(Dispatchers.IO) { publish(out, segment.displayName ?: appContext.getString(R.string.video_default_name)) }
+            if (published != null) out.delete() // the MediaStore copy is the one that counts (review M2)
+            val uri = published ?: Uri.fromFile(out)
             val elapsed = System.currentTimeMillis() - started
             Log.i(TAG, "mini video rendered segment=$segmentId duration=${built.durationMs}ms elapsed=${elapsed}ms skipped=${built.skipped.size}")
             Result.success(workDataOf(KEY_RESULT_URI to uri.toString(), KEY_DURATION_MS to built.durationMs, KEY_ELAPSED_MS to elapsed, KEY_SKIPPED to built.skipped.size))
@@ -109,7 +111,8 @@ class RenderWorker @AssistedInject constructor(
                     handler.postDelayed(this, 500)
                 }
             }
-            cont.invokeOnCancellation { handler.removeCallbacks(poll); transformer.cancel() }
+            // Transformer must be cancelled on its application thread; WorkManager cancels from its own (review I3).
+            cont.invokeOnCancellation { handler.post { handler.removeCallbacks(poll); runCatching { transformer.cancel() } } }
             transformer.start(composition, out.absolutePath)
             handler.post(poll)
         }
@@ -129,18 +132,23 @@ class RenderWorker @AssistedInject constructor(
         val resolver = appContext.contentResolver
         val uri = resolver.insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values) ?: return null
         return try {
-            resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return null
+            val stream = resolver.openOutputStream(uri) ?: throw java.io.IOException("MediaStore sin flujo de salida")
+            stream.use { out -> file.inputStream().use { it.copyTo(out) } }
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             uri
         } catch (e: Exception) {
-            resolver.delete(uri, null, null)
+            resolver.delete(uri, null, null) // no pending row left behind (review M3)
             null
         }
     }
 
+    private var channelReady = false
+
     private fun foregroundInfo(progress: Int): ForegroundInfo {
-        val nm = appContext.getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, appContext.getString(R.string.render_channel), NotificationManager.IMPORTANCE_LOW))
+        if (!channelReady) {
+            appContext.getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL_ID, appContext.getString(R.string.render_channel), NotificationManager.IMPORTANCE_LOW))
+            channelReady = true
+        }
         val n = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle(appContext.getString(R.string.render_notif_title))
@@ -155,7 +163,6 @@ class RenderWorker @AssistedInject constructor(
     companion object {
         private const val TAG = "Bitacora"
         const val KEY_SEGMENT_ID = "segment_id"
-        const val KEY_MUSIC = "music"
         const val KEY_PROGRESS = "progress"
         const val KEY_RESULT_URI = "result_uri"
         const val KEY_DURATION_MS = "duration_ms"
@@ -169,8 +176,8 @@ class RenderWorker @AssistedInject constructor(
 
         fun workName(segmentId: String) = "render-$segmentId"
 
-        fun enqueue(context: Context, segmentId: String, musicFile: String? = null) {
-            val req = OneTimeWorkRequestBuilder<RenderWorker>().setInputData(workDataOf(KEY_SEGMENT_ID to segmentId, KEY_MUSIC to musicFile)).build()
+        fun enqueue(context: Context, segmentId: String) {
+            val req = OneTimeWorkRequestBuilder<RenderWorker>().setInputData(workDataOf(KEY_SEGMENT_ID to segmentId)).build()
             WorkManager.getInstance(context).enqueueUniqueWork(workName(segmentId), ExistingWorkPolicy.KEEP, req)
         }
     }

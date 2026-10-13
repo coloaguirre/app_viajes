@@ -31,9 +31,13 @@ class MiniVideoPlanner @Inject constructor(
     private val notes: NotesRepository,
     private val places: PlacesRepository,
 ) {
-    data class Prepared(val input: PlanInput, val plan: VideoPlan)
+    data class Prepared(val segment: com.bitacoraviaje.core.model.Segment, val input: PlanInput, val plan: VideoPlan)
 
-    suspend fun prepare(segmentId: String, musicFile: String? = null): Prepared? {
+    /**
+     * Media without a segment (unlinked) stays out: a stage video is about that stage. The export
+     * adapter lists them under the first segment only so they travel in the ZIP (review M6).
+     */
+    suspend fun prepare(segmentId: String): Prepared? {
         val s = tracking.getSegment(segmentId) ?: return null
         val trip = tracking.getTrip(s.tripId) ?: return null
         val points = tracking.validPoints(segmentId)
@@ -47,7 +51,7 @@ class MiniVideoPlanner @Inject constructor(
         val segment = PlanSegment(
             id = s.id,
             title = s.displayName ?: when (s.type) { SegmentType.TREKKING -> "Trekking"; SegmentType.EXCURSION -> "Excursión"; else -> "Etapa" },
-            date = Instant.ofEpochMilli(s.startedUtcMs).atZone(ZoneId.of(s.tzId)).toLocalDate().toString(),
+            date = Instant.ofEpochMilli(s.startedUtcMs).atZone(runCatching { ZoneId.of(s.tzId) }.getOrDefault(ZoneId.of("UTC"))).toLocalDate().toString(),
             startedUtcMs = s.startedUtcMs,
             endedUtcMs = s.endedUtcMs,
             distanceM = s.stats.distanceM,
@@ -61,7 +65,7 @@ class MiniVideoPlanner @Inject constructor(
             places = placeRows,
         )
         val input = PlanInput(trip.id, trip.title, trip.coverMediaId, listOf(segment), extraCredits = listOf(TILES_CREDIT))
-        return Prepared(input, Planner.plan(input, PlanParams.quickOneMinute(segmentId, musicFile = musicFile)))
+        return Prepared(s, input, Planner.plan(input, PlanParams.quickOneMinute(segmentId)))
     }
 
     companion object {
