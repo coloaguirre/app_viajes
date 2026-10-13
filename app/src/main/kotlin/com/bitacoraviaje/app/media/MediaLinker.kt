@@ -80,8 +80,9 @@ class MediaLinker @Inject constructor(
         val offsets = HashMap(media.cameraOffsets(tripId))
         for (c in candidates) {
             val existing = media.getByMediaStoreId(c.mediaStoreId)
-            if (existing != null && (existing.linkMethod == LinkMethod.MANUAL || existing.isExcluded || existing.tripId != tripId)) {
-                // User edits win; an item already owned by another trip is not stolen (review M8).
+            if (existing != null && (existing.linkMethod == LinkMethod.MANUAL || existing.isExcluded || existing.tripId != tripId || existing.source == MediaSource.APP_CAMERA)) {
+                // User edits win; an item already owned by another trip is not stolen (review M8); a shot taken
+                // by the app's own camera already knows its exact instant and place (PLAN 5.2).
                 skipped++
                 continue
             }

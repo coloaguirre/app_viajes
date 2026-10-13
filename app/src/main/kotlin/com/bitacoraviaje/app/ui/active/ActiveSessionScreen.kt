@@ -51,7 +51,7 @@ import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.tracking.TrackingNotificationFactory
 
 @Composable
-fun ActiveSessionRoute(mapRenderer: MapRenderer, onFinish: (String) -> Unit, viewModel: ActiveSessionViewModel = hiltViewModel()) {
+fun ActiveSessionRoute(mapRenderer: MapRenderer, onFinish: (String) -> Unit, onOpenCamera: (String) -> Unit = {}, viewModel: ActiveSessionViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -70,7 +70,11 @@ fun ActiveSessionRoute(mapRenderer: MapRenderer, onFinish: (String) -> Unit, vie
     ActiveSessionScreen(
         state = state,
         onAction = { a ->
-            if (a == ActiveSessionAction.Finish) onFinish(state.live.segmentId ?: viewModel.segmentId) else viewModel.onAction(a)
+            when (a) {
+                ActiveSessionAction.Finish -> onFinish(state.live.segmentId ?: viewModel.segmentId)
+                ActiveSessionAction.Camera -> onOpenCamera(state.live.segmentId ?: viewModel.segmentId)
+                else -> viewModel.onAction(a)
+            }
         },
         map = { s, m -> mapRenderer.TrackMap(s, m) },
         snackbar = snackbar,
@@ -135,6 +139,7 @@ fun ActiveSessionScreen(
                     Button(onClick = { onAction(ActiveSessionAction.VoiceNote) }, modifier = Modifier.weight(1.4f).height(64.dp).testTag("active_voice")) { Text(stringResource(R.string.action_voice_note)) }
                     OutlinedButton(onClick = { markerText = ""; markerDialog = true }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_marker")) { Text(stringResource(R.string.action_marker)) }
                     OutlinedButton(onClick = { onAction(ActiveSessionAction.Highlight) }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_highlight")) { Text(stringResource(R.string.action_highlight)) }
+                    OutlinedButton(onClick = { onAction(ActiveSessionAction.Camera) }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_camera")) { Text(stringResource(R.string.action_photo)) }
                 }
                 Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = { onAction(ActiveSessionAction.TogglePause) }, modifier = Modifier.weight(1f).height(64.dp).testTag("active_pause")) {

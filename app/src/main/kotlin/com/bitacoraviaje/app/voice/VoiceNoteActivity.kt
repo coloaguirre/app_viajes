@@ -192,8 +192,8 @@ class VoiceNoteActivity : ComponentActivity() {
                 finishAndRemoveTask()
                 return@launch
             }
-            val pos = controller.position()
-            controller.saveVoiceNote(seg, trip, noteId, startedUtcMs, duration, pos)
+            val pos = controller.position(System.currentTimeMillis())
+            controller.saveVoiceNote(seg, trip, noteId, startedUtcMs, duration, pos, mediaItemId = intent.getStringExtra(EXTRA_MEDIA_ITEM_ID))
             Log.i(TAG, "voice note saved id=$noteId duration=${duration}ms pos=${pos.lat != null}")
             finishAndRemoveTask()
         }
@@ -223,6 +223,11 @@ class VoiceNoteActivity : ComponentActivity() {
         const val TAG = "Bitacora"
         const val START_TIMEOUT_MS = 4_000L
 
-        fun intent(context: Context): Intent = Intent(context, VoiceNoteActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        /** A note "about this photo" (DISENO §7.8) carries the media id it describes. */
+        const val EXTRA_MEDIA_ITEM_ID = "media_item_id"
+
+        fun intent(context: Context, mediaItemId: String? = null): Intent = Intent(context, VoiceNoteActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            .apply { mediaItemId?.let { putExtra(EXTRA_MEDIA_ITEM_ID, it) } }
     }
 }

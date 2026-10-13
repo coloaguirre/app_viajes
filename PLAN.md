@@ -384,9 +384,12 @@ su aceptación es la evidencia que él aporta, registrada en
       Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.1-motor-media3.md`
       (3 min verificados en el emulador; el Pixel lo mide el usuario; el
       plan se guarda como `video_plan.json` para el renderizador de la PC).
-- [ ] 5.2 Cámara integrada (CameraX) con EXIF GPS y nota sobre la foto.  (est: 1.5)
+- [x] 5.2 Cámara integrada (CameraX) con EXIF GPS y nota sobre la foto.  (est: 1.5)
       Aceptación: foto tomada en el emulador queda vinculada con
       confianza 1,0.
+      Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.2-camara-integrada.md`
+      (foto y video en el emulador vinculados con confianza 1,0 y EXIF GPS;
+      el barrido no los re-vincula; la nota sobre la foto se prueba en el Pixel).
 - [ ] 5.3 Widget, mosaico de Configuración rápida y accesos directos.  (est: 1.5)
       Aceptación: nota de voz iniciada desde el mosaico en el emulador.
 - [ ] 5.4 Mapas offline con MapLibre (descarga de región).  (est: 1.5)

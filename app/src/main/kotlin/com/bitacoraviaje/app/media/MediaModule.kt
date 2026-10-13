@@ -10,4 +10,7 @@ import dagger.hilt.components.SingletonComponent
 abstract class MediaModule {
     @Binds
     abstract fun bindMediaCatalog(impl: MediaScanner): MediaCatalog
+
+    @Binds
+    abstract fun bindPositionProvider(impl: com.bitacoraviaje.app.voice.NotesController): com.bitacoraviaje.app.voice.PositionProvider
 }

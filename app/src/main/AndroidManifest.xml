@@ -16,6 +16,9 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Integrated camera (DISENO §7.8): asked when the camera screen opens. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- ACCESS_BACKGROUND_LOCATION is deliberately NOT requested in v1 (DISENO §6.1). -->
 

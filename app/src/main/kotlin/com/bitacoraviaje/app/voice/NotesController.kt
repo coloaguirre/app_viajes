@@ -24,6 +24,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** Position + time for a note (DISENO §8.1): last fix if fresh, else a quick current-location request. */
 data class NotePosition(val lat: Double?, val lon: Double?, val accuracyM: Float?)
 
+/** Where a note or a camera shot gets its position from (the controller in the app; a fake in tests). */
+fun interface PositionProvider {
+    suspend fun position(nowUtcMs: Long): NotePosition
+}
+
 @Singleton
 class NotesController @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -32,10 +37,10 @@ class NotesController @Inject constructor(
     private val stateHolder: TrackingStateHolder,
     private val fused: FusedLocationProviderClient,
     private val prefs: UserPreferences,
-) {
+) : PositionProvider {
     suspend fun currentSegmentId(): String? = stateHolder.state.value.segmentId ?: tracking.getOpenSegment()?.id
 
-    suspend fun position(nowUtcMs: Long = System.currentTimeMillis()): NotePosition {
+    override suspend fun position(nowUtcMs: Long): NotePosition {
         val last = stateHolder.state.value.lastPoint
         if (last != null && nowUtcMs - last.timeUtcMs <= FRESH_FIX_MS) return NotePosition(last.lat, last.lon, last.hAccuracyM)
         val loc = withTimeoutOrNull(CURRENT_LOCATION_TIMEOUT_MS) { currentLocation() }
@@ -75,7 +80,7 @@ class NotesController @Inject constructor(
 
     private suspend fun addText(kind: TextNoteKind, text: String?): TextNote? {
         val segmentId = currentSegmentId() ?: return null
-        val pos = position()
+        val pos = position(System.currentTimeMillis())
         return notes.addTextNote(segmentId, kind, System.currentTimeMillis(), pos.lat, pos.lon, text)
     }
 
