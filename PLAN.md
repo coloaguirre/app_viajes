@@ -259,16 +259,16 @@ su aceptación es la evidencia que él aporta, registrada en
       medio de transporte, desfase de reloj de cámara automático (GPS
       UTC) y manual, confianza por método.  (est: 1.5)
       Aceptación: un test por caso de §7.6, todos verdes.
-- [ ] 2.4 Notas de voz: grabación AAC, `VoiceNoteActivity` desde la
+- [x] 2.4 Notas de voz: grabación AAC, `VoiceNoteActivity` desde la
       notificación y la pantalla bloqueada, posición al grabar;
       transcripción con el reconocedor del sistema desde archivo (API
       33+, con detección de soporte y stub de respaldo) detrás de
       `Transcriber`.  (est: 2.5)
       Aceptación: nota grabada en el emulador aparece en la línea de
       tiempo con ubicación; tests de la interfaz con stub.
-      Estado 2026-10-12: aceptación cumplida en el emulador (nota en la línea
-      de tiempo con ubicación, detalle editable, reintento); queda la prueba
-      con micrófono real y transcripción en el Pixel, que se hace junto con 2.8.
+      Cerrado 2026-10-13: además del emulador, dos notas reales del usuario
+      grabadas en el Pixel 8 Pro se transcribieron completas sin internet
+      (PR #6; evidencia en `2.4-2.5-notas.md`).
 - [x] 2.5 Notas de texto, marcadores y destacados.  (est: 0.5)
       Aceptación: tests de DAO; aparecen en la línea de tiempo.
 - [x] 2.6 `core/timeline`: `buildTimeline` puro con agrupación de

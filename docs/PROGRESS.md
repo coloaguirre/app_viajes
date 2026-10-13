@@ -11,7 +11,7 @@
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
-| 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.3, 2.5-2.7 cerrados; 2.4 cumplido en emulador (micrófono real pendiente con 2.8); 2.9 cerrado; 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
+| 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
@@ -50,6 +50,7 @@
 | 2026-10-12 | Cambio de medio en sesión (2.9) sin tabla nueva: `text_note.kind = TRANSPORT_CHANGE` con el medio en `text`; la etapa guarda el último medio y perfil; el servicio re-siembra el filtro con el último punto aceptado | Pedido del usuario 2026-10-12; evita esquema v6 |
 | 2026-10-12 | Revisión de código Fase 2 (PR #5) aplicada antes del merge: tope de 5 min guarda la nota (antes se borraba), rotación no cancela la grabación, grabador liberado si falla el arranque, solo reconocedor on-device (nunca el micrófono en segundo plano), escáner compatible API 26–28, ventana de barrido ensanchada por el desfase de cámara, re-vinculación con UPDATE condicionado (no pisa ubicaciones manuales), desfase automático por hora GPS, config de vinculación por medio de transporte | PR #5 |
 | 2026-10-12 | Diferidos con registro: barrido incremental por generación (Fase 3); claves foráneas de `camera_clock_offset`→`trip` y `voice_note.media_item_id` (entran con el próximo cambio de esquema); acceso solo-video en permisos; `creation_time` de MP4 asumido UTC hasta validarlo con un video real en 2.8 | Revisión PR #5 (NIT, M6) |
+| 2026-10-13 | Transcripción con el reconocedor del dispositivo: elegir el paquete instalado del mismo idioma (es-US/es-ES en lugar de es-AR), alimentar el audio a ritmo real y usar la sesión por segmentos. D3 (nube): Claude no acepta audio (documentación oficial verificada 2026-10-13); si se suma transcripción en la nube en Fase 3 será un motor de voz a texto aparte, con la clave del usuario, y Claude queda para corregir y redactar texto (Fase 4.3) | PR #6; pregunta del usuario |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -136,4 +137,4 @@ Observaciones de la verificación (ítem 0.1):
 - [x] Definir nombre y `applicationId` (D1) — default confirmado 2026-10-11
 - [x] Crear clave gratuita de MapTiler y ponerla en `local.properties` — hecho 2026-10-12
 - [ ] Ítem 1.7: hecha una salida de 46 min en auto en Full (2026-10-12, ver evidencia); falta 1 h con pantalla apagada en Económico (y Full), anotando batería al inicio y al final
-- [ ] Ítem 2.8: las 5 fotos de la salida quedaron vinculadas solas; reintentar la transcripción de las 2 notas de voz desde el detalle con la build nueva y avisar si falla
+- [ ] Ítem 2.8: las 5 fotos de la salida quedaron vinculadas solas y las 2 notas de voz transcribieron bien; falta una salida con pantalla apagada para cerrar junto con 1.7 y revisar la línea de tiempo del viaje en el teléfono
