@@ -25,7 +25,27 @@ class SettingsViewModel @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val prefs: UserPreferences,
     private val secrets: com.bitacoraviaje.app.settings.Secrets,
+    private val stateHolder: com.bitacoraviaje.app.tracking.TrackingStateHolder,
+    private val tracking: com.bitacoraviaje.data.repository.TrackingRepository,
 ) : ViewModel() {
+    /** PLAN 5.5: privacy zones. The position comes from the live session or the last recorded point; never from a network lookup. */
+    val privacyMessage = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    fun addPrivacyZoneHere(name: String, radiusM: Int) = viewModelScope.launch {
+        val live = stateHolder.state.value.lastPoint
+        val point = live ?: tracking.segmentsOfLatestTrip().firstNotNullOfOrNull { s -> tracking.lastValidPoint(s.id) }
+        if (point == null) { privacyMessage.value = appContext.getString(com.bitacoraviaje.app.R.string.settings_privacy_no_location); return@launch }
+        addPrivacyZone(name, point.lat, point.lon, radiusM)
+    }
+
+    fun addPrivacyZone(name: String, lat: Double, lon: Double, radiusM: Int) = viewModelScope.launch {
+        val zone = com.bitacoraviaje.core.model.PrivacyZone(java.util.UUID.randomUUID().toString(), name.ifBlank { appContext.getString(com.bitacoraviaje.app.R.string.settings_privacy) }, lat, lon, radiusM.toDouble())
+        prefs.setPrivacyZones(settings.value.privacyZones + zone)
+        privacyMessage.value = null
+    }
+
+    fun removePrivacyZone(id: String) = viewModelScope.launch { prefs.setPrivacyZones(settings.value.privacyZones.filter { it.id != id }) }
+
     val hasLlmKey: StateFlow<Boolean> = secrets.has(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY)
 
     /** Keystore + file I/O off the main thread (review M9). */

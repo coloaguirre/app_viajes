@@ -39,7 +39,7 @@ class StagedExport(
 
     private fun note(line: String) = manifest.appendText(line + "\n", Charsets.UTF_8)
 
-    fun run(trip: TripExport, files: FileSource, onProgress: ((done: Int, total: Int) -> Unit)? = null): ExportReport {
+    fun run(trip: TripExport, files: FileSource, privacy: PrivacyReport? = null, onProgress: ((done: Int, total: Int) -> Unit)? = null): ExportReport {
         stagingDir.mkdirs()
         val folder = Names.packageFolder(trip.trip.title, trip.exportedUtcMs, trip.tzId)
         val (ok, missing) = readManifest()
@@ -105,6 +105,7 @@ class StagedExport(
             audioMissing = audioMissing,
             textNotesInDb = trip.allTextNotes.size,
             stopsInDb = trip.allStops.size,
+            privacy = privacy,
         )
         ok.remove("LEEME.txt")
         File(stagingDir, "LEEME.txt").writeText(LeemeWriter.text(trip, report, includeMedia, includeAudio), Charsets.UTF_8)

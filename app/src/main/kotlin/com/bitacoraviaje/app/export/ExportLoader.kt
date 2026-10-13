@@ -15,6 +15,10 @@ data class ExportOptions(
     val includeMedia: Boolean = true,
     val includeAudio: Boolean = true,
     val includeFilteredPoints: Boolean = false,
+    /** PLAN 5.5: cut the export at the user's privacy zones (on by default when zones exist). */
+    val applyPrivacyZones: Boolean = true,
+    /** Rewrite the exported JPEG copies without GPS tags when their location was blanked (originals untouched). */
+    val stripExifGps: Boolean = true,
 )
 
 /** Loads a whole trip from Room into the pure [TripExport], assigning the relative file names inside the ZIP. */
@@ -24,6 +28,18 @@ class ExportLoader @Inject constructor(
     private val notes: NotesRepository,
     private val places: com.bitacoraviaje.data.repository.PlacesRepository,
 ) {
+    data class ForExport(val trip: TripExport, val privacy: com.bitacoraviaje.core.export.PrivacyReport?, val blankedMediaIds: Set<String>)
+
+    /** The export view of a trip: the full load, then the privacy zones when asked (PLAN 5.5). Backups use [load] and keep everything. */
+    suspend fun loadForExport(tripId: String, options: ExportOptions, zones: List<com.bitacoraviaje.core.model.PrivacyZone>, nowUtcMs: Long = System.currentTimeMillis()): ForExport? {
+        val full = load(tripId, options, nowUtcMs) ?: return null
+        if (!options.applyPrivacyZones || zones.isEmpty()) return ForExport(full, null, emptySet())
+        val (filtered, report) = com.bitacoraviaje.core.export.PrivacyFilter.apply(full, zones)
+        val before = full.allMedia.associateBy { it.id }
+        val blanked = filtered.allMedia.filter { m -> val b = before[m.id]; b != null && (b.linkedLat != null || b.exifLat != null) && m.linkedLat == null && m.exifLat == null }.map { it.id }.toSet()
+        return ForExport(filtered, report, blanked)
+    }
+
     suspend fun load(tripId: String, options: ExportOptions, nowUtcMs: Long = System.currentTimeMillis()): TripExport? {
         val trip = tracking.getTrip(tripId) ?: return null
         val segments = tracking.segmentsOf(tripId)

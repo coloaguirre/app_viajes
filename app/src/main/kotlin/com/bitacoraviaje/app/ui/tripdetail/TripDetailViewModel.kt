@@ -92,6 +92,9 @@ class TripDetailViewModel @Inject constructor(
     private val secrets: com.bitacoraviaje.app.settings.Secrets,
     private val rewriter: com.bitacoraviaje.app.enrichment.LlmRewriter,
 ) : ViewModel() {
+    /** Number of privacy zones in Settings: the export dialog offers to apply them (PLAN 5.5). */
+    val privacyZones: StateFlow<Int> = prefs.settings.map { it.privacyZones.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     private val rewriting = MutableStateFlow<Set<String>>(emptySet())
     private val placesMessage = MutableStateFlow<String?>(null)
     val tripId: String = savedState.toRoute<Route.TripDetail>().tripId

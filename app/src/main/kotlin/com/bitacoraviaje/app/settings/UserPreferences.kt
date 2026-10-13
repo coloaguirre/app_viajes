@@ -48,6 +48,8 @@ data class UserSettings(
     /** DISENO §15: send coordinates rounded to ~1 km to Wikipedia/Nominatim for places. */
     val roundEnrichmentCoords: Boolean = false,
     val llmModel: String = DEFAULT_LLM_MODEL,
+    /** DISENO §15.3 / PLAN 5.5: circles the exports must not reveal. */
+    val privacyZones: List<com.bitacoraviaje.core.model.PrivacyZone> = emptyList(),
 ) {
     companion object {
         /**
@@ -68,6 +70,7 @@ data class UserSettings(
             enrichPlaces: Boolean? = null,
             roundEnrichmentCoords: Boolean? = null,
             llmModel: String? = null,
+            privacyZonesJson: String? = null,
             onInvalid: (key: String, value: String) -> Unit = { _, _ -> },
         ): UserSettings = UserSettings(
             units = parseEnum<Units>(units, Units.METRIC) { onInvalid("units", it) },
@@ -94,6 +97,7 @@ data class UserSettings(
             enrichPlaces = enrichPlaces ?: true,
             roundEnrichmentCoords = roundEnrichmentCoords ?: false,
             llmModel = llmModel?.trim()?.takeIf { it.matches(Regex("^[A-Za-z0-9._-]{3,64}$")) } ?: run { if (llmModel != null) onInvalid("llm_model", llmModel); DEFAULT_LLM_MODEL },
+            privacyZones = privacyZonesJson?.let { raw -> PrivacyZones.parse(raw) ?: run { onInvalid("privacy_zones", raw.take(80)); emptyList() } } ?: emptyList(),
         )
 
         /** https only, except a loopback host (a local instance on the PC through the emulator's 10.0.2.2 or adb reverse). */
@@ -131,6 +135,7 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
         val ENRICH_PLACES = androidx.datastore.preferences.core.booleanPreferencesKey("enrich_places")
         val ROUND_ENRICHMENT_COORDS = androidx.datastore.preferences.core.booleanPreferencesKey("round_enrichment_coords")
         val LLM_MODEL = stringPreferencesKey("llm_model")
+        val PRIVACY_ZONES = stringPreferencesKey("privacy_zones")
     }
 
     val settings: Flow<UserSettings> = context.settingsStore.data.map { p ->
@@ -148,6 +153,7 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
             enrichPlaces = p[Keys.ENRICH_PLACES],
             roundEnrichmentCoords = p[Keys.ROUND_ENRICHMENT_COORDS],
             llmModel = p[Keys.LLM_MODEL],
+            privacyZonesJson = p[Keys.PRIVACY_ZONES],
         )
     }
 
@@ -177,7 +183,29 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
 
     suspend fun setLlmModel(model: String) = context.settingsStore.edit { it[Keys.LLM_MODEL] = model.trim() }
 
+    suspend fun setPrivacyZones(zones: List<com.bitacoraviaje.core.model.PrivacyZone>) = context.settingsStore.edit { it[Keys.PRIVACY_ZONES] = PrivacyZones.encode(zones) }
+
     private companion object {
         const val TAG = "Bitacora"
     }
 }
+
+/** JSON codec of the zones list in DataStore (coordinates stay on the phone; only the export is affected). */
+object PrivacyZones {
+    @kotlinx.serialization.Serializable
+    private data class Dto(val id: String, val name: String, val lat: Double, val lon: Double, val radius_m: Double)
+
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+    val RADII_M: List<Int> = listOf(100, 250, 500, 1000)
+
+    fun encode(zones: List<com.bitacoraviaje.core.model.PrivacyZone>): String =
+        json.encodeToString(kotlinx.serialization.builtins.ListSerializer(Dto.serializer()), zones.map { Dto(it.id, it.name, it.lat, it.lon, it.radiusM) })
+
+    /** Null when the stored text is not a valid list (corrupt or newer): never a silent partial list. */
+    fun parse(raw: String): List<com.bitacoraviaje.core.model.PrivacyZone>? = runCatching {
+        json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(Dto.serializer()), raw)
+            .filter { it.lat in -90.0..90.0 && it.lon in -180.0..180.0 && it.radius_m in 10.0..50_000.0 }
+            .map { com.bitacoraviaje.core.model.PrivacyZone(it.id, it.name, it.lat, it.lon, it.radius_m) }
+    }.getOrNull()
+}
+

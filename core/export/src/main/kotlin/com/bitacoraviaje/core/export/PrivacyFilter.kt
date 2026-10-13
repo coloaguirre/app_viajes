@@ -1,0 +1,78 @@
+package com.bitacoraviaje.core.export
+
+import com.bitacoraviaje.core.geo.haversineM
+import com.bitacoraviaje.core.model.PauseKind
+import com.bitacoraviaje.core.model.PrivacyZone
+import com.bitacoraviaje.core.model.SegmentPause
+import com.bitacoraviaje.core.model.TrackPoint
+
+/** What the zones removed or blanked, reported in LEEME and the export dialog (nothing is dropped silently). */
+data class PrivacyReport(
+    val zones: Int,
+    val pointsRemoved: Int,
+    val cuts: Int,
+    val stopsRemoved: Int,
+    val placesRemoved: Int,
+    val mediaBlanked: Int,
+    val notesBlanked: Int,
+    /** JPEG copies rewritten without GPS tags by the exporter (null: the option was off or no copy needed it). */
+    val exifStripped: Int? = null,
+) {
+    val isEmpty: Boolean get() = pointsRemoved == 0 && stopsRemoved == 0 && placesRemoved == 0 && mediaBlanked == 0 && notesBlanked == 0
+}
+
+/**
+ * DISENO §15.3 / PLAN 5.5, pure: applied to the export, never to the database. Points inside a
+ * zone disappear and the track is cut there (a [PauseKind.PRIVACY] pause, which every writer
+ * already honours as a `<trkseg>` break); stops and places inside are dropped; media, voice and
+ * text notes inside keep their row but lose lat/lon (the original files are untouched; the
+ * exported copy's EXIF is the app's job). Everything removed is counted in [PrivacyReport].
+ */
+object PrivacyFilter {
+    fun inside(lat: Double?, lon: Double?, zones: List<PrivacyZone>): Boolean =
+        lat != null && lon != null && zones.any { haversineM(lat, lon, it.lat, it.lon) <= it.radiusM }
+
+    fun apply(trip: TripExport, zones: List<PrivacyZone>): Pair<TripExport, PrivacyReport> {
+        if (zones.isEmpty()) return trip to PrivacyReport(0, 0, 0, 0, 0, 0, 0)
+        var pointsRemoved = 0
+        var cuts = 0
+        var stopsRemoved = 0
+        var mediaBlanked = 0
+        var notesBlanked = 0
+        val removedPlaceIds = HashSet<String>()
+        val segments = trip.segments.map { se ->
+            val kept = ArrayList<TrackPoint>()
+            val pauses = ArrayList(se.pauses)
+            var lastInside = false
+            for (p in se.points) {
+                val hit = inside(p.lat, p.lon, zones)
+                if (hit) {
+                    pointsRemoved++
+                    if (!lastInside && kept.isNotEmpty()) {
+                        // Entering a zone with track behind us: cut here so no straight line crosses the zone.
+                        pauses += SegmentPause("privacy-${se.segment.id}-${p.timeUtcMs}", se.segment.id, PauseKind.PRIVACY, p.timeUtcMs, null)
+                        cuts++
+                    }
+                } else {
+                    kept += p
+                }
+                lastInside = hit
+            }
+            val stops = se.stops.filter { !inside(it.lat, it.lon, zones) }.also { stopsRemoved += se.stops.size - it.size }
+            val media = se.media.map { m ->
+                if (inside(m.linkedLat, m.linkedLon, zones) || inside(m.exifLat, m.exifLon, zones)) { mediaBlanked++; m.copy(linkedLat = null, linkedLon = null, exifLat = null, exifLon = null) } else m
+            }
+            val voice = se.voiceNotes.map { v -> if (inside(v.lat, v.lon, zones)) { notesBlanked++; v.copy(lat = null, lon = null) } else v }
+            val text = se.textNotes.map { n -> if (inside(n.lat, n.lon, zones)) { notesBlanked++; n.copy(lat = null, lon = null) } else n }
+            se.copy(points = kept, pauses = pauses.sortedBy { it.pausedUtcMs }, stops = stops, media = media, voiceNotes = voice, textNotes = text)
+        }
+        val places = trip.places.filter { p -> !inside(p.lat, p.lon, zones).also { if (it) removedPlaceIds += p.id } }
+        val filtered = trip.copy(
+            segments = segments,
+            places = places,
+            enrichments = trip.enrichments.filter { it.placeId !in removedPlaceIds },
+            segmentPlaces = trip.segmentPlaces.filter { it.placeId !in removedPlaceIds },
+        )
+        return filtered to PrivacyReport(zones.size, pointsRemoved, cuts, stopsRemoved, removedPlaceIds.size, mediaBlanked, notesBlanked)
+    }
+}

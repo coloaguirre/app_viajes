@@ -74,8 +74,10 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
     var pendingMedia by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
     var pendingAudio by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
     var pendingFiltered by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var pendingPrivacy by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
+    var pendingStrip by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
     val createZip = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        uri?.let { viewModel.startExport(ExportOptions(pendingMedia, pendingAudio, pendingFiltered), ExportDestination.SAF, it) }
+        uri?.let { viewModel.startExport(ExportOptions(pendingMedia, pendingAudio, pendingFiltered, applyPrivacyZones = pendingPrivacy, stripExifGps = pendingStrip), ExportDestination.SAF, it) }
     }
     TripDetailScreen(
         state = state,
@@ -89,7 +91,9 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
         map = { s, m -> mapRenderer.TrackMap(s, m) },
     )
     if (showExport) {
+        val zones by viewModel.privacyZones.collectAsStateWithLifecycle()
         ExportDialog(
+            zones = zones,
             status = export,
             onDismiss = { showExport = false },
             onStart = { opts, dest ->
@@ -98,6 +102,8 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
                         pendingMedia = opts.includeMedia
                         pendingAudio = opts.includeAudio
                         pendingFiltered = opts.includeFilteredPoints
+                        pendingPrivacy = opts.applyPrivacyZones
+                        pendingStrip = opts.stripExifGps
                         createZip.launch(com.bitacoraviaje.core.export.Names.packageFolder(state.trip?.title ?: "viaje", System.currentTimeMillis(), state.segments.firstOrNull()?.segment?.tzId ?: "UTC") + ".zip")
                     }
                     else -> viewModel.startExport(opts, dest)

@@ -43,7 +43,7 @@ internal object Diary {
     fun line(e: TimelineEvent): String = when (e) {
         is TimelineEvent.SegmentStart -> "Inicio"
         is TimelineEvent.SegmentEnd -> "Fin"
-        is TimelineEvent.Pause -> when (e.kind) { PauseKind.AUTO_REST -> "Reposo automático"; PauseKind.NESTED -> "Pausa por excursión"; PauseKind.USER -> "Pausa" }
+        is TimelineEvent.Pause -> when (e.kind) { PauseKind.AUTO_REST -> "Reposo automático"; PauseKind.NESTED -> "Pausa por excursión"; PauseKind.USER -> "Pausa"; PauseKind.PRIVACY -> "Tramo omitido por una zona de privacidad" }
         is TimelineEvent.Resume -> "Reanudado tras ${dur(e.pausedMs)}"
         is TimelineEvent.StopArrived -> e.stop.userLabel?.let { "Llegada a $it" } ?: "Llegada a una parada"
         is TimelineEvent.StopLeft -> "Salida tras ${dur(e.dwellMs)}"
@@ -138,8 +138,10 @@ footer{font-size:.75rem;color:#666;margin-top:24px}
   const bounds=[];const side=document.getElementById('timeline');
   const fmt=t=>t.slice(11,16);
   trip.segments.forEach((s,i)=>{
-    const line=s.points.filter(p=>!p.filtered).map(p=>[p.lat,p.lon]);
-    if(line.length>1){L.polyline(line,{color:colors[i%colors.length],weight:4}).addTo(map);line.forEach(p=>bounds.push(p));}
+    const cuts=(s.pauses||[]).map(p=>p.paused_utc_ms).sort((a,b)=>a-b);let ci=0,piece=[];const pieces=[];
+    s.points.filter(p=>!p.filtered).forEach(p=>{let cut=false;while(ci<cuts.length&&cuts[ci]<=p.t_utc_ms){cut=true;ci++;}if(cut&&piece.length){pieces.push(piece);piece=[];}piece.push([p.lat,p.lon]);});
+    if(piece.length)pieces.push(piece);
+    pieces.filter(l=>l.length>1).forEach(line=>{L.polyline(line,{color:colors[i%colors.length],weight:4}).addTo(map);line.forEach(p=>bounds.push(p));});
     const h2=document.createElement('h2');h2.textContent=(s.started||'').slice(0,10)+' · '+(s.title||s.type.toLowerCase())+(s.stats.distance_m?' · '+(s.stats.distance_m/1000).toFixed(1)+' km':'');side.appendChild(h2);
     const events=[];
     s.media.forEach(m=>events.push({t:m.taken,lat:m.lat,lon:m.lon,label:m.caption||(m.kind==='VIDEO'?'Video':'Foto'),file:m.file,kind:'photo'}));

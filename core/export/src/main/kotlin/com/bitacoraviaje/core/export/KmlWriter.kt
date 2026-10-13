@@ -50,15 +50,21 @@ class KmlWriter(
             if (i < MY_MAPS_MAX_LAYERS) x.open("Folder")
             x.leaf("name", "${Iso.localDate(s.startedUtcMs, z)} · ${s.title ?: s.type.name.lowercase()}")
             val pts = se.points.filter { !it.isFilteredOut }
-            if (pts.size >= 2) {
-                val keep = simplifyIndices(pts, toleranceM)
+            // One LineString per piece between pauses (a privacy cut must not be bridged by a straight line, PLAN 5.5).
+            val pieces = TrackSplitter.split(pts, se.pauses).filter { it.size >= 2 }
+            if (pieces.isNotEmpty()) {
                 x.open("Placemark")
                 x.leaf("name", s.title ?: "Recorrido")
                 x.leaf("styleUrl", "#track$i")
-                x.open("LineString")
-                x.leaf("tessellate", "1")
-                x.leaf("coordinates", keep.joinToString(" ") { k -> val p = pts[k]; "${Num.coord(p.lon)},${Num.coord(p.lat)},${Num.ele(p.altM ?: 0.0)}" })
-                x.close()
+                if (pieces.size > 1) x.open("MultiGeometry")
+                for (piece in pieces) {
+                    val keep = simplifyIndices(piece, toleranceM)
+                    x.open("LineString")
+                    x.leaf("tessellate", "1")
+                    x.leaf("coordinates", keep.joinToString(" ") { k -> val p = piece[k]; "${Num.coord(p.lon)},${Num.coord(p.lat)},${Num.ele(p.altM ?: 0.0)}" })
+                    x.close()
+                }
+                if (pieces.size > 1) x.close()
                 x.close()
             }
             var budget = maxPlacemarksPerSegment - 1

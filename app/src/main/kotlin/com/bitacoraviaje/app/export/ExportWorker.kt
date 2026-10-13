@@ -26,6 +26,7 @@ import androidx.work.workDataOf
 import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.export.FileSource
 import com.bitacoraviaje.core.export.StagedExport
+import kotlinx.coroutines.flow.first
 import com.bitacoraviaje.core.export.TripExport
 import com.bitacoraviaje.core.model.MediaKind
 import dagger.assisted.Assisted
@@ -62,6 +63,7 @@ class ExportWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted params: WorkerParameters,
     private val loader: ExportLoader,
+    private val prefs: com.bitacoraviaje.app.settings.UserPreferences,
 ) : CoroutineWorker(appContext, params) {
     private val notifications = appContext.getSystemService(NotificationManager::class.java)
 
@@ -73,11 +75,16 @@ class ExportWorker @AssistedInject constructor(
             includeMedia = inputData.getBoolean(KEY_MEDIA, true),
             includeAudio = inputData.getBoolean(KEY_AUDIO, true),
             includeFilteredPoints = inputData.getBoolean(KEY_FILTERED, false),
+            applyPrivacyZones = inputData.getBoolean(KEY_PRIVACY, true),
+            stripExifGps = inputData.getBoolean(KEY_STRIP_EXIF, true),
         )
         val destination = ExportDestination.valueOf(inputData.getString(KEY_DESTINATION) ?: ExportDestination.SHARE.name)
         val targetUri = inputData.getString(KEY_TARGET_URI)?.toUri()
         runCatching { setForeground(foregroundInfo(0, 1)) }.onFailure { Log.w(TAG, "foreground not allowed: ${it.message}") }
-        val trip = loader.load(tripId, options) ?: return@withContext Result.failure(workDataOf(KEY_ERROR to "viaje inexistente"))
+        val zones = prefs.settings.first().privacyZones
+        val forExport = loader.loadForExport(tripId, options, zones) ?: return@withContext Result.failure(workDataOf(KEY_ERROR to "viaje inexistente"))
+        val trip = forExport.trip
+        val strip = if (options.stripExifGps) forExport.blankedMediaIds else emptySet()
         val staging = stagingDir(appContext, tripId)
         // Staging + ZIP need roughly twice the media size; refuse early with a clear message (review I3, skill trip-export).
         val needed = estimateBytes(trip) * 2 + 20L * 1024 * 1024
@@ -86,7 +93,8 @@ class ExportWorker @AssistedInject constructor(
         val staged = StagedExport(staging, thumbnails(trip), options.includeMedia, options.includeAudio)
         var createdUri: Uri? = null
         return@withContext try {
-            val report = staged.run(trip, fileSource(trip)) { done, total -> publish(done, total) }
+            val privacy = forExport.privacy?.let { if (options.stripExifGps) it.copy(exifStripped = strip.count { id -> trip.allMedia.firstOrNull { m -> m.id == id }?.let { m -> m.kind == MediaKind.PHOTO && (m.mimeType == null || m.mimeType == "image/jpeg") } == true }) else it }
+            val report = staged.run(trip, fileSource(trip, strip), privacy) { done, total -> publish(done, total) }
             val (uri, label) = openDestination(destination, targetUri, report.folder)
             createdUri = if (destination == ExportDestination.DOWNLOADS) uri else null
             // "wt": truncate. Some document providers keep the old tail with plain "w" and a retry would leave a corrupt ZIP (review I2).
@@ -101,6 +109,7 @@ class ExportWorker @AssistedInject constructor(
                 workDataOf(
                     KEY_RESULT_URI to (uri?.toString() ?: label), KEY_RESULT_FOLDER to report.folder, KEY_MEDIA_WRITTEN to report.mediaWritten, KEY_MEDIA_TOTAL to report.mediaInDb,
                     KEY_AUDIO_WRITTEN to report.audioWritten, KEY_AUDIO_TOTAL to report.voiceNotesInDb, KEY_MISSING to (report.mediaMissing.size + report.audioMissing.size),
+                    KEY_PRIVACY_POINTS to (report.privacy?.pointsRemoved ?: 0), KEY_PRIVACY_STOPS to (report.privacy?.stopsRemoved ?: 0), KEY_PRIVACY_MEDIA to (report.privacy?.mediaBlanked ?: 0),
                 ),
             )
         } catch (e: Exception) {
@@ -115,13 +124,30 @@ class ExportWorker @AssistedInject constructor(
     private fun estimateBytes(trip: TripExport): Long =
         trip.allMedia.filter { it.id in trip.mediaFiles }.sumOf { it.sizeBytes ?: 0L } + trip.allVoiceNotes.filter { it.id in trip.audioFiles }.sumOf { File(appContext.filesDir, it.audioPath).length() }
 
-    private fun fileSource(trip: TripExport): FileSource {
-        val byMediaPath = trip.allMedia.associateBy({ trip.mediaFiles[it.id] }, { it.contentUri })
+    /** [stripIds]: media whose location the privacy zones blanked; their JPEG copies are served without GPS tags (PLAN 5.5). */
+    private fun fileSource(trip: TripExport, stripIds: Set<String> = emptySet()): FileSource {
+        val byMediaPath = trip.allMedia.associateBy({ trip.mediaFiles[it.id] }, { it })
         val byAudioPath = trip.allVoiceNotes.associateBy({ trip.audioFiles[it.id] }, { it.audioPath })
+        val tmpDir = File(appContext.cacheDir, "export-strip").apply { mkdirs() }
         return FileSource { path ->
-            byMediaPath[path]?.let { uri -> runCatching { appContext.contentResolver.openInputStream(uri.toUri()) }.getOrNull() }
+            byMediaPath[path]?.let { m ->
+                val raw = runCatching { appContext.contentResolver.openInputStream(m.contentUri!!.toUri()) }.getOrNull()
+                if (raw != null && m.id in stripIds && m.kind == MediaKind.PHOTO && (m.mimeType == null || m.mimeType == "image/jpeg")) {
+                    val tmp = File(tmpDir, m.id + ".jpg")
+                    ExifGps.stripped(raw, tmp)?.let { StripTempStream(it, tmp) } ?: run { Log.w(TAG, "exif strip failed for ${m.id}; copying the original"); runCatching { appContext.contentResolver.openInputStream(m.contentUri!!.toUri()) }.getOrNull() }
+                } else {
+                    raw
+                }
+            }
                 ?: byAudioPath[path]?.let { rel -> File(appContext.filesDir, rel).takeIf { it.isFile }?.let(::FileInputStream) as InputStream? }
         }
+    }
+
+    /** Deletes the stripped temp copy when the stream is closed. */
+    private class StripTempStream(private val inner: InputStream, private val file: File) : InputStream() {
+        override fun read(): Int = inner.read()
+        override fun read(b: ByteArray, off: Int, len: Int): Int = inner.read(b, off, len)
+        override fun close() { inner.close(); file.delete() }
     }
 
     /** 512 px JPEG thumbnails for the KMZ (Google Earth), API 29+; failures just leave the placemark without an image. */
@@ -196,6 +222,11 @@ class ExportWorker @AssistedInject constructor(
         const val KEY_MEDIA = "media"
         const val KEY_AUDIO = "audio"
         const val KEY_FILTERED = "filtered"
+        const val KEY_PRIVACY = "privacy"
+        const val KEY_STRIP_EXIF = "strip_exif"
+        const val KEY_PRIVACY_POINTS = "privacy_points"
+        const val KEY_PRIVACY_STOPS = "privacy_stops"
+        const val KEY_PRIVACY_MEDIA = "privacy_media"
         const val KEY_DESTINATION = "destination"
         const val KEY_TARGET_URI = "target_uri"
         const val KEY_PROGRESS_DONE = "done"
@@ -220,6 +251,8 @@ class ExportWorker @AssistedInject constructor(
                 .putBoolean(KEY_MEDIA, options.includeMedia)
                 .putBoolean(KEY_AUDIO, options.includeAudio)
                 .putBoolean(KEY_FILTERED, options.includeFilteredPoints)
+                .putBoolean(KEY_PRIVACY, options.applyPrivacyZones)
+                .putBoolean(KEY_STRIP_EXIF, options.stripExifGps)
                 .putString(KEY_DESTINATION, destination.name)
                 .apply { targetUri?.let { putString(KEY_TARGET_URI, it.toString()) } }
                 .build()

@@ -27,6 +27,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /** Injectable clock so repository logic is testable without waiting. */
@@ -207,6 +208,12 @@ class TrackingRepository @Inject constructor(
     suspend fun validPoints(segmentId: String): List<TrackPoint> = points.getValidBySegment(segmentId).map { it.toDomain() }
 
     suspend fun countValidPoints(segmentId: String): Int = points.countValidBySegment(segmentId)
+
+    /** Segments of the most recently created trip, newest first (a "where am I" fallback for the privacy zones). */
+    suspend fun segmentsOfLatestTrip(): List<Segment> {
+        val trip = trips.observeAll().first().maxByOrNull { it.createdUtcMs } ?: return emptyList()
+        return segments.getByTrip(trip.id).map { it.toDomain() }.sortedByDescending { it.startedUtcMs }
+    }
 
     /** Every point, filtered ones included (export with the debugging option). */
     suspend fun allPoints(segmentId: String): List<TrackPoint> = points.getBySegment(segmentId).map { it.toDomain() }
