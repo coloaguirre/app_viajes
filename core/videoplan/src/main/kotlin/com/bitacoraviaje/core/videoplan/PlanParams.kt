@@ -17,6 +17,8 @@ data class PlanParams(
     val includeMap: Boolean = true,
     val includeVideos: Boolean = true,
     val musicFile: String? = null,
+    /** 0..1 gain of the music under the video (DISENO §13.2); the desktop renderer also ducks it under voices. */
+    val musicVolume: Double = 0.4,
     /** Restrict to these segments (an "etapa" video or a date range); null = whole trip. */
     val segmentIds: Set<String>? = null,
 ) {

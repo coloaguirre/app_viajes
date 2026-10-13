@@ -205,7 +205,23 @@ object Cards {
      * Only the route (time-interpolated prefix up to [progress], DISENO §13.4) and its tip, over whatever is on [c]
      * (a map, or transparency for an overlay). [base] is only needed to map snapshot pixels to the frame.
      */
-    fun drawRoutePath(c: Canvas, w: Int, h: Int, points: List<TrackPoint>, projected: List<Pair<Float, Float>>?, progress: Double, base: Bitmap? = null, baseSize: Pair<Int, Int>? = null) {
+    private val ROUTE_COLORS = listOf(NAVY, Color.rgb(100, 143, 31), Color.rgb(212, 63, 31), Color.rgb(164, 31, 143), Color.rgb(255, 127, 0))
+
+    /** Several tracks fitted together on the plain ground (an overview), each in frame pixels. */
+    fun fitTracks(w: Int, h: Int, tracks: List<List<TrackPoint>>): List<List<Pair<Float, Float>>> {
+        val all = tracks.flatten()
+        if (all.size < 2) return tracks.map { emptyList() }
+        val lat0 = all.sumOf { it.lat } / all.size
+        val kx = cos(Math.toRadians(lat0))
+        val xs = all.map { it.lon * kx }; val ys = all.map { -it.lat }
+        val minX = xs.min(); val maxX = xs.max(); val minY = ys.min(); val maxY = ys.max()
+        val spanX = max(1e-9, maxX - minX); val spanY = max(1e-9, maxY - minY)
+        val scale = min((w * 0.8) / spanX, (h * 0.8) / spanY)
+        val ox = (w - spanX * scale) / 2; val oy = (h - spanY * scale) / 2
+        return tracks.map { t -> t.map { p -> (ox + (p.lon * kx - minX) * scale).toFloat() to (oy + (-p.lat - minY) * scale).toFloat() } }
+    }
+
+    fun drawRoutePath(c: Canvas, w: Int, h: Int, points: List<TrackPoint>, projected: List<Pair<Float, Float>>?, progress: Double, base: Bitmap? = null, baseSize: Pair<Int, Int>? = null, colorIndex: Int = 0) {
         val size = baseSize ?: base?.let { it.width to it.height }
         val pixels = routePixels(w, h, points, projected, size?.first, size?.second)
         val drawn: List<Pair<Float, Float>> = if (pixels.size >= 2 && progress < 1.0) {
@@ -228,7 +244,7 @@ object Cards {
             drawn.forEachIndexed { i, (px, py) -> if (i == 0) path.moveTo(px, py) else path.lineTo(px, py) }
             val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
             c.drawPath(path, stroke.apply { color = Color.WHITE; strokeWidth = h * 0.012f })
-            c.drawPath(path, stroke.apply { color = NAVY; strokeWidth = h * 0.007f })
+            c.drawPath(path, stroke.apply { color = ROUTE_COLORS[colorIndex % ROUTE_COLORS.size]; strokeWidth = h * 0.007f })
             val (ex, ey) = drawn.last()
             c.drawCircle(ex, ey, h * 0.014f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
             c.drawCircle(ex, ey, h * 0.01f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(212, 63, 31) })

@@ -59,11 +59,12 @@ class PlanParams:
     include_map: bool = True
     include_videos: bool = True
     music_file: str | None = None
+    music_volume: float = 0.4
     segment_ids: frozenset[str] | None = None
 
     @staticmethod
     def quick_one_minute(segment_id: str, aspect: str = "16:9", music_file: str | None = None) -> PlanParams:
-        return PlanParams(60, aspect, "subtitles", True, True, False, music_file, frozenset({segment_id}))
+        return PlanParams(60, aspect, "subtitles", True, True, False, music_file, 0.4, frozenset({segment_id}))
 
     @staticmethod
     def from_dict(d: dict) -> PlanParams:
@@ -76,6 +77,7 @@ class PlanParams:
             bool(d.get("include_map", True)),
             bool(d.get("include_videos", True)),
             d.get("music_file"),
+            float(d.get("music_volume", 0.4)),
             frozenset(ids) if ids is not None else None,
         )
 
@@ -327,7 +329,7 @@ def plan(inp: PlanInput, params: PlanParams) -> VideoPlan:
     multi = len(segments) > 1
     w, h = ASPECTS[params.aspect]
     output = Output(width=w, height=h)
-    music = Music(file=params.music_file) if params.music_file else None
+    music = Music(file=params.music_file, volume=params.music_volume) if params.music_file else None
 
     fixed = TITLE_MS + CREDITS_MS
     if params.include_map and multi:
@@ -399,7 +401,8 @@ def plan(inp: PlanInput, params: PlanParams) -> VideoPlan:
                 )
             else:
                 voice_id = None
-                if c.voice is not None and params.voice != "audio" and c.voice.id not in used_voices:
+                # Set in every mode: the engine decides subtitle vs audio (review B2 of PR #11).
+                if c.voice is not None and c.voice.id not in used_voices:
                     used_voices.add(c.voice.id)
                     voice_id = c.voice.id
                 photo = Photo(
@@ -412,16 +415,17 @@ def plan(inp: PlanInput, params: PlanParams) -> VideoPlan:
                 ken_index += 1
                 scenes.append(photo)
                 photo_scores.append((photo, c.score))
-        if params.voice != "audio":
-            left = remaining - len(chosen) * photo_ms
-            for v in sorted(s.voice_notes, key=lambda v: v.started_utc_ms):
-                if v.id in used_voices or not v.text or not v.text.strip():
-                    continue
-                d = min(VOICE_OVERLAY_MAX_MS, max(3_000, v.duration_ms))
-                if left < d:
-                    break
-                scenes.append(VoiceOverlay(duration_ms=d, voice=v.id, segment=s.id, text=v.text))
-                left -= d
+        left = remaining - len(chosen) * photo_ms
+        for v in sorted(s.voice_notes, key=lambda v: v.started_utc_ms):
+            if v.id in used_voices:
+                continue
+            if (not v.text or not v.text.strip()) and params.voice == "subtitles":
+                continue
+            d = min(VOICE_OVERLAY_MAX_MS, max(3_000, v.duration_ms))
+            if left < d:
+                break
+            scenes.append(VoiceOverlay(duration_ms=d, voice=v.id, segment=s.id, text=v.text))
+            left -= d
         scenes.append(
             StatsScene(
                 duration_ms=STATS_MS,

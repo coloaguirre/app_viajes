@@ -36,15 +36,18 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * `render-<segmentId>`: plans the 1-minute video, draws the cards, runs Media3 Transformer in
- * the foreground (dataSync type; `mediaProcessing` and its time limit are a Fase 5 check) and
- * saves the MP4 under Movies/BitacoraViaje through MediaStore (PLAN 4.6, DISENO §13.6).
+ * Video rendering in the foreground (PLAN 4.6 and 5.1, DISENO §13.6): the 1-minute stage video
+ * (`render-<segmentId>`) or the full trip video from the plan the user reviewed
+ * (`render-trip-<tripId>`). Draws the cards, runs Media3 Transformer, measures the result and
+ * saves the MP4 under Movies/BitacoraViaje through MediaStore. Foreground type `dataSync`:
+ * `mediaProcessing` (Android 15) and its 6-hour budget are evaluated in Fase 6 before release.
  */
 @UnstableApi
 @HiltWorker
@@ -66,7 +69,10 @@ class RenderWorker @AssistedInject constructor(
         if (segmentId == null && tripId == null) return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
         val started = System.currentTimeMillis()
         runCatching { setForeground(foregroundInfo(0)) }.onFailure { Log.w(TAG, "foreground not allowed: ${it.message}") }
-        val work = File(appContext.cacheDir, "render/${segmentId ?: tripId}").apply { deleteRecursively(); mkdirs() }
+        // One directory per run (review I2): a replaced run may still be writing while the new one starts.
+        val renderRoot = File(appContext.cacheDir, "render")
+        renderRoot.listFiles()?.filter { it.isDirectory && System.currentTimeMillis() - it.lastModified() > STALE_MS }?.forEach { it.deleteRecursively() }
+        val work = File(renderRoot, id.toString()).apply { mkdirs() }
         return try {
             val built: MiniVideoComposer.Built
             val name: String
@@ -78,22 +84,23 @@ class RenderWorker @AssistedInject constructor(
                 val mediaById = withContext(Dispatchers.IO) { media.allOfTrip(segment.tripId).associateBy { it.id } }
                 val voices = withContext(Dispatchers.IO) { notes.voiceNotesOf(segmentId).associateBy { it.id } }
                 val base = RouteSnapshotter(appContext).snapshot(points, WIDTH, HEIGHT)
-                built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, WIDTH, HEIGHT).build(prepared.plan, prepared.input, mediaById, voices, points, base) }
+                built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, WIDTH, HEIGHT).build(prepared.plan, prepared.input, mediaById, voices, mapOf(segmentId to MiniVideoComposer.SegmentMedia(points, base)), isActive = { isActive }) }
                 name = segment.displayName ?: appContext.getString(R.string.video_default_name)
             } else {
                 // PLAN 5.1: the full trip video from the plan the user reviewed (VideoPlanStore), animated map, voices and music.
-                val (params, plan) = store.load(tripId!!) ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_plan)))
+                val loaded = store.load(tripId!!)
+                val plan = loaded?.plan ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_plan)))
+                val params = loaded.params
                 val prepared = withContext(Dispatchers.IO) { tripPlanner.input(tripId) } ?: return Result.failure(workDataOf(KEY_ERROR to appContext.getString(R.string.video_error_no_segment)))
                 val w = plan.output.width; val h = plan.output.height
                 val mediaById = withContext(Dispatchers.IO) { media.allOfTrip(tripId).associateBy { it.id } }
                 val voices = withContext(Dispatchers.IO) { prepared.segments.flatMap { notes.voiceNotesOf(it.id) }.associateBy { it.id } }
                 val snapshotter = RouteSnapshotter(appContext)
-                val wanted = plan.scenes.filterIsInstance<VideoPlan.MapRoute>().flatMap { it.segments }.toSet() + plan.scenes.filterIsInstance<VideoPlan.VoiceOverlay>().map { it.segment }
                 val perSegment = HashMap<String, MiniVideoComposer.SegmentMedia>()
                 for (s in prepared.segments) {
                     val points = withContext(Dispatchers.IO) { tracking.validPoints(s.id) }
-                    val base = if (s.id in wanted) snapshotter.snapshot(points, w, h) else null
-                    perSegment[s.id] = MiniVideoComposer.SegmentMedia(points, base)
+                    // The snapshot is fetched when a map scene asks for it and recycled by the composer (review I3).
+                    perSegment[s.id] = MiniVideoComposer.SegmentMedia(points) { kotlinx.coroutines.runBlocking { snapshotter.snapshot(points, w, h) } }
                 }
                 val options = MiniVideoComposer.Options(
                     voice = params.toPlanParams().voice,
@@ -101,25 +108,34 @@ class RenderWorker @AssistedInject constructor(
                     musicUri = params.musicUri?.let { Uri.parse(it) },
                     musicVolume = params.musicVolume.toFloat(),
                 )
-                built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, w, h, options = options).build(plan, prepared.input, mediaById, voices, perSegment) }
+                built = withContext(Dispatchers.Default) { MiniVideoComposer(appContext, work, w, h, options = options).build(plan, prepared.input, mediaById, voices, perSegment, isActive = { isActive }) }
                 name = prepared.input.title
             }
             val out = File(work, "resumen.mp4")
             export(built.composition, out)
+            // What the user is told is measured on the file, never the plan's sum (review I8).
+            val actualMs = withContext(Dispatchers.IO) { measuredDurationMs(out) ?: built.durationMs }
             val published = withContext(Dispatchers.IO) { publish(out, name) }
             if (published != null) out.delete() // the MediaStore copy is the one that counts (review M2)
             val uri = published ?: Uri.fromFile(out)
             val elapsed = System.currentTimeMillis() - started
-            Log.i(TAG, "video rendered ${segmentId?.let { "segment=$it" } ?: "trip=$tripId"} duration=${built.durationMs}ms elapsed=${elapsed}ms skipped=${built.skipped.size} audio=${built.hasAudio}")
-            Result.success(workDataOf(KEY_RESULT_URI to uri.toString(), KEY_DURATION_MS to built.durationMs, KEY_ELAPSED_MS to elapsed, KEY_SKIPPED to built.skipped.size))
+            Log.i(TAG, "video rendered ${segmentId?.let { "segment=$it" } ?: "trip=$tripId"} planned=${built.durationMs}ms actual=${actualMs}ms elapsed=${elapsed}ms skipped=${built.skipped.size} voicesDropped=${built.voicesDropped} audio=${built.hasAudio} warnings=${built.warnings.size}")
+            Result.success(workDataOf(KEY_RESULT_URI to uri.toString(), KEY_DURATION_MS to actualMs, KEY_PLANNED_MS to built.durationMs, KEY_ELAPSED_MS to elapsed, KEY_SKIPPED to built.skipped.size, KEY_VOICES_DROPPED to built.voicesDropped, KEY_WARNINGS to built.warnings.joinToString(" · ")))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            Log.w(TAG, "video failed ${segmentId ?: tripId}: ${e.javaClass.simpleName} ${e.message}")
-            Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
+            // Only the class and an error code reach the log: messages may carry the user's file names (review N5).
+            val code = (e as? ExportException)?.errorCode
+            Log.w(TAG, "video failed ${segmentId ?: tripId}: ${e.javaClass.simpleName} code=$code")
+            Result.failure(workDataOf(KEY_ERROR to (if (code != null) "${e.javaClass.simpleName} $code" else e.message ?: e.javaClass.simpleName)))
         } finally {
             work.listFiles()?.filter { it.name != "resumen.mp4" }?.forEach { it.delete() }
         }
     }
+
+    /** Duration of the produced MP4 as the container declares it. */
+    private fun measuredDurationMs(file: File): Long? = runCatching {
+        android.media.MediaMetadataRetriever().use { r -> r.setDataSource(file.absolutePath); r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() }
+    }.getOrNull()
 
     /** Transformer wants the main looper; progress is polled every 500 ms into setProgress and the notification. */
     private suspend fun export(composition: Composition, out: File) = withContext(Dispatchers.Main) {
@@ -203,6 +219,10 @@ class RenderWorker @AssistedInject constructor(
         const val KEY_DURATION_MS = "duration_ms"
         const val KEY_ELAPSED_MS = "elapsed_ms"
         const val KEY_SKIPPED = "skipped"
+        const val KEY_PLANNED_MS = "planned_ms"
+        const val KEY_VOICES_DROPPED = "voices_dropped"
+        const val KEY_WARNINGS = "warnings"
+        const val STALE_MS = 6 * 3_600_000L
         const val KEY_ERROR = "error"
         const val CHANNEL_ID = "render"
         const val NOTIFICATION_ID = 4206

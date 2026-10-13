@@ -99,6 +99,13 @@
     </plurals>
     <string name="video_error_no_segment">La etapa no existe</string>
     <string name="video_error_no_plan">No hay un plan guardado: generalo primero</string>
+    <string name="video_error_plan_failed">No se pudo generar el plan: %1$s</string>
+    <string name="video_warn_music_missing">la música no se pudo abrir y el video salió sin música</string>
+    <plurals name="video_voices_dropped">
+        <item quantity="one">%d nota de voz omitida (sin archivo o superpuesta)</item>
+        <item quantity="other">%d notas de voz omitidas (sin archivo o superpuestas)</item>
+    </plurals>
+    <string name="video_scene_position">Escena %1$d</string>
     <string name="video_title">Crear video</string>
     <string name="video_duration">Duración</string>
     <string name="video_duration_min">%1$d min</string>

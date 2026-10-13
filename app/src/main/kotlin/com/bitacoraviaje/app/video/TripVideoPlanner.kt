@@ -33,12 +33,15 @@ class TripVideoPlanner @Inject constructor(
 ) {
     data class Prepared(val segments: List<Segment>, val input: PlanInput)
 
-    suspend fun input(tripId: String): Prepared? {
+    suspend fun segment(segmentId: String): Segment? = tracking.getSegment(segmentId)
+
+    /** [onlySegmentId]: a stage video keeps only that segment and never the unlinked media. */
+    suspend fun input(tripId: String, onlySegmentId: String? = null): Prepared? {
         val trip = tracking.getTrip(tripId) ?: return null
-        val segments = tracking.segmentsOf(tripId).sortedBy { it.startedUtcMs }
+        val segments = tracking.segmentsOf(tripId).sortedBy { it.startedUtcMs }.filter { onlySegmentId == null || it.id == onlySegmentId }
         val allMedia = media.allOfTrip(tripId)
         val planSegments = segments.mapIndexed { i, s ->
-            val mediaItems = allMedia.filter { it.segmentId == s.id || (i == 0 && it.segmentId == null) }.sortedBy { it.takenUtcMs } // orphans with the first segment, like the export
+            val mediaItems = allMedia.filter { it.segmentId == s.id || (onlySegmentId == null && i == 0 && it.segmentId == null) }.sortedBy { it.takenUtcMs } // orphans with the first segment, like the export
             val voices = notes.voiceNotesOf(s.id).sortedBy { it.startedUtcMs }
             val texts = notes.textNotesOf(s.id)
             val placeRows = places.placesOf(s.id).flatMap { p ->
@@ -51,7 +54,7 @@ class TripVideoPlanner @Inject constructor(
                 date = Instant.ofEpochMilli(s.startedUtcMs).atZone(runCatching { ZoneId.of(s.tzId) }.getOrDefault(ZoneId.of("UTC"))).toLocalDate().toString(),
                 startedUtcMs = s.startedUtcMs, endedUtcMs = s.endedUtcMs,
                 distanceM = s.stats.distanceM, movingTimeMs = s.stats.movingTimeMs, elevationGainM = s.stats.elevationGainM, maxAltM = s.stats.maxAltM,
-                hasTrack = tracking.validPoints(s.id).size >= 2,
+                hasTrack = tracking.countValidPoints(s.id) >= 2, // a count, not the whole track (review M7)
                 media = mediaItems.map { m -> PlanMedia(m.id, m.kind == MediaKind.VIDEO, m.takenUtcMs, m.durationMs, m.isFavorite, m.isExcluded, m.userCaption) },
                 voiceNotes = voices.map { v -> PlanVoice(v.id, v.startedUtcMs, v.durationMs, v.displayText) },
                 highlightsUtcMs = texts.filter { it.kind == TextNoteKind.HIGHLIGHT }.map { it.timeUtcMs }.sorted(),

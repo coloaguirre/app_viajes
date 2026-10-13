@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -141,42 +144,52 @@ fun VideoCreateScreen(
                 item {
                     Text(stringResource(R.string.video_plan_summary, plan.scenes.size, plan.total_duration_ms / 1000), style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("video_plan_summary"))
                 }
-                itemsIndexed(plan.scenes, key = { i, s -> "$i-${s::class.simpleName}" }) { i, scene ->
+                itemsIndexed(plan.scenes, key = { i, _ -> i }) { i, scene ->
                     ListItem(
                         headlineContent = { Text(sceneLabel(scene)) },
                         supportingContent = { Text("${scene.durationMs / 1000.0} s") },
                         leadingContent = { Text("${i + 1}") },
                         trailingContent = {
                             Row {
-                                IconButton(onClick = { onMove(i, -1) }, enabled = i > 0, modifier = Modifier.testTag("scene_up_$i")) { Text("↑") }
-                                IconButton(onClick = { onMove(i, 1) }, enabled = i < plan.scenes.lastIndex, modifier = Modifier.testTag("scene_down_$i")) { Text("↓") }
-                                IconButton(onClick = { onRemove(i) }, modifier = Modifier.testTag("scene_remove_$i")) { Text("✕") }
+                                IconButton(onClick = { onMove(i, -1) }, enabled = i > 0, modifier = Modifier.testTag("scene_up_$i")) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.video_scene_up)) }
+                                IconButton(onClick = { onMove(i, 1) }, enabled = i < plan.scenes.lastIndex, modifier = Modifier.testTag("scene_down_$i")) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.video_scene_down)) }
+                                IconButton(onClick = { onRemove(i) }, modifier = Modifier.testTag("scene_remove_$i")) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.video_scene_remove)) }
                             }
                         },
                         modifier = Modifier.testTag("scene_$i"),
                     )
                 }
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        when {
-                            render.running -> {
-                                Text(stringResource(R.string.video_rendering, render.progress), modifier = Modifier.testTag("video_running"))
-                                LinearProgressIndicator(progress = { render.progress / 100f }, modifier = Modifier.fillMaxWidth())
-                                OutlinedButton(onClick = onCancel, modifier = Modifier.testTag("video_cancel")) { Text(stringResource(R.string.video_cancel)) }
-                            }
-                            render.finished && render.resultUri != null -> {
-                                Text(stringResource(R.string.video_done, render.durationMs / 1000, render.elapsedMs / 1000) + if (render.skipped > 0) " · " + androidx.compose.ui.res.pluralStringResource(R.plurals.finish_video_skipped, render.skipped, render.skipped) else "", modifier = Modifier.testTag("video_done"))
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Button(onClick = { onOpen(render.resultUri) }, modifier = Modifier.weight(1f).testTag("video_open")) { Text(stringResource(R.string.video_open)) }
-                                    OutlinedButton(onClick = { onShare(render.resultUri) }, modifier = Modifier.weight(1f).testTag("video_share")) { Text(stringResource(R.string.video_share)) }
-                                }
-                            }
-                            render.failed -> Text(stringResource(R.string.video_failed, render.error ?: ""), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("video_failed"))
-                        }
-                        if (!render.running) {
+                    if (!render.running) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = onRender, modifier = Modifier.fillMaxWidth().testTag("video_render")) { Text(stringResource(R.string.video_render)) }
                             TextButton(onClick = onSavePlan, modifier = Modifier.testTag("video_save_plan")) { Text(stringResource(R.string.video_save_plan)) }
                         }
+                    }
+                }
+            }
+            // The render status lives outside the plan block: changing a parameter mid-render must not hide it (review M1).
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when {
+                        render.running -> {
+                            Text(stringResource(R.string.video_rendering, render.progress), modifier = Modifier.testTag("video_running"))
+                            LinearProgressIndicator(progress = { render.progress / 100f }, modifier = Modifier.fillMaxWidth())
+                            OutlinedButton(onClick = onCancel, modifier = Modifier.testTag("video_cancel")) { Text(stringResource(R.string.video_cancel)) }
+                        }
+                        render.finished && render.resultUri != null -> {
+                            val notes = buildList {
+                                if (render.skipped > 0) add(androidx.compose.ui.res.pluralStringResource(R.plurals.finish_video_skipped, render.skipped, render.skipped))
+                                if (render.voicesDropped > 0) add(androidx.compose.ui.res.pluralStringResource(R.plurals.video_voices_dropped, render.voicesDropped, render.voicesDropped))
+                                render.warnings?.let { add(it) }
+                            }
+                            Text(stringResource(R.string.video_done, render.durationMs / 1000, render.elapsedMs / 1000) + notes.joinToString("") { " · $it" }, modifier = Modifier.testTag("video_done"))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Button(onClick = { onOpen(render.resultUri) }, modifier = Modifier.weight(1f).testTag("video_open")) { Text(stringResource(R.string.video_open)) }
+                                OutlinedButton(onClick = { onShare(render.resultUri) }, modifier = Modifier.weight(1f).testTag("video_share")) { Text(stringResource(R.string.video_share)) }
+                            }
+                        }
+                        render.failed -> Text(stringResource(R.string.video_failed, render.error ?: ""), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("video_failed"))
                     }
                 }
             }

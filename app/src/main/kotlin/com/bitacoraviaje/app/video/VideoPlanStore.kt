@@ -23,6 +23,8 @@ data class VideoParams(
     val includeMap: Boolean = true,
     val includeVideos: Boolean = true,
     val musicUri: String? = null,
+    /** Display name of the music file: what `video_plan.json` carries for the desktop renderer (review I6). */
+    val musicName: String? = null,
     val musicVolume: Double = 0.4,
     val segmentIds: List<String>? = null,
 ) {
@@ -31,32 +33,36 @@ data class VideoParams(
         aspect = if (aspect == "9:16") Aspect.PORTRAIT_9_16 else Aspect.LANDSCAPE_16_9,
         voice = VoiceMode.entries.firstOrNull { it.name.equals(voice, ignoreCase = true) } ?: VoiceMode.SUBTITLES,
         includePlaces = includePlaces, includeMap = includeMap, includeVideos = includeVideos,
-        musicFile = musicUri, segmentIds = segmentIds?.toSet(),
+        musicFile = if (musicUri != null) (musicName ?: "musica") else null, musicVolume = musicVolume, segmentIds = segmentIds?.toSet(),
     )
 }
 
 /** `files/videoplans/<tripId>.json`: the last plan (editable) and its parameters; `video_plan.json` is also what the desktop renderer reads. */
 @Singleton
 class VideoPlanStore @Inject constructor(@ApplicationContext private val context: Context) {
+    /** Parameters survive without a plan (review M2): editing them invalidates the plan, not the choices. */
     @Serializable
-    data class Saved(val params: VideoParams, val plan: String)
+    data class Saved(val params: VideoParams, val plan: String? = null)
+
+    data class Loaded(val params: VideoParams, val plan: VideoPlan?)
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
     private val dir get() = File(context.filesDir, "videoplans")
 
     fun file(tripId: String) = File(dir, "${com.bitacoraviaje.core.export.SafeId.require(tripId, "trip id")}.json")
 
-    fun save(tripId: String, params: VideoParams, plan: VideoPlan) {
+    fun save(tripId: String, params: VideoParams, plan: VideoPlan?) {
+        val target = file(tripId) // validates the id before anything touches the disk (review M3)
         dir.mkdirs()
-        val tmp = File(dir, "${tripId}.tmp")
-        tmp.writeText(json.encodeToString(Saved.serializer(), Saved(params, plan.toJson())))
-        if (!tmp.renameTo(file(tripId))) { file(tripId).delete(); tmp.renameTo(file(tripId)) }
+        val tmp = File(dir, "${target.nameWithoutExtension}.tmp")
+        tmp.writeText(json.encodeToString(Saved.serializer(), Saved(params, plan?.toJson())))
+        if (!tmp.renameTo(target)) { target.delete(); tmp.renameTo(target) }
     }
 
-    fun load(tripId: String): Pair<VideoParams, VideoPlan>? {
+    fun load(tripId: String): Loaded? {
         val f = file(tripId)
         if (!f.isFile) return null
-        return runCatching { val s = json.decodeFromString(Saved.serializer(), f.readText()); s.params to VideoPlan.fromJson(s.plan) }.getOrNull()
+        return runCatching { val s = json.decodeFromString(Saved.serializer(), f.readText()); Loaded(s.params, s.plan?.let { VideoPlan.fromJson(it) }) }.getOrNull()
     }
 
     fun clear(tripId: String) { file(tripId).delete() }

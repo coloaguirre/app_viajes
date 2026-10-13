@@ -20,6 +20,7 @@ import com.bitacoraviaje.core.videoplan.VideoPlan.Companion.toJson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,27 +53,40 @@ class VideoCreateViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RenderStatus())
 
     init {
-        store.load(tripId)?.let { (p, plan) -> _state.value = VideoCreateUiState(params = p, plan = plan) }
+        viewModelScope.launch(Dispatchers.IO) {
+            store.load(tripId)?.let { l -> _state.value = VideoCreateUiState(params = l.params, plan = l.plan) }
+        }
     }
 
+    /** Parameters are persisted as soon as they change (review M2); a change invalidates the plan. */
     fun setParams(update: (VideoParams) -> VideoParams) {
-        _state.value = _state.value.copy(params = update(_state.value.params), plan = null)
+        val params = update(_state.value.params)
+        _state.value = _state.value.copy(params = params, plan = null)
+        viewModelScope.launch(Dispatchers.IO) { store.save(tripId, params, null) }
     }
 
     fun setMusic(uri: Uri?) {
+        val previous = _state.value.params.musicUri
+        if (uri == null && previous != null) runCatching { appContext.contentResolver.releasePersistableUriPermission(Uri.parse(previous), android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } // review N6
         uri?.let { runCatching { appContext.contentResolver.takePersistableUriPermission(it, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
-        setParams { it.copy(musicUri = uri?.toString()) }
+        val name = uri?.let { u -> runCatching { appContext.contentResolver.query(u, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null } }.getOrNull() ?: u.lastPathSegment }
+        setParams { it.copy(musicUri = uri?.toString(), musicName = name) }
     }
 
     fun generatePlan() {
         if (_state.value.planning) return
         _state.value = _state.value.copy(planning = true, message = null)
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val params = _state.value.params
-            val result = runCatching { planner.plan(tripId, params.toPlanParams()) }.getOrNull()
-            val plan = result?.second
+            val result = runCatching { planner.plan(tripId, params.toPlanParams()) }
+            val plan = result.getOrNull()?.second
             if (plan != null) store.save(tripId, params, plan)
-            _state.value = _state.value.copy(planning = false, plan = plan, message = if (plan == null) appContext.getString(com.bitacoraviaje.app.R.string.video_error_no_segment) else null)
+            val message = when {
+                plan != null -> null
+                result.isFailure -> appContext.getString(com.bitacoraviaje.app.R.string.video_error_plan_failed, result.exceptionOrNull()?.message ?: result.exceptionOrNull()?.javaClass?.simpleName ?: "?") // review M9
+                else -> appContext.getString(com.bitacoraviaje.app.R.string.video_error_no_segment)
+            }
+            _state.value = _state.value.copy(planning = false, plan = plan, message = message)
         }
     }
 
@@ -80,8 +94,8 @@ class VideoCreateViewModel @Inject constructor(
     private fun updatePlan(scenes: List<VideoPlan.Scene>) {
         val plan = _state.value.plan ?: return
         val updated = plan.copy(scenes = scenes, total_duration_ms = scenes.sumOf { it.durationMs })
-        store.save(tripId, _state.value.params, updated)
         _state.value = _state.value.copy(plan = updated)
+        viewModelScope.launch(Dispatchers.IO) { store.save(tripId, _state.value.params, updated) }
     }
 
     fun removeScene(index: Int) = _state.value.plan?.scenes?.let { s -> if (index in s.indices) updatePlan(s.filterIndexed { i, _ -> i != index }) }
@@ -101,7 +115,7 @@ class VideoCreateViewModel @Inject constructor(
     /** `video_plan.json` for the desktop renderer: `bitacora-render render export/ plan.json`. */
     fun savePlanTo(uri: Uri) {
         val plan = _state.value.plan ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val ok = runCatching { appContext.contentResolver.openOutputStream(uri, "wt")?.use { it.write(plan.toJson().toByteArray()) } }.isSuccess
             _state.value = _state.value.copy(message = appContext.getString(if (ok) com.bitacoraviaje.app.R.string.video_plan_saved else com.bitacoraviaje.app.R.string.finish_video_open_failed))
         }

@@ -47,7 +47,7 @@ object Planner {
         val budget = params.targetDurationS * 1_000L
         val multi = segments.size > 1
         val output = VideoPlan.Output(params.aspect.width, params.aspect.height)
-        val music = params.musicFile?.let { VideoPlan.Music(it) }
+        val music = params.musicFile?.let { VideoPlan.Music(it, volume = params.musicVolume) }
 
         // 1. Fixed scenes.
         var fixed = TITLE_MS + CREDITS_MS
@@ -96,18 +96,21 @@ object Planner {
                     val start = max(0L, (d - len) / 2)
                     scenes += VideoPlan.VideoClip(c.media.id, start, start + len, keep_audio = true, caption = c.media.caption) // clip audio always kept; VoiceMode governs voice notes
                 } else {
-                    val voiceId = c.voice?.takeIf { params.voice != VoiceMode.AUDIO && usedVoices.add(it.id) }?.id
+                    // The voice reference is set in every mode: the engine decides subtitle vs audio (review B2 of PR #11).
+                    val voiceId = c.voice?.takeIf { usedVoices.add(it.id) }?.id
                     val photo = VideoPlan.Photo(photoMs, c.media.id, kenBurns(kenIndex++), c.media.caption, voiceId)
                     scenes += photo
                     photoScenes += photo to c.score
                 }
             }
-            // 4. Voice notes without a photo nearby: a short overlay on the map, budget permitting.
-            if (params.voice != VoiceMode.AUDIO) {
+            // 4. Voice notes without a photo nearby: a short overlay on the map, budget permitting (in audio mode the
+            //    overlay plays the note; a note without transcript still enters when the audio is wanted).
+            run {
                 val spent = chosen.size * photoMs
                 var left = remaining - spent
                 for (v in s.voiceNotes.sortedBy { it.startedUtcMs }) {
-                    if (v.id in usedVoices || v.text.isNullOrBlank()) continue
+                    if (v.id in usedVoices) continue
+                    if (v.text.isNullOrBlank() && params.voice == VoiceMode.SUBTITLES) continue
                     val d = min(VOICE_OVERLAY_MAX_MS, max(3_000L, v.durationMs))
                     if (left < d) break
                     scenes += VideoPlan.VoiceOverlay(d, v.id, s.id, v.text)

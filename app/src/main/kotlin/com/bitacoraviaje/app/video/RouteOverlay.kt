@@ -5,23 +5,25 @@ package com.bitacoraviaje.app.video
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import androidx.media3.effect.BitmapOverlay
 import androidx.media3.common.OverlaySettings
+import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.StaticOverlaySettings
 import com.bitacoraviaje.core.model.TrackPoint
 
 /**
  * The animated map as a Media3 overlay (DISENO §13.4 on the device): the base map is an
- * ordinary image item and this overlay draws the route grown up to the frame's presentation
- * time (ease-in-out). Media3 asks for every frame with its exact timestamp, so the clip
+ * ordinary image item and this overlay draws the routes grown up to the frame's presentation
+ * time (ease-in-out). Media3 asks for every frame with its exact timestamp, so the scene
  * lasts exactly what the plan says — unlike a Surface-fed MediaCodec clip, whose frames are
  * stamped with the wall clock (first attempt of PLAN 5.1, measured 15 % short, then 20 % long).
+ * Several tracks (an overview) grow one after the other by accumulated moving time, so days
+ * between stages do not stall the animation (review I7).
  */
 class RouteOverlay(
     private val width: Int,
     private val height: Int,
-    private val points: List<TrackPoint>,
-    private val projected: List<Pair<Float, Float>>?,
+    private val tracks: List<List<TrackPoint>>,
+    private val projected: List<List<Pair<Float, Float>>>,
     private val startUs: Long,
     private val durationUs: Long,
 ) : BitmapOverlay() {
@@ -29,6 +31,8 @@ class RouteOverlay(
     private val canvas = Canvas(bitmap)
     private var lastProgress = -1.0
     private val settings = StaticOverlaySettings.Builder().build()
+    private val spans = tracks.map { t -> (t.last().timeUtcMs - t.first().timeUtcMs).coerceAtLeast(1L) }
+    private val total = spans.sum().toDouble()
 
     override fun getBitmap(presentationTimeUs: Long): Bitmap {
         val t = if (durationUs <= 0) 1.0 else ((presentationTimeUs - startUs).toDouble() / durationUs).coerceIn(0.0, 1.0)
@@ -36,7 +40,13 @@ class RouteOverlay(
         if (progress != lastProgress) {
             // Drawing on the same bitmap bumps its generation id, which is how Media3 knows to re-upload the texture.
             bitmap.eraseColor(Color.TRANSPARENT)
-            Cards.drawRoutePath(canvas, width, height, points, projected, progress, baseSize = width to height)
+            var consumed = 0.0
+            tracks.forEachIndexed { k, track ->
+                val share = spans[k] / total
+                val local = ((progress - consumed) / share).coerceIn(0.0, 1.0)
+                if (local > 0.0) Cards.drawRoutePath(canvas, width, height, track, projected.getOrNull(k), local, baseSize = width to height, colorIndex = k)
+                consumed += share
+            }
             lastProgress = progress
         }
         return bitmap

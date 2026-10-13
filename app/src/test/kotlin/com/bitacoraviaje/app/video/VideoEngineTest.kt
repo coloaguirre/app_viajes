@@ -41,6 +41,22 @@ class VideoEngineTest {
         return PlanInput("t", "Patagonia", null, listOf(s1, s2)) to pts
     }
 
+    /** A real JPEG on disk for the photo that carries the voice note: the resolver opens file:// uris. */
+    private fun photoWithFile(id: String): Map<String, com.bitacoraviaje.core.model.MediaItem> {
+        val f = File(ctx.cacheDir, "$id.jpg")
+        android.graphics.Bitmap.createBitmap(64, 48, android.graphics.Bitmap.Config.ARGB_8888).also { it.eraseColor(0xFF3366AA.toInt()) }
+            .compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, f.outputStream())
+        return mapOf(
+            id to com.bitacoraviaje.core.model.MediaItem(
+                id, "t", "s1", com.bitacoraviaje.core.model.MediaKind.PHOTO, com.bitacoraviaje.core.model.MediaSource.MEDIASTORE, android.net.Uri.fromFile(f).toString(),
+                takenUtcMs = t0 + 1_200_000, takenTimeSource = com.bitacoraviaje.core.model.TakenTimeSource.EXIF_WITH_OFFSET,
+            ),
+        )
+    }
+
+    /** The second stage's track, a day later (increasing times across stages, review I9). */
+    private fun pts2(): List<TrackPoint> = (0 until 10).map { i -> TrackPoint(segmentId = "s2", timeUtcMs = t0 + 86_400_000 + i * 60_000L, lat = -49.40 + i * 1e-4, lon = -72.95 + i * 1e-4) }
+
     @Test
     fun `full plan becomes a composition with animated map clips, voices with gaps and looping music`() {
         val (inp, pts) = input()
@@ -51,23 +67,35 @@ class VideoEngineTest {
         val voices = mapOf("v1" to VoiceNote("v1", "s1", t0 + 1_230_000, 4_000, audioPath = "audio/t/v1.m4a", transcript = "Qué viento", transcriptStatus = com.bitacoraviaje.core.model.TranscriptStatus.DONE))
         val work = File(ctx.cacheDir, "engine-test").apply { mkdirs() }
         val options = MiniVideoComposer.Options(voice = VoiceMode.BOTH, animateMap = true, musicUri = android.net.Uri.fromFile(music), musicVolume = 0.3f)
-        val built = MiniVideoComposer(ctx, work, 384, 216, options = options).build(plan, inp, emptyMap(), voices, mapOf("s1" to MiniVideoComposer.SegmentMedia(pts, null), "s2" to MiniVideoComposer.SegmentMedia(pts.take(10), null)))
+        // m2 (favourite, 30 s before the voice note) exists on disk: its photo scene carries the subtitle_from_voice.
+        val built = MiniVideoComposer(ctx, work, 384, 216, options = options).build(plan, inp, photoWithFile("m2"), voices, mapOf("s1" to MiniVideoComposer.SegmentMedia(pts, null), "s2" to MiniVideoComposer.SegmentMedia(pts2(), null)))
+        assertTrue(plan.scenes.filterIsInstance<VideoPlan.Photo>().any { it.media == "m2" && it.subtitle_from_voice == "v1" }, "the note subtitles m2")
         val maps = plan.scenes.filterIsInstance<VideoPlan.MapRoute>()
         val items = built.composition.sequences.first().editedMediaItems
         // Animated maps: an image item under an OverlayEffect whose RouteOverlay grows the route with the frame time.
         val mapItems = items.filter { it.mediaItem.localConfiguration?.uri.toString().contains("/map_") }
         assertEquals(maps.size, mapItems.size)
         assertTrue(mapItems.all { it.effects.videoEffects.any { e -> e is androidx.media3.effect.OverlayEffect } }, "every map item carries the route overlay")
-        val overlay = RouteOverlay(384, 216, pts, null, 1_000_000, 4_000_000)
+        val overlay = RouteOverlay(384, 216, listOf(pts), Cards.fitTracks(384, 216, listOf(pts)), 1_000_000, 4_000_000)
         val b0 = overlay.getBitmap(1_000_000).copy(android.graphics.Bitmap.Config.ARGB_8888, false)
         val b1 = overlay.getBitmap(5_000_000)
         fun inked(b: android.graphics.Bitmap): Int { val px = IntArray(b.width * b.height); b.getPixels(px, 0, b.width, 0, 0, b.width, b.height); return px.count { it ushr 24 > 0 } }
         assertTrue(inked(b1) > inked(b0) * 3, "the route grows between the item start and its end: ${inked(b0)} → ${inked(b1)}")
         assertTrue(built.hasAudio)
         val seqs = built.composition.sequences
-        assertTrue(seqs.size >= 2 && seqs.last().isLooping, "the music sequence loops: ${seqs.size}")
-        // Photos have no content uri in this test → skipped and counted; cards and maps remain.
-        assertEquals(plan.scenes.count { it is VideoPlan.Photo || it is VideoPlan.VideoClip }, built.skipped.size)
+        assertEquals(3, seqs.size, "video, voices, music")
+        assertTrue(seqs.last().isLooping, "the music sequence loops")
+        // Voice sequence: the note sits at its scene offset after a gap, clipped to the scene (review I9/I5).
+        val voiceSeq = seqs[1]
+        // A gap is itself an item of the sequence: [gap, note].
+        val voiceItems = voiceSeq.editedMediaItems.filter { it.mediaItem.localConfiguration?.uri?.scheme == "file" }
+        assertEquals(1, voiceItems.size, "one note after a gap: ${voiceSeq.editedMediaItems.size} items")
+        assertEquals(2, voiceSeq.editedMediaItems.size)
+        val clipEnd = voiceItems.single().mediaItem.clippingConfiguration.endPositionMs
+        assertTrue(clipEnd in 1..8_000, "clipped to its scene: $clipEnd")
+        assertEquals(0, built.voicesDropped)
+        // Every other photo and the clip have no file → skipped and counted; cards, maps and m2 remain.
+        assertEquals(plan.scenes.count { it is VideoPlan.Photo || it is VideoPlan.VideoClip } - 1, built.skipped.size)
         assertEquals(plan.scenes.size - built.skipped.size, seqs.first().editedMediaItems.size)
         assertTrue(work.listFiles()!!.any { it.name.startsWith("map_") && it.extension == "jpg" }, "the base map is a still")
         audioFile.delete(); music.delete()
@@ -83,6 +111,22 @@ class VideoEngineTest {
         assertEquals(1, built.composition.sequences.size)
         assertTrue(!built.hasAudio)
         assertTrue(built.composition.sequences.first().editedMediaItems.none { it.effects.videoEffects.any { e -> e is androidx.media3.effect.OverlayEffect } }, "static maps without animateMap")
+    }
+
+    @Test
+    fun `audio mode plays the voice note without subtitle and a missing music file degrades with a warning`() {
+        val (inp, pts) = input()
+        val plan = Planner.plan(inp, PlanParams(120, voice = VoiceMode.AUDIO))
+        val refs = plan.scenes.filterIsInstance<VideoPlan.Photo>().mapNotNull { it.subtitle_from_voice } + plan.scenes.filterIsInstance<VideoPlan.VoiceOverlay>().map { it.voice }
+        assertTrue("v1" in refs, "the plan keeps the note in audio mode (review B2): $refs")
+        File(ctx.filesDir, "audio/t/v1.m4a").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(64)) }
+        val voices = mapOf("v1" to VoiceNote("v1", "s1", t0 + 1_230_000, 4_000, audioPath = "audio/t/v1.m4a", transcript = "Qué viento", transcriptStatus = com.bitacoraviaje.core.model.TranscriptStatus.DONE))
+        val work = File(ctx.cacheDir, "engine-test-3").apply { mkdirs() }
+        val options = MiniVideoComposer.Options(voice = VoiceMode.AUDIO, musicUri = android.net.Uri.fromFile(File(ctx.cacheDir, "no-such-music.mp3")))
+        val built = MiniVideoComposer(ctx, work, 384, 216, options = options).build(plan, inp, photoWithFile("m2"), voices, mapOf("s1" to MiniVideoComposer.SegmentMedia(pts, null), "s2" to MiniVideoComposer.SegmentMedia(pts2(), null)))
+        assertEquals(2, built.composition.sequences.size, "video + voices; the unreadable music is dropped")
+        assertEquals(1, built.warnings.size)
+        assertTrue(built.hasAudio)
     }
 
     @Test

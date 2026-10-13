@@ -61,26 +61,37 @@ class MiniVideoComposer(
         val musicVolume: Float = 0.4f,
     )
 
-    /** What the engine needs per segment: the track and, when the map could be fetched, its snapshot. */
-    data class SegmentMedia(val points: List<TrackPoint>, val mapBase: RouteSnapshotter.RouteBase?)
+    /**
+     * What the engine needs per segment: the track and a way to get its map. The snapshot is fetched
+     * only when a map scene needs it and recycled right after the still is written (review I3).
+     */
+    class SegmentMedia(val points: List<TrackPoint>, private val mapProvider: () -> RouteSnapshotter.RouteBase?) {
+        constructor(points: List<TrackPoint>, mapBase: RouteSnapshotter.RouteBase?) : this(points, { mapBase })
 
-    data class Built(val composition: Composition, val durationMs: Long, val skipped: List<String>, val hasAudio: Boolean)
+        fun map(): RouteSnapshotter.RouteBase? = mapProvider()
+    }
+
+    data class Built(val composition: Composition, val durationMs: Long, val skipped: List<String>, val hasAudio: Boolean, val voicesDropped: Int, val warnings: List<String>)
 
     /** Stage video: one segment. */
     fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, points: List<TrackPoint>, mapBase: RouteSnapshotter.RouteBase?): Built =
         build(plan, input, media, voices, input.segments.associate { it.id to SegmentMedia(points, mapBase) })
 
-    fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, segments: Map<String, SegmentMedia>): Built {
+    /** [isActive] is polled per scene so a cancelled worker stops drawing instead of finishing the whole build (review I1). */
+    fun build(plan: VideoPlan, input: PlanInput, media: Map<String, TripMedia>, voices: Map<String, VoiceNote>, segments: Map<String, SegmentMedia>, isActive: () -> Boolean = { true }): Built {
         workDir.mkdirs()
         val items = ArrayList<EditedMediaItem>()
         val skipped = ArrayList<String>()
-        val voiceCues = ArrayList<Pair<Long, VoiceNote>>() // offsetUs → note
+        val warnings = ArrayList<String>()
+        val voiceCues = ArrayList<Triple<Long, Long, VoiceNote>>() // offsetUs, maxDurationUs, note
         var startUs = 0L
         var anyClipAudio = false
+        var anyMap = false
         val titles = input.segments.associate { it.id to it.title }
-        val anyMap = segments.values.any { it.mapBase != null }
         val mapAttribution = "© OpenStreetMap contributors"
+        val credits = plan.scenes.filterIsInstance<VideoPlan.Credits>()
         for ((i, scene) in plan.scenes.withIndex()) {
+            if (!isActive()) throw kotlinx.coroutines.CancellationException("render cancelled")
             val durationMs = scene.durationMs
             val item: EditedMediaItem? = when (scene) {
                 is VideoPlan.Title -> {
@@ -91,16 +102,19 @@ class MiniVideoComposer(
                 is VideoPlan.PlaceCard -> image(card("place_$i", Cards.place(width, height, scene.title, scene.text, scene.source)), durationMs)
                 is VideoPlan.Stats -> image(card("stats_$i", statsCard(scene, titles[scene.segment ?: ""])), durationMs)
                 is VideoPlan.Credits -> {
-                    // The tile provider is credited only when its map was actually used (review M1).
+                    // The tile provider is credited only when its map was actually used (review M1): credits come last, after every map scene.
                     val lines = if (!anyMap) scene.lines.filterNot { it == MiniVideoPlanner.TILES_CREDIT } else scene.lines
                     image(card("credits_$i", Cards.credits(width, height, lines)), durationMs)
                 }
-                is VideoPlan.MapRoute -> mapScene(i, scene, segments, mapAttribution, startUs)
+                is VideoPlan.MapRoute -> mapScene(i, scene, segments, mapAttribution, startUs).also { (_, usedMap) -> anyMap = anyMap || usedMap }.first
                 is VideoPlan.VoiceOverlay -> {
                     val sm = segments[scene.segment]
-                    val still = Cards.route(width, height, sm?.points.orEmpty(), sm?.mapBase?.bitmap, mapAttribution, sm?.mapBase?.projected)
+                    val base = sm?.map()
+                    anyMap = anyMap || base != null
+                    val still = Cards.route(width, height, sm?.points.orEmpty(), base?.bitmap, mapAttribution, base?.projected)
+                    base?.bitmap?.recycle()
                     if (options.voice != VoiceMode.AUDIO) scene.text?.let { overlayOn(still, Cards.caption(width, height, it)) }
-                    if (options.voice != VoiceMode.SUBTITLES) voices[scene.voice]?.let { voiceCues += startUs to it }
+                    if (options.voice != VoiceMode.SUBTITLES) voices[scene.voice]?.let { voiceCues += Triple(startUs, durationMs * 1000, it) }
                     image(card("voice_$i", still), durationMs)
                 }
                 is VideoPlan.Photo -> {
@@ -108,7 +122,7 @@ class MiniVideoComposer(
                     val still = m?.let { still("photo_$i", it) }
                     if (still == null) { skipped += scene.media; null } else {
                         val voice = scene.subtitle_from_voice?.let { voices[it] }
-                        if (voice != null && options.voice != VoiceMode.SUBTITLES) voiceCues += startUs to voice
+                        if (voice != null && options.voice != VoiceMode.SUBTITLES) voiceCues += Triple(startUs, durationMs * 1000, voice)
                         val subtitle = if (options.voice == VoiceMode.AUDIO) scene.caption else (voice?.displayText ?: scene.caption)
                         photo(still, durationMs, scene.kenburns, subtitle, startUs)
                     }
@@ -122,32 +136,44 @@ class MiniVideoComposer(
             if (item != null) { items += item; startUs += durationMs * 1000 }
         }
         require(items.isNotEmpty()) { context.getString(com.bitacoraviaje.app.R.string.video_error_no_scenes) }
-        val wantAudio = anyClipAudio || voiceCues.isNotEmpty() || options.musicUri != null
+        // Music that cannot be opened degrades to "no music" with a warning instead of failing the export (review M4).
+        val musicUri = options.musicUri?.takeIf { uri -> runCatching { context.contentResolver.openInputStream(uri)?.use { } != null }.getOrDefault(false) }
+        if (options.musicUri != null && musicUri == null) warnings += context.getString(com.bitacoraviaje.app.R.string.video_warn_music_missing)
+        val wantAudio = anyClipAudio || voiceCues.isNotEmpty() || musicUri != null
         // Declaring both tracks fills the items without audio with silence, so clips, voices and music can mix.
         val videoBuilder = if (wantAudio) EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO, C.TRACK_TYPE_AUDIO)) else EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO))
         items.forEach { videoBuilder.addItem(it) }
         val sequences = arrayListOf(videoBuilder.build())
+        var voicesDropped = 0
         if (voiceCues.isNotEmpty()) {
             val b = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
             var cursor = 0L
-            for ((offsetUs, note) in voiceCues.sortedBy { it.first }) {
+            var added = 0
+            for ((offsetUs, maxUs, note) in voiceCues.sortedBy { it.first }) {
                 val f = File(context.filesDir, note.audioPath)
-                if (!f.exists() || offsetUs < cursor) continue
+                if (!f.exists() || offsetUs < cursor) { voicesDropped++; continue } // missing file or overlapping the previous note (review I5)
                 if (offsetUs > cursor) b.addGap(offsetUs - cursor)
-                b.addItem(EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(f))).setRemoveVideo(true).build())
-                cursor = offsetUs + note.durationMs * 1000
+                // Clipped to its scene like the desktop `atrim` (review I5).
+                val lengthMs = minOf(note.durationMs, maxUs / 1000)
+                b.addItem(
+                    EditedMediaItem.Builder(
+                        MediaItem.Builder().setUri(Uri.fromFile(f)).setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(lengthMs).build()).build(),
+                    ).setRemoveVideo(true).build(),
+                )
+                cursor = offsetUs + lengthMs * 1000
+                added++
             }
-            if (cursor > 0) sequences += b.build()
+            if (added > 0) sequences += b.build()
         }
-        options.musicUri?.let { uri ->
+        musicUri?.let { uri ->
+            // Constant-power downmix of 1–6 channels to stereo, scaled by the user's volume (review M5).
             val gain = ChannelMixingAudioProcessor().apply {
-                putChannelMixingMatrix(ChannelMixingMatrix.createForConstantGain(1, 2).scaleBy(options.musicVolume))
-                putChannelMixingMatrix(ChannelMixingMatrix.createForConstantGain(2, 2).scaleBy(options.musicVolume))
+                for (ch in 1..6) runCatching { putChannelMixingMatrix(ChannelMixingMatrix.createForConstantPower(ch, 2).scaleBy(options.musicVolume)) }
             }
             val music = EditedMediaItem.Builder(MediaItem.fromUri(uri)).setRemoveVideo(true).setEffects(Effects(listOf(gain), emptyList())).build()
             sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO)).addItem(music).setIsLooping(true).build()
         }
-        return Built(Composition.Builder(sequences).build(), startUs / 1000, skipped, wantAudio)
+        return Built(Composition.Builder(sequences).build(), startUs / 1000, skipped, wantAudio, voicesDropped, warnings)
     }
 
     private fun statsCard(scene: VideoPlan.Stats, segmentTitle: String?): Bitmap = Cards.stats(
@@ -161,20 +187,30 @@ class MiniVideoComposer(
         ),
     )
 
-    /** Static route card, or (full video) the base map with the route growing in a [RouteOverlay] timed from the item start. */
-    private fun mapScene(i: Int, scene: VideoPlan.MapRoute, segments: Map<String, SegmentMedia>, attribution: String, startUs: Long): EditedMediaItem {
+    /**
+     * Static route card, or (full video) the base map with the routes growing in a [RouteOverlay] timed from
+     * the item start. Each segment keeps its own line (review I7); one snapshot covers one segment, so an
+     * overview of several segments is drawn on the plain ground. Returns the item and whether a map was used.
+     */
+    private fun mapScene(i: Int, scene: VideoPlan.MapRoute, segments: Map<String, SegmentMedia>, attribution: String, startUs: Long): Pair<EditedMediaItem, Boolean> {
         val parts = scene.segments.mapNotNull { segments[it] }
-        val points = parts.flatMap { it.points }
-        // One snapshot covers one segment; an overview of several segments is drawn on the plain ground unless there is exactly one.
-        val base = parts.singleOrNull()?.mapBase
-        if (!options.animateMap || points.size < 2) return image(card("map_$i", Cards.route(width, height, points, base?.bitmap, attribution, base?.projected)), scene.duration_ms)
+        val base = if (parts.size == 1) parts[0].map() else null
+        val tracks = parts.map { it.points }.filter { it.size >= 2 }
         val baseSize = base?.let { it.bitmap.width to it.bitmap.height }
+        val projectedTracks: List<List<Pair<Float, Float>>> = if (base != null) listOf(Cards.routePixels(width, height, tracks.firstOrNull().orEmpty(), base.projected, baseSize?.first, baseSize?.second)) else Cards.fitTracks(width, height, tracks)
+        if (!options.animateMap || tracks.isEmpty()) {
+            val still = Cards.routeBase(width, height, base?.bitmap, attribution)
+            Canvas(still).let { c -> tracks.forEachIndexed { k, t -> Cards.drawRoutePath(c, width, height, t, projectedTracks.getOrNull(k), 1.0, baseSize = width to height, colorIndex = k) } }
+            base?.bitmap?.recycle()
+            return image(card("map_$i", still), scene.duration_ms) to (base != null)
+        }
         val still = card("map_$i", Cards.routeBase(width, height, base?.bitmap, attribution))
-        val overlay = RouteOverlay(width, height, points, base?.projected?.let { p -> Cards.routePixels(width, height, points, p, baseSize?.first, baseSize?.second) }, startUs, scene.duration_ms * 1000)
+        base?.bitmap?.recycle()
+        val overlay = RouteOverlay(width, height, tracks, projectedTracks, startUs, scene.duration_ms * 1000)
         return EditedMediaItem.Builder(MediaItem.Builder().setUri(still).setMimeType("image/jpeg").setImageDurationMs(scene.duration_ms).build())
             .setFrameRate(fps)
             .setEffects(Effects(emptyList(), listOf(OverlayEffect(listOf(overlay)))))
-            .build()
+            .build() to (base != null)
     }
 
     private fun card(name: String, bitmap: Bitmap): Uri {
