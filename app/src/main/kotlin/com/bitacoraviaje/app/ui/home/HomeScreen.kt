@@ -55,6 +55,8 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
             }
         }
     }
+    val importStatus by viewModel.importStatus.collectAsStateWithLifecycle()
+    val pickFile = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri -> uri?.let(viewModel::importFrom) }
     HomeScreen(
         state = state,
         snackbar = snackbar,
@@ -64,6 +66,49 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
         onRecoverResume = viewModel::resumeOpenSegment,
         onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
         onOpenTrip = onOpenTrip,
+        onImport = { pickFile.launch(arrayOf("application/zip", "application/json", "application/gpx+xml", "application/octet-stream", "text/xml", "application/xml")) },
+    )
+    ImportDialog(
+        status = importStatus,
+        onOpenTrip = { id -> viewModel.dismissImport(); onOpenTrip(id) },
+        onReplace = { viewModel.resolveImportConflict(com.bitacoraviaje.app.export.ImportConflict.REPLACE) },
+        onCopy = { viewModel.resolveImportConflict(com.bitacoraviaje.app.export.ImportConflict.COPY) },
+        onDismiss = viewModel::dismissImport,
+    )
+}
+
+/** Result of an import: open the trip, answer the conflict question, or read the error. */
+@Composable
+fun ImportDialog(status: com.bitacoraviaje.app.export.ImportStatus, onOpenTrip: (String) -> Unit, onReplace: () -> Unit, onCopy: () -> Unit, onDismiss: () -> Unit) {
+    if (status.idle) return
+    AlertDialog(
+        onDismissRequest = { if (!status.running) onDismiss() },
+        title = { Text(stringResource(R.string.import_title)) },
+        text = {
+            Column {
+                when {
+                    status.running -> Text(stringResource(R.string.import_running), modifier = Modifier.testTag("import_running"))
+                    status.conflictFile != null -> Text(stringResource(R.string.import_conflict, status.conflictFile), modifier = Modifier.testTag("import_conflict"))
+                    status.error != null -> Text(stringResource(R.string.import_failed, status.error), modifier = Modifier.testTag("import_failed"))
+                    else -> {
+                        Text(stringResource(R.string.import_done), modifier = Modifier.testTag("import_done"))
+                        status.warnings.forEach { Text("• $it") }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when {
+                status.running -> Unit
+                status.conflictFile != null -> Column {
+                    TextButton(onClick = onReplace, modifier = Modifier.testTag("import_replace")) { Text(stringResource(R.string.import_replace)) }
+                    TextButton(onClick = onCopy, modifier = Modifier.testTag("import_copy")) { Text(stringResource(R.string.import_copy)) }
+                }
+                status.tripId != null -> TextButton(onClick = { onOpenTrip(status.tripId) }, modifier = Modifier.testTag("import_open")) { Text(stringResource(R.string.import_open)) }
+                else -> TextButton(onClick = onDismiss) { Text(stringResource(R.string.active_cancel)) }
+            }
+        },
+        dismissButton = { if (!status.running) TextButton(onClick = onDismiss) { Text(stringResource(R.string.active_cancel)) } },
     )
 }
 
@@ -78,6 +123,7 @@ fun HomeScreen(
     onRecoverResume: () -> Unit = {},
     onRecoverClose: () -> Unit = {},
     onOpenTrip: (String) -> Unit = {},
+    onImport: () -> Unit = {},
 ) {
     if (state.needsRecovery) {
         AlertDialog(
@@ -93,6 +139,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.home_title)) },
                 actions = {
+                    IconButton(onClick = onImport, modifier = Modifier.testTag("home_import")) {
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.import_title))
+                    }
                     IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("home_settings")) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.nav_settings))
                     }

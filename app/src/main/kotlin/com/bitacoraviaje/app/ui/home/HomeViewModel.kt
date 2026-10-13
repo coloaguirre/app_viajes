@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,10 +32,31 @@ sealed interface HomeEvent {
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val repository: TrackingRepository,
     private val controller: TrackingController,
     stateHolder: TrackingStateHolder,
 ) : ViewModel() {
+    /** Import job (PLAN 3.3) as the Home dialog sees it. */
+    val importStatus: StateFlow<com.bitacoraviaje.app.export.ImportStatus> = androidx.work.WorkManager.getInstance(appContext)
+        .getWorkInfosForUniqueWorkFlow(com.bitacoraviaje.app.export.ImportWorker.WORK_NAME)
+        .map { infos -> com.bitacoraviaje.app.export.ImportStatus.from(infos.firstOrNull()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.bitacoraviaje.app.export.ImportStatus())
+
+    private var lastImportUri: android.net.Uri? = null
+
+    fun importFrom(uri: android.net.Uri, conflict: com.bitacoraviaje.app.export.ImportConflict = com.bitacoraviaje.app.export.ImportConflict.ASK) {
+        lastImportUri = uri
+        com.bitacoraviaje.app.export.ImportWorker.enqueue(appContext, uri, conflict)
+    }
+
+    /** Answer to the "trip already exists" question: re-run on the same file with the chosen policy. */
+    fun resolveImportConflict(conflict: com.bitacoraviaje.app.export.ImportConflict) {
+        lastImportUri?.let { importFrom(it, conflict) }
+    }
+
+    fun dismissImport() = androidx.work.WorkManager.getInstance(appContext).pruneWork()
+
     val state: StateFlow<HomeUiState> = combine(repository.observeTrips(), repository.observeOpenSegment(), stateHolder.state) { trips, open, live ->
         HomeUiState(trips, open, needsRecovery = open != null && !live.isRunning)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())

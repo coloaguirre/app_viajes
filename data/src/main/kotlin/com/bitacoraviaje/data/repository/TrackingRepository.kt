@@ -211,6 +211,30 @@ class TrackingRepository @Inject constructor(
 
     suspend fun getTrip(tripId: String): Trip? = trips.getById(tripId)?.toDomain()
 
+    suspend fun tripExists(tripId: String): Boolean = trips.getById(tripId) != null
+
+    /**
+     * Imports a whole trip in one transaction (DISENO §12.5). With [replace] an existing
+     * trip of the same id is deleted first (cascades to everything under it); otherwise
+     * the caller must have regenerated the ids.
+     */
+    suspend fun importTrip(
+        trip: Trip,
+        segmentsToInsert: List<Segment>,
+        pointsBySegment: Map<String, List<TrackPoint>>,
+        pausesToInsert: List<SegmentPause>,
+        stopsToInsert: List<Stop>,
+        replace: Boolean = false,
+    ) = db.withTransaction {
+        if (replace) trips.delete(trip.id)
+        trips.insert(trip.toEntity())
+        // Parents first: a nested excursion references its parent segment.
+        for (s in segmentsToInsert.sortedBy { if (it.parentSegmentId == null) 0 else 1 }) segments.insert(s.toEntity())
+        for ((sid, pts) in pointsBySegment) pts.chunked(500).forEach { chunk -> points.insertAll(chunk.map { it.copy(id = 0, segmentId = sid).toEntity() }) }
+        for (p in pausesToInsert) segments.insertPause(p.toEntity())
+        if (stopsToInsert.isNotEmpty()) stops.insertAll(stopsToInsert.map { it.toEntity() })
+    }
+
     suspend fun lastValidPoint(segmentId: String): TrackPoint? = points.getLastValid(segmentId)?.toDomain()
 
     fun observeValidPoints(segmentId: String): Flow<List<TrackPoint>> = points.observeValidBySegment(segmentId).map { l -> l.map { it.toDomain() } }

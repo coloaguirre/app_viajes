@@ -18,7 +18,10 @@ kotlin {
 
 sourceSets {
     // docs/trip.schema.json is the contract with the desktop renderer: the writer is validated against it.
-    test { resources.srcDir(rootProject.file("docs")) }
+    test {
+        resources.srcDir(rootProject.file("docs"))
+        resources.srcDir(rootProject.file("tools/sample-trips")) // external GPX fixtures
+    }
 }
 
 dependencies {

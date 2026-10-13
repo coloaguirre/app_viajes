@@ -305,8 +305,9 @@ su aceptación es la evidencia que él aporta, registrada en
       simulada reanuda sin duplicar.
       Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.2-export-worker.md`);
       `mediaProcessing` queda para el render de video (Fase 5).
-- [ ] 3.3 Importación de `trip.json` y de GPX externo.  (est: 1)
+- [x] 3.3 Importación de `trip.json` y de GPX externo.  (est: 1)
       Aceptación: exportar e importar un viaje da la misma base (test).
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.3-import.md`).
 - [ ] 3.4 whisper.cpp con NDK (alineado a 16 KB), descarga de modelo,
       VAD obligatorio, confianza por segmento, `TranscribeWorker`;
       medición `base` vs `small` con notas reales del usuario.  (est: 3)

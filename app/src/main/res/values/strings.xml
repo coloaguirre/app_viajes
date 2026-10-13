@@ -130,6 +130,14 @@
     <string name="export_retry">Intentar de nuevo</string>
     <string name="export_notif_channel">Exportaciones</string>
     <string name="export_notif_title">Exportando el viaje</string>
+    <string name="import_title">Importar un viaje</string>
+    <string name="import_running">Importando…</string>
+    <string name="import_done">Viaje importado.</string>
+    <string name="import_conflict">El viaje de %1$s ya está en el teléfono. ¿Reemplazarlo con lo que trae el archivo o importarlo como una copia?</string>
+    <string name="import_replace">Reemplazar</string>
+    <string name="import_copy">Importar como copia</string>
+    <string name="import_failed">No se pudo importar: %1$s</string>
+    <string name="import_open">Abrir el viaje</string>
     <string name="finish_title">Terminar</string>
     <string name="finish_done_title">Etapa cerrada</string>
     <string name="finish_body">Se calculan las estadísticas de la etapa y se detectan las paradas. Cerrar la etapa deja el viaje abierto; cerrar el viaje lo termina.</string>
