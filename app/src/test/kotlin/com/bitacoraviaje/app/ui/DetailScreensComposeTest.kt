@@ -141,6 +141,31 @@ class DetailScreensComposeTest {
     }
 
     @Test
+    fun `offline dialog offers both detail levels with an estimate, shows progress and the result`() {
+        val chosen = mutableListOf<Int>()
+        val boxes = listOf(com.bitacoraviaje.core.model.BoundingBox(-34.61, -58.42, -34.59, -58.38))
+        rule.setContent {
+            var st by remember { mutableStateOf(com.bitacoraviaje.app.ui.tripdetail.OfflineUiState(available = true, stageBoxes = boxes)) }
+            BitacoraTheme {
+                com.bitacoraviaje.app.ui.tripdetail.OfflineDialog(
+                    state = st,
+                    onStart = { z -> chosen += z; st = st.copy(running = true, progress = com.bitacoraviaje.app.map.OfflineProgress(40, 100, 1_048_576)) },
+                    onCancel = { st = st.copy(running = false, progress = com.bitacoraviaje.app.map.OfflineProgress(100, 100, 2_097_152, done = true)) },
+                    onDismiss = {},
+                )
+            }
+        }
+        rule.onNodeWithTag("offline_zoom_12").assertIsDisplayed()
+        rule.onNodeWithTag("offline_zoom_14").assertIsDisplayed()
+        rule.onNodeWithTag("offline_zoom_12").performClick()
+        assertEquals(listOf(12), chosen)
+        rule.onNodeWithText("40 de 100 teselas · 1 MB").assertIsDisplayed()
+        rule.onNodeWithTag("offline_cancel").performClick()
+        rule.onNodeWithTag("offline_done").assertIsDisplayed()
+        rule.onNodeWithTag("offline_close").assertIsDisplayed()
+    }
+
+    @Test
     fun `media review exposes the three actions and the camera fix only with a suggestion`() {
         var useTrack = 0
         var excluded = 0

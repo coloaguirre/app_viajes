@@ -395,9 +395,12 @@ su aceptación es la evidencia que él aporta, registrada en
       Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.3-accesos-rapidos.md`
       (nota de voz grabada desde el mosaico en el emulador; mosaico Iniciar/Pausar,
       accesos directos y widget Glance con tests).
-- [ ] 5.4 Mapas offline con MapLibre (descarga de región).  (est: 1.5)
+- [x] 5.4 Mapas offline con MapLibre (descarga de región).  (est: 1.5)
       Aceptación: con red desactivada en el emulador el mapa de la
       región descargada se muestra.
+      Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.4-mapas-sin-red.md`
+      (en modo avión la zona descargada se dibuja con detalle y una zona no
+      descargada queda vacía; plan por etapas para viajes extensos).
 - [x] 5.5 Zonas de privacidad aplicadas al exportar.  (est: 1)
       Aceptación: test: puntos dentro del radio no aparecen en el ZIP y
       el conteo de excluidos se reporta.

@@ -52,7 +52,8 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
 
     override val isConfigured: Boolean = BuildConfig.MAPTILER_KEY.isNotBlank()
 
-    private val styleUrl = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
+    /** Style with the MapTiler key: never logged. The offline downloader needs the same URL so cached tiles serve the map (PLAN 5.4). */
+    internal val styleUrl = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
 
     @Composable
     override fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)?) {
