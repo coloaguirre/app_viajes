@@ -195,3 +195,14 @@ def test_tie_break_matches_kotlin_and_helpers():
     photos = [sc.media for sc in p.scenes if sc.type == "photo"]
     assert "late" in photos and "far" in photos, photos
     assert ffmpeg.escape_filter_path("/tmp/a'b:c,d.ass") == "/tmp/a\\'b\\:c\\,d.ass"
+
+
+def test_every_voice_mode_keeps_the_voice_notes(export_dir: Path):
+    """Review B2 of PR #11: in audio mode the planner used to drop every voice note."""
+    trip = Trip.model_validate_json((export_dir / "trip.json").read_text(encoding="utf-8"))
+    for mode in ("subtitles", "audio", "both"):
+        p = planner.plan(planner.plan_input_of(trip), planner.PlanParams(180, voice=mode))
+        refs = [sc.subtitle_from_voice for sc in p.scenes if sc.type == "photo" and sc.subtitle_from_voice] + [
+            sc.voice for sc in p.scenes if sc.type == "voice_overlay"
+        ]
+        assert "v-1" in refs, (mode, refs)

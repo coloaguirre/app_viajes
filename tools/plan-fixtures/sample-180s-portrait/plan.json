@@ -97,6 +97,12 @@
             "text": "Llegamos al mirador, el viento es tremendo"
         },
         {
+            "type": "voice_overlay",
+            "duration_ms": 4000,
+            "voice": "v-2",
+            "segment": "seg-1"
+        },
+        {
             "type": "stats",
             "duration_ms": 4000,
             "segment": "seg-1",
@@ -138,5 +144,5 @@
             ]
         }
     ],
-    "total_duration_ms": 91500
+    "total_duration_ms": 95500
 }

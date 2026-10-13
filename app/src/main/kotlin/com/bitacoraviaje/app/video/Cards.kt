@@ -150,13 +150,42 @@ object Cards {
      * Static map of the stage: the route over [base] (a MapLibre snapshot, with the points already
      * projected by its camera, review I2) or over a plain ground with an equirectangular fit.
      */
-    fun route(w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>? = null): Bitmap {
+    fun route(w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>? = null, progress: Double = 1.0): Bitmap {
         val (b, c) = bitmap(w, h, GROUND)
-        if (base != null) drawCover(c, base, w, h, darken = 1f)
-        val pixels: List<Pair<Float, Float>> = if (base != null && projected != null && projected.size == points.size) {
-            // Snapshot pixels → frame pixels (the snapshot may have been clamped to MAX_SIDE, drawCover scales it to cover).
-            val scale = max(w.toFloat() / base.width, h.toFloat() / base.height)
-            val offX = (w - base.width * scale) / 2; val offY = (h - base.height * scale) / 2
+        drawRoute(c, w, h, points, base, attribution, projected, progress)
+        return b
+    }
+
+    /** Base map (snapshot or plain ground with attribution) plus the route up to [progress]; used for stills. */
+    fun drawRoute(c: Canvas, w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>?, progress: Double) {
+        drawRouteBase(c, w, h, base, attribution)
+        drawRoutePath(c, w, h, points, projected, progress, base)
+    }
+
+    /** The map alone: a MapLibre snapshot (which carries its own attribution) or the plain ground with ours. */
+    fun drawRouteBase(c: Canvas, w: Int, h: Int, base: Bitmap?, attribution: String) {
+        if (base != null) drawCover(c, base, w, h, darken = 1f) else c.drawColor(GROUND)
+        if (base == null) {
+            val p = paint(max(10f, h / 60f), Color.DKGRAY)
+            val tw = p.measureText(attribution)
+            c.drawRect(w - tw - 18f, h - p.textSize - 18f, w.toFloat(), h.toFloat(), Paint().apply { color = Color.WHITE })
+            c.drawText(attribution, w - tw - 9f, h - 12f, p)
+        }
+    }
+
+    /** Base map without the route, as a bitmap (the image item under an animated [RouteOverlay]). */
+    fun routeBase(w: Int, h: Int, base: Bitmap?, attribution: String): Bitmap {
+        val (b, c) = bitmap(w, h, GROUND)
+        drawRouteBase(c, w, h, base, attribution)
+        return b
+    }
+
+    /** Pixels of the track in the frame: the snapshot's own projection when there is one, else an equirectangular fit. */
+    fun routePixels(w: Int, h: Int, points: List<TrackPoint>, projected: List<Pair<Float, Float>>?, baseW: Int?, baseH: Int?): List<Pair<Float, Float>> =
+        if (projected != null && baseW != null && baseH != null && projected.size == points.size) {
+            // Snapshot pixels → frame pixels (the snapshot may have been clamped to MAX_SIDE; drawCover scales it to cover).
+            val scale = max(w.toFloat() / baseW, h.toFloat() / baseH)
+            val offX = (w - baseW * scale) / 2; val offY = (h - baseH * scale) / 2
             projected.map { (x, y) -> (offX + x * scale) to (offY + y * scale) }
         } else if (points.size >= 2) {
             val lat0 = points.sumOf { it.lat } / points.size
@@ -171,25 +200,59 @@ object Cards {
         } else {
             emptyList()
         }
-        if (pixels.size >= 2) {
+
+    /**
+     * Only the route (time-interpolated prefix up to [progress], DISENO §13.4) and its tip, over whatever is on [c]
+     * (a map, or transparency for an overlay). [base] is only needed to map snapshot pixels to the frame.
+     */
+    private val ROUTE_COLORS = listOf(NAVY, Color.rgb(100, 143, 31), Color.rgb(212, 63, 31), Color.rgb(164, 31, 143), Color.rgb(255, 127, 0))
+
+    /** Several tracks fitted together on the plain ground (an overview), each in frame pixels. */
+    fun fitTracks(w: Int, h: Int, tracks: List<List<TrackPoint>>): List<List<Pair<Float, Float>>> {
+        val all = tracks.flatten()
+        if (all.size < 2) return tracks.map { emptyList() }
+        val lat0 = all.sumOf { it.lat } / all.size
+        val kx = cos(Math.toRadians(lat0))
+        val xs = all.map { it.lon * kx }; val ys = all.map { -it.lat }
+        val minX = xs.min(); val maxX = xs.max(); val minY = ys.min(); val maxY = ys.max()
+        val spanX = max(1e-9, maxX - minX); val spanY = max(1e-9, maxY - minY)
+        val scale = min((w * 0.8) / spanX, (h * 0.8) / spanY)
+        val ox = (w - spanX * scale) / 2; val oy = (h - spanY * scale) / 2
+        return tracks.map { t -> t.map { p -> (ox + (p.lon * kx - minX) * scale).toFloat() to (oy + (-p.lat - minY) * scale).toFloat() } }
+    }
+
+    fun drawRoutePath(c: Canvas, w: Int, h: Int, points: List<TrackPoint>, projected: List<Pair<Float, Float>>?, progress: Double, base: Bitmap? = null, baseSize: Pair<Int, Int>? = null, colorIndex: Int = 0) {
+        val size = baseSize ?: base?.let { it.width to it.height }
+        val pixels = routePixels(w, h, points, projected, size?.first, size?.second)
+        val drawn: List<Pair<Float, Float>> = if (pixels.size >= 2 && progress < 1.0) {
+            val t0 = points.first().timeUtcMs; val t1 = points.last().timeUtcMs
+            val t = t0 + ((t1 - t0) * progress.coerceIn(0.0, 1.0)).toLong()
+            val n = points.indexOfFirst { it.timeUtcMs > t }.let { if (it < 0) points.size else it }
+            val prefix = pixels.take(max(1, n)).toMutableList()
+            if (n in 1 until points.size) {
+                val pa = points[n - 1]; val pb = points[n]
+                val f = ((t - pa.timeUtcMs).toDouble() / max(1L, pb.timeUtcMs - pa.timeUtcMs)).coerceIn(0.0, 1.0).toFloat()
+                val (ax, ay) = pixels[n - 1]; val (bx, by) = pixels[n]
+                prefix += (ax + (bx - ax) * f) to (ay + (by - ay) * f)
+            }
+            prefix
+        } else {
+            pixels
+        }
+        if (drawn.size >= 2) {
             val path = android.graphics.Path()
-            pixels.forEachIndexed { i, (px, py) -> if (i == 0) path.moveTo(px, py) else path.lineTo(px, py) }
+            drawn.forEachIndexed { i, (px, py) -> if (i == 0) path.moveTo(px, py) else path.lineTo(px, py) }
             val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
             c.drawPath(path, stroke.apply { color = Color.WHITE; strokeWidth = h * 0.012f })
-            c.drawPath(path, stroke.apply { color = NAVY; strokeWidth = h * 0.007f })
-            val (ex, ey) = pixels.last()
+            c.drawPath(path, stroke.apply { color = ROUTE_COLORS[colorIndex % ROUTE_COLORS.size]; strokeWidth = h * 0.007f })
+            val (ex, ey) = drawn.last()
             c.drawCircle(ex, ey, h * 0.014f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
             c.drawCircle(ex, ey, h * 0.01f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(212, 63, 31) })
         }
-        // A MapLibre snapshot already carries its own attribution; only the plain ground needs ours.
-        if (base == null) {
-            val p = paint(max(10f, h / 60f), Color.DKGRAY)
-            val tw = p.measureText(attribution)
-            c.drawRect(w - tw - 18f, h - p.textSize - 18f, w.toFloat(), h.toFloat(), Paint().apply { color = Color.WHITE })
-            c.drawText(attribution, w - tw - 9f, h - 12f, p)
-        }
-        return b
     }
+
+    /** Ease-in-out for the map animation (same curve as desktop `_ease`). */
+    fun ease(t: Double): Double = 0.5 - 0.5 * kotlin.math.cos(Math.PI * t.coerceIn(0.0, 1.0))
 
     /** Scales a bitmap to cover the frame (centre crop); [darken] multiplies the colours (1 = unchanged). */
     private fun drawCover(c: Canvas, src: Bitmap, w: Int, h: Int, darken: Float) {

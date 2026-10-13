@@ -99,6 +99,15 @@ class PlannerTest {
     }
 
     @Test
+    fun `every voice mode carries the voice notes into the plan (review B2 of PR 11)`() {
+        for (mode in VoiceMode.entries) {
+            val plan = Planner.plan(sampleTrip(), PlanParams(180, voice = mode))
+            val referenced = plan.scenes.filterIsInstance<VideoPlan.Photo>().mapNotNull { it.subtitle_from_voice } + plan.scenes.filterIsInstance<VideoPlan.VoiceOverlay>().map { it.voice }
+            assertTrue("v1" in referenced && "v2" in referenced, "mode $mode lost a voice note: $referenced")
+        }
+    }
+
+    @Test
     fun `equal scores in one window pick the later photo (shared rule with the python planner)`() {
         val seg = PlanSegment("s", "Etapa", "2026-01-01", t0, t0 + 3_600_000, media = listOf(photo("early", t0 + 60_000), photo("late", t0 + 120_000), photo("far", t0 + 3_000_000)))
         val plan = Planner.plan(PlanInput("t", "T", null, listOf(seg)), PlanParams(60, includeMap = false, includePlaces = false))

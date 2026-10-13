@@ -40,6 +40,10 @@ sealed interface Route {
 
     @Serializable
     data class VoiceNoteDetail(val noteId: String) : Route
+
+    /** PLAN 5.1: parameters, editable plan and render of the trip video. */
+    @Serializable
+    data class VideoCreate(val tripId: String) : Route
 }
 
 @Composable
@@ -60,7 +64,11 @@ fun BitacoraNavHost(mapRenderer: MapRenderer) {
                 onBack = { navController.popBackStack() },
                 onReview = { id -> navController.navigate(Route.MediaReview(id)) },
                 onVoiceNote = { id -> navController.navigate(Route.VoiceNoteDetail(id)) },
+                onCreateVideo = { id -> navController.navigate(Route.VideoCreate(id)) },
             )
+        }
+        composable<Route.VideoCreate> {
+            com.bitacoraviaje.app.ui.video.VideoCreateRoute(onBack = { navController.popBackStack() })
         }
         composable<Route.MediaReview> {
             MediaReviewRoute(mapRenderer = mapRenderer, onBack = { navController.popBackStack() })

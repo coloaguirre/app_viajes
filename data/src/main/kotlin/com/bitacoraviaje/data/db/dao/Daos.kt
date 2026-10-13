@@ -99,6 +99,9 @@ interface TrackPointDao {
     @Query("SELECT * FROM track_point WHERE segment_id = :segmentId AND is_filtered_out = 0 ORDER BY time_utc_ms")
     suspend fun getValidBySegment(segmentId: String): List<TrackPointEntity>
 
+    @Query("SELECT COUNT(*) FROM track_point WHERE segment_id = :segmentId AND is_filtered_out = 0")
+    suspend fun countValidBySegment(segmentId: String): Int
+
     @Query("SELECT * FROM track_point WHERE segment_id = :segmentId AND is_filtered_out = 0 ORDER BY time_utc_ms")
     fun observeValidBySegment(segmentId: String): Flow<List<TrackPointEntity>>
 

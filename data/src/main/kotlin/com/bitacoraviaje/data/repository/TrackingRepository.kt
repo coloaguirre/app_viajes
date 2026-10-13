@@ -206,6 +206,8 @@ class TrackingRepository @Inject constructor(
 
     suspend fun validPoints(segmentId: String): List<TrackPoint> = points.getValidBySegment(segmentId).map { it.toDomain() }
 
+    suspend fun countValidPoints(segmentId: String): Int = points.countValidBySegment(segmentId)
+
     /** Every point, filtered ones included (export with the debugging option). */
     suspend fun allPoints(segmentId: String): List<TrackPoint> = points.getBySegment(segmentId).map { it.toDomain() }
 

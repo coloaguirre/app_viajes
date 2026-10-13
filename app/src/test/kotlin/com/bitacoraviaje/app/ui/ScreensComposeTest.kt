@@ -14,6 +14,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollTo
 import com.bitacoraviaje.app.tracking.LiveTrackingState
 import com.bitacoraviaje.app.ui.active.ActiveSessionAction
@@ -30,6 +32,7 @@ import com.bitacoraviaje.core.model.SegmentType
 import com.bitacoraviaje.core.model.Transport
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -159,4 +162,57 @@ class ScreensComposeTest {
         render = com.bitacoraviaje.app.video.RenderStatus(failed = true, error = "codec")
         rule.onNodeWithTag("video_retry").assertIsDisplayed()
     }
+
+    @Test
+    fun `video create screen edits parameters, generates and edits the plan and renders`() {
+        val events = mutableListOf<String>()
+        var ui by mutableStateOf(com.bitacoraviaje.app.ui.video.VideoCreateUiState())
+        var render by mutableStateOf(com.bitacoraviaje.app.video.RenderStatus())
+        val t0 = 1_760_000_000_000L
+        val plan = com.bitacoraviaje.core.videoplan.Planner.plan(
+            com.bitacoraviaje.core.videoplan.PlanInput("t", "Patagonia", null, listOf(com.bitacoraviaje.core.videoplan.PlanSegment("s1", "Etapa 1", "2026-03-14", t0, t0 + 3_600_000, media = (0 until 4).map { i -> com.bitacoraviaje.core.videoplan.PlanMedia("m$i", false, t0 + i * 600_000L) }))),
+            com.bitacoraviaje.core.videoplan.PlanParams(60),
+        )
+        rule.setContent {
+            BitacoraTheme {
+                com.bitacoraviaje.app.ui.video.VideoCreateScreen(
+                    state = ui, render = render, onBack = {},
+                    onParams = { f -> ui = ui.copy(params = f(ui.params)); events += "params" },
+                    onPickMusic = { events += "music" }, onGenerate = { events += "generate"; ui = ui.copy(plan = plan) },
+                    onRemove = { events += "remove:$it" }, onMove = { i, d -> events += "move:$i:$d" }, onRender = { events += "render" }, onCancel = { events += "cancel" },
+                    onSavePlan = { events += "save" }, onOpen = { events += "open:$it" }, onShare = { events += "share" },
+                )
+            }
+        }
+        fun scrollTo(tag: String) = rule.onNodeWithTag("video_list").performScrollToNode(hasTestTag(tag))
+        scrollTo("video_plan_empty")
+        rule.onNodeWithTag("video_plan_empty").assertIsDisplayed()
+        scrollTo("video_duration_300")
+        rule.onNodeWithTag("video_duration_300").performClick()
+        assertEquals(300, ui.params.durationS)
+        scrollTo("video_voice_both")
+        rule.onNodeWithTag("video_voice_both").performClick()
+        assertEquals("both", ui.params.voice)
+        scrollTo("video_generate")
+        rule.onNodeWithTag("video_generate").performClick()
+        scrollTo("video_plan_summary")
+        rule.onNodeWithTag("video_plan_summary").assertIsDisplayed()
+        scrollTo("scene_remove_1")
+        rule.onNodeWithTag("scene_remove_1").performClick()
+        scrollTo("scene_down_0")
+        rule.onNodeWithTag("scene_down_0").performClick()
+        scrollTo("video_render")
+        rule.onNodeWithTag("video_render").performClick()
+        assertTrue(events.containsAll(listOf("params", "generate", "remove:1", "move:0:1", "render")), events.toString())
+        render = com.bitacoraviaje.app.video.RenderStatus(running = true, progress = 55)
+        scrollTo("video_running")
+        rule.onNodeWithText("Renderizando… 55 %").assertIsDisplayed()
+        render = com.bitacoraviaje.app.video.RenderStatus(finished = true, resultUri = "content://media/1", durationMs = 180_000, elapsedMs = 240_000, skipped = 2)
+        scrollTo("video_done")
+        rule.onNodeWithText("Video listo (180 s, generado en 240 s) · 2 fotos sin archivo").assertIsDisplayed()
+        scrollTo("video_open")
+        rule.onNodeWithTag("video_open").performClick()
+        assertTrue("open:content://media/1" in events)
+    }
 }
+
