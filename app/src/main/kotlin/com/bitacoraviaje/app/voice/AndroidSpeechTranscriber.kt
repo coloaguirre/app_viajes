@@ -8,6 +8,8 @@ import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
+import android.speech.RecognitionSupportCallback
+import android.speech.RecognitionSupport
 import android.speech.SpeechRecognizer
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -44,11 +46,67 @@ class AndroidSpeechTranscriber @Inject constructor(@ApplicationContext private v
                 .onFailure { Log.w(TAG, "pcm feed ended early: ${it.message}") }
         }.apply { start() }
         return try {
-            withTimeout(RESULT_TIMEOUT_MS) { recognize(readFd, languageTag) }
+            val lang = resolveOnDeviceLanguage(languageTag)
+            withTimeout(RESULT_TIMEOUT_MS) { recognize(readFd, lang) }
         } finally {
             writer.interrupt()
             runCatching { readFd.close() }
         }
+    }
+
+    /**
+     * The on-device engine only speaks the language packs the user downloaded (Pixel 8 Pro,
+     * 2026-10-12: "es-AR" requested, no pack → error 12). Ask the engine what it has: use the
+     * requested tag if installed, else any installed pack of the same language; if a pack is
+     * supported but not installed, request its download and fail so the worker retries later.
+     */
+    private suspend fun resolveOnDeviceLanguage(requested: String): String {
+        if (Build.VERSION.SDK_INT < 33) return requested
+        val support = withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine<RecognitionSupport?> { cont ->
+                val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE, requested)
+                cont.invokeOnCancellation { runCatching { recognizer.destroy() } }
+                recognizer.checkRecognitionSupport(
+                    intent, context.mainExecutor,
+                    object : RecognitionSupportCallback {
+                        override fun onSupportResult(recognitionSupport: RecognitionSupport) {
+                            recognizer.destroy()
+                            if (cont.isActive) cont.resume(recognitionSupport)
+                        }
+
+                        override fun onError(error: Int) {
+                            recognizer.destroy()
+                            Log.w(TAG, "checkRecognitionSupport error $error")
+                            if (cont.isActive) cont.resume(null)
+                        }
+                    },
+                )
+            }
+        } ?: return requested
+        val installed = support.installedOnDeviceLanguages
+        val supported = support.supportedOnDeviceLanguages
+        val pending = support.pendingOnDeviceLanguages
+        Log.i(TAG, "on-device speech packs installed=$installed pending=$pending supported=$supported")
+        val language = requested.substringBefore('-').lowercase()
+        fun sameLanguage(tag: String) = tag.substringBefore('-').lowercase() == language
+        installed.firstOrNull { it.equals(requested, ignoreCase = true) }?.let { return it }
+        installed.firstOrNull(::sameLanguage)?.let {
+            Log.i(TAG, "requested $requested not installed; using $it")
+            return it
+        }
+        if (pending.any(::sameLanguage)) throw TranscriptionException("language pack for $language still downloading")
+        val downloadable = supported.firstOrNull { it.equals(requested, ignoreCase = true) } ?: supported.firstOrNull(::sameLanguage)
+        if (downloadable != null) {
+            withContext(Dispatchers.Main) {
+                val r = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                r.triggerModelDownload(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE, downloadable))
+                r.destroy()
+            }
+            Log.i(TAG, "requested download of on-device pack $downloadable")
+            throw TranscriptionException("language pack $downloadable requested for download; retry later")
+        }
+        throw TranscriptionException("no on-device pack for language $language (installed=$installed)")
     }
 
     private suspend fun recognize(readFd: ParcelFileDescriptor, languageTag: String): TranscriptResult = withContext(Dispatchers.Main) {
