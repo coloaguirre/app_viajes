@@ -318,10 +318,11 @@ su aceptación es la evidencia que él aporta, registrada en
       y motor configurable hechos; transcribe notas reales en español
       (`docs/notes/evidencia/fase-3/3.4-whisper.md`). Falta la medición
       sobre ≥10 notas (salida 2.8) para fijar el default con datos.
-- [ ] 3.5 Respaldo: base excluida del Auto Backup; `trip.json`
+- [x] 3.5 Respaldo: base excluida del Auto Backup; `trip.json`
       automático al cerrar cada etapa.  (est: 0.5)
       Aceptación: reglas de extracción verificadas en test; archivo
       generado al cerrar una etapa en el emulador.
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.5-respaldo.md`).
 - [ ] 3.6 Nombre de ruta y detección de senderos (Nominatim, Overpass)
       con política de resiliencia (User-Agent, caché, backoff, instancia
       cambiable en Ajustes).  (est: 1)

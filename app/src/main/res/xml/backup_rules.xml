@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 8–11 equivalent of data_extraction_rules.xml: only what is listed is backed up. -->
+<full-backup-content>
+    <include domain="sharedpref" path="." />
+    <include domain="file" path="datastore/" />
+    <include domain="file" path="backup/" />
+</full-backup-content>

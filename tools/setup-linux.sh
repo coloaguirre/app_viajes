@@ -19,6 +19,8 @@ CMDLINE_TOOLS_SHA256="4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74e
 PLATFORM="android-36"          # emulator image
 COMPILE_PLATFORM="android-37.0" # compileSdk (current AndroidX requires API 37)
 BUILD_TOOLS="36.0.0"
+NDK="29.0.14206865"              # whisper.cpp (:whisper); must match whisper/build.gradle.kts
+CMAKE="4.1.2"
 SYSTEM_IMAGE="system-images;${PLATFORM};google_apis;x86_64"
 AVD_NAME="bitacora36"
 FFMPEG_VERSION="7.0.2"
@@ -101,7 +103,7 @@ elif confirm "Android command-line tools en $ANDROID_HOME (180 MB)"; then
 else missing=1; fi
 
 step "Paquetes del SDK"
-pkgs=("platform-tools" "platforms;$PLATFORM" "platforms;$COMPILE_PLATFORM" "build-tools;$BUILD_TOOLS" "emulator" "$SYSTEM_IMAGE")
+pkgs=("platform-tools" "platforms;$PLATFORM" "platforms;$COMPILE_PLATFORM" "build-tools;$BUILD_TOOLS" "emulator" "$SYSTEM_IMAGE" "ndk;$NDK" "cmake;$CMAKE")
 if command -v sdkmanager >/dev/null; then
   installed=$(sdkmanager --list_installed 2>/dev/null || true)
   to_install=()

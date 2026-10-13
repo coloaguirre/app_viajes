@@ -12,7 +12,7 @@
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
-| 3 — Exportación y transcripción local | 🟨 3.1–3.3 cerrados; 3.4 hecho salvo la medición con ≥10 notas | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` (+capturas) |
+| 3 — Exportación y transcripción local | 🟨 3.1–3.3 y 3.5 cerrados; 3.4 hecho salvo la medición con ≥10 notas | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` · 3.5: `3.5-respaldo.md` |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
 | 6 — Pulido y publicación | ⬜ Pendiente | |
@@ -56,6 +56,7 @@
 | 2026-10-13 | Importación (3.3): ZIP / trip.json / GPX por el selector del sistema; conflicto de id → reemplazar o copia con ids regenerados; medios copiados a `Pictures/BitacoraViaje/<viaje>/` con su id de MediaStore guardado (evita que el barrido los duplique); GPX con SAX (StAX no existe en Android); GPX sin horas → horas ficticias + aviso. En API 26–28 los medios del ZIP no se copian (permiso heredado) | DISENO §12.5 |
 | 2026-10-13 | whisper.cpp v1.9.5 como submódulo, NDK r29 + CMake 4.1.2, solo CPU, `-O3` en debug, 16 KB; VAD Silero obligatorio; modelos `base`/`small` descargados y verificados por SHA-256, nunca en el APK | DISENO §8.3; PLAN 3.4 |
 | 2026-10-13 | Motor de transcripción por defecto **Automático** (reconocedor del sistema primero, whisper de respaldo) en lugar de whisper primero: con 2 notas reales el sistema no tuvo errores y whisper `base` tuvo ~20–40 % de palabras mal (emulador). Se revisa con ≥10 notas en el Pixel (`3.4-whisper.md`) | Dato manda sobre la doctrina de DISENO §8.3 |
+| 2026-10-13 | Respaldo (3.5): reglas de Auto Backup como listas de inclusión (preferencias, DataStore, `files/backup/`; audio solo en transferencia directa); la base nunca se respalda; `trip.json` automático por viaje al cerrar etapa o viaje, escritura atómica | PLAN 3.5; revisión Fase 0 (`allowBackup`) |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -132,7 +133,7 @@ Observaciones de la verificación (ítem 0.1):
 - Pendientes anotados por la revisión de código de Fase 0 (ver PR #1):
   idioma de transcripción se muestra como etiqueta cruda y no es editable
   (placeholder hasta Fase 3); `allowBackup` sin `dataExtractionRules`
-  (se decide en 1.1 con la base; ítem 3.5); el plugin de Room y
+  (resuelto en 3.5 el 2026-10-13); el plugin de Room y
   `schemaDirectory` se aplican en 1.1; cuatro `build.gradle.kts` de
   `core/*` idénticos → convention plugin cuando entre `core/videoplan`.
 
