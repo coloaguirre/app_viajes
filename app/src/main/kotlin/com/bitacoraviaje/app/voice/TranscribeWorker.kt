@@ -37,20 +37,28 @@ class TranscribeWorker @AssistedInject constructor(
         if (!file.exists()) return Result.failure()
         notes.setTranscriptStatus(id, TranscriptStatus.RUNNING)
         val engines: List<Transcriber> = listOf(speech, StubTranscriber())
+        var packPending = false
         for (engine in engines) {
             if (!engine.isAvailable()) continue
             try {
                 val r = engine.transcribe(file, lang)
+                if (r.text.isBlank()) throw TranscriptionException("empty transcript from ${engine.id}")
                 notes.setTranscript(id, engine.id, r.language, r.text, segmentsJson(r.segments))
                 Log.i(TAG, "transcribed note=$id engine=${engine.id} chars=${r.text.length}")
                 return Result.success()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e // WorkManager stop/replace: not a failure of the engine (review M4)
+            } catch (e: LanguagePackPendingException) {
+                packPending = true
+                Log.i(TAG, "engine ${engine.id} waiting for a language pack for note=$id: ${e.message}")
             } catch (e: Exception) {
                 Log.w(TAG, "engine ${engine.id} failed for note=$id: ${e.message}")
             }
         }
         // FAILED only when WorkManager will not try again; otherwise the detail would offer a
-        // manual retry while an automatic one is already scheduled (review M1).
-        val willRetry = runAttemptCount < 2
+        // manual retry while an automatic one is already scheduled (review M1). A language pack
+        // download takes minutes and may wait for Wi-Fi: it gets a longer leash (review I1).
+        val willRetry = if (packPending) runAttemptCount < MAX_ATTEMPTS_PACK_PENDING else runAttemptCount < 2
         notes.setTranscriptStatus(id, if (willRetry) TranscriptStatus.PENDING else TranscriptStatus.FAILED)
         return if (willRetry) Result.retry() else Result.failure()
     }
@@ -61,6 +69,8 @@ class TranscribeWorker @AssistedInject constructor(
     private fun jsonString(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
     companion object {
+        /** With exponential backoff from 30 s this covers roughly 15-20 min of download. */
+        const val MAX_ATTEMPTS_PACK_PENDING = 10
         const val TAG = "Bitacora"
         const val KEY_NOTE_ID = "note_id"
         const val KEY_LANG = "lang"
