@@ -41,7 +41,7 @@ import kotlin.math.max
  * cover the frame, vertical ones over their own blurred copy like the desktop renderer) so the
  * video sequence has one format. Photos get a Ken Burns [MatrixTransformation] timed from the
  * item's start inside the composition and a subtitle [BitmapOverlay]. With [Options.animateMap]
- * the map scenes become short clips drawn frame by frame and encoded with [ClipEncoder]. Voice
+ * the map scenes are the base map under a [RouteOverlay] that grows the route per frame. Voice
  * notes (mode audio/both) go in a parallel audio sequence with gaps at their scene offsets;
  * the user's music loops in a third sequence scaled by [Options.musicVolume].
  */
@@ -53,7 +53,6 @@ class MiniVideoComposer(
     private val height: Int,
     private val fps: Int = 30,
     private val options: Options = Options(),
-    private val encoder: ClipEncoder = MapClipEncoder(),
 ) {
     data class Options(
         val voice: VoiceMode = VoiceMode.SUBTITLES,
@@ -96,7 +95,7 @@ class MiniVideoComposer(
                     val lines = if (!anyMap) scene.lines.filterNot { it == MiniVideoPlanner.TILES_CREDIT } else scene.lines
                     image(card("credits_$i", Cards.credits(width, height, lines)), durationMs)
                 }
-                is VideoPlan.MapRoute -> mapScene(i, scene, segments, mapAttribution)
+                is VideoPlan.MapRoute -> mapScene(i, scene, segments, mapAttribution, startUs)
                 is VideoPlan.VoiceOverlay -> {
                     val sm = segments[scene.segment]
                     val still = Cards.route(width, height, sm?.points.orEmpty(), sm?.mapBase?.bitmap, mapAttribution, sm?.mapBase?.projected)
@@ -162,19 +161,20 @@ class MiniVideoComposer(
         ),
     )
 
-    /** Static route card, or an animated clip (route growing with ease-in-out) when the engine runs the full video. */
-    private fun mapScene(i: Int, scene: VideoPlan.MapRoute, segments: Map<String, SegmentMedia>, attribution: String): EditedMediaItem {
+    /** Static route card, or (full video) the base map with the route growing in a [RouteOverlay] timed from the item start. */
+    private fun mapScene(i: Int, scene: VideoPlan.MapRoute, segments: Map<String, SegmentMedia>, attribution: String, startUs: Long): EditedMediaItem {
         val parts = scene.segments.mapNotNull { segments[it] }
         val points = parts.flatMap { it.points }
         // One snapshot covers one segment; an overview of several segments is drawn on the plain ground unless there is exactly one.
         val base = parts.singleOrNull()?.mapBase
         if (!options.animateMap || points.size < 2) return image(card("map_$i", Cards.route(width, height, points, base?.bitmap, attribution, base?.projected)), scene.duration_ms)
-        val frames = max(2, (scene.duration_ms * fps / 1000).toInt())
-        val out = File(workDir, "map_$i.mp4")
-        encoder.encode(out, width, height, fps, frames) { f, canvas ->
-            Cards.drawRoute(canvas, width, height, points, base?.bitmap, attribution, base?.projected, Cards.ease(f.toDouble() / (frames - 1)))
-        }
-        return EditedMediaItem.Builder(MediaItem.Builder().setUri(Uri.fromFile(out)).setMimeType("video/mp4").build()).setRemoveAudio(true).build()
+        val baseSize = base?.let { it.bitmap.width to it.bitmap.height }
+        val still = card("map_$i", Cards.routeBase(width, height, base?.bitmap, attribution))
+        val overlay = RouteOverlay(width, height, points, base?.projected?.let { p -> Cards.routePixels(width, height, points, p, baseSize?.first, baseSize?.second) }, startUs, scene.duration_ms * 1000)
+        return EditedMediaItem.Builder(MediaItem.Builder().setUri(still).setMimeType("image/jpeg").setImageDurationMs(scene.duration_ms).build())
+            .setFrameRate(fps)
+            .setEffects(Effects(emptyList(), listOf(OverlayEffect(listOf(overlay)))))
+            .build()
     }
 
     private fun card(name: String, bitmap: Bitmap): Uri {

@@ -156,13 +156,36 @@ object Cards {
         return b
     }
 
-    /** Draws the (partial, up to [progress] of the time span, eased by the caller) route on [c]; used for stills and animated frames. */
+    /** Base map (snapshot or plain ground with attribution) plus the route up to [progress]; used for stills. */
     fun drawRoute(c: Canvas, w: Int, h: Int, points: List<TrackPoint>, base: Bitmap?, attribution: String, projected: List<Pair<Float, Float>>?, progress: Double) {
+        drawRouteBase(c, w, h, base, attribution)
+        drawRoutePath(c, w, h, points, projected, progress, base)
+    }
+
+    /** The map alone: a MapLibre snapshot (which carries its own attribution) or the plain ground with ours. */
+    fun drawRouteBase(c: Canvas, w: Int, h: Int, base: Bitmap?, attribution: String) {
         if (base != null) drawCover(c, base, w, h, darken = 1f) else c.drawColor(GROUND)
-        val pixels: List<Pair<Float, Float>> = if (base != null && projected != null && projected.size == points.size) {
-            // Snapshot pixels → frame pixels (the snapshot may have been clamped to MAX_SIDE, drawCover scales it to cover).
-            val scale = max(w.toFloat() / base.width, h.toFloat() / base.height)
-            val offX = (w - base.width * scale) / 2; val offY = (h - base.height * scale) / 2
+        if (base == null) {
+            val p = paint(max(10f, h / 60f), Color.DKGRAY)
+            val tw = p.measureText(attribution)
+            c.drawRect(w - tw - 18f, h - p.textSize - 18f, w.toFloat(), h.toFloat(), Paint().apply { color = Color.WHITE })
+            c.drawText(attribution, w - tw - 9f, h - 12f, p)
+        }
+    }
+
+    /** Base map without the route, as a bitmap (the image item under an animated [RouteOverlay]). */
+    fun routeBase(w: Int, h: Int, base: Bitmap?, attribution: String): Bitmap {
+        val (b, c) = bitmap(w, h, GROUND)
+        drawRouteBase(c, w, h, base, attribution)
+        return b
+    }
+
+    /** Pixels of the track in the frame: the snapshot's own projection when there is one, else an equirectangular fit. */
+    fun routePixels(w: Int, h: Int, points: List<TrackPoint>, projected: List<Pair<Float, Float>>?, baseW: Int?, baseH: Int?): List<Pair<Float, Float>> =
+        if (projected != null && baseW != null && baseH != null && projected.size == points.size) {
+            // Snapshot pixels → frame pixels (the snapshot may have been clamped to MAX_SIDE; drawCover scales it to cover).
+            val scale = max(w.toFloat() / baseW, h.toFloat() / baseH)
+            val offX = (w - baseW * scale) / 2; val offY = (h - baseH * scale) / 2
             projected.map { (x, y) -> (offX + x * scale) to (offY + y * scale) }
         } else if (points.size >= 2) {
             val lat0 = points.sumOf { it.lat } / points.size
@@ -177,7 +200,14 @@ object Cards {
         } else {
             emptyList()
         }
-        // Time-interpolated prefix of the track (DISENO §13.4): the tip moves smoothly between fixes.
+
+    /**
+     * Only the route (time-interpolated prefix up to [progress], DISENO §13.4) and its tip, over whatever is on [c]
+     * (a map, or transparency for an overlay). [base] is only needed to map snapshot pixels to the frame.
+     */
+    fun drawRoutePath(c: Canvas, w: Int, h: Int, points: List<TrackPoint>, projected: List<Pair<Float, Float>>?, progress: Double, base: Bitmap? = null, baseSize: Pair<Int, Int>? = null) {
+        val size = baseSize ?: base?.let { it.width to it.height }
+        val pixels = routePixels(w, h, points, projected, size?.first, size?.second)
         val drawn: List<Pair<Float, Float>> = if (pixels.size >= 2 && progress < 1.0) {
             val t0 = points.first().timeUtcMs; val t1 = points.last().timeUtcMs
             val t = t0 + ((t1 - t0) * progress.coerceIn(0.0, 1.0)).toLong()
@@ -202,13 +232,6 @@ object Cards {
             val (ex, ey) = drawn.last()
             c.drawCircle(ex, ey, h * 0.014f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
             c.drawCircle(ex, ey, h * 0.01f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(212, 63, 31) })
-        }
-        // A MapLibre snapshot already carries its own attribution; only the plain ground needs ours.
-        if (base == null) {
-            val p = paint(max(10f, h / 60f), Color.DKGRAY)
-            val tw = p.measureText(attribution)
-            c.drawRect(w - tw - 18f, h - p.textSize - 18f, w.toFloat(), h.toFloat(), Paint().apply { color = Color.WHITE })
-            c.drawText(attribution, w - tw - 9f, h - 12f, p)
         }
     }
 
