@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitacoraviaje.app/schemas/trip.schema.json",
+  "title": "Bitácora de Viaje — trip.json",
+  "description": "Contrato entre la app Android y el renderizador de escritorio (DISENO §12.2). schema_version 1.",
+  "type": "object",
+  "required": ["schema_version", "app_version", "exported_utc", "trip", "segments", "attributions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "app_version": { "type": "string" },
+    "exported_utc": { "type": "string", "format": "date-time" },
+    "trip": { "$ref": "#/$defs/trip" },
+    "segments": { "type": "array", "items": { "$ref": "#/$defs/segment" } },
+    "places": { "type": "array", "items": { "$ref": "#/$defs/place" } },
+    "enrichments": { "type": "array", "items": { "$ref": "#/$defs/enrichment" } },
+    "attributions": { "type": "array", "items": { "$ref": "#/$defs/attribution" } }
+  },
+  "$defs": {
+    "localTime": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$" },
+    "nullableLocalTime": { "oneOf": [ { "$ref": "#/$defs/localTime" }, { "type": "null" } ] },
+    "nullableString": { "type": ["string", "null"] },
+    "nullableNumber": { "type": ["number", "null"] },
+    "nullableInteger": { "type": ["integer", "null"] },
+    "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+    "lon": { "type": "number", "minimum": -180, "maximum": 180 },
+    "trip": {
+      "type": "object",
+      "required": ["id", "title", "status", "tz_id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "$ref": "#/$defs/nullableString" },
+        "status": { "enum": ["PLANNED", "ACTIVE", "PAUSED", "FINISHED"] },
+        "started": { "$ref": "#/$defs/nullableLocalTime" },
+        "started_utc_ms": { "$ref": "#/$defs/nullableInteger" },
+        "ended": { "$ref": "#/$defs/nullableLocalTime" },
+        "ended_utc_ms": { "$ref": "#/$defs/nullableInteger" },
+        "cover_media_id": { "$ref": "#/$defs/nullableString" },
+        "tz_id": { "type": "string" }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "distance_m": { "$ref": "#/$defs/nullableNumber" },
+        "moving_time_ms": { "$ref": "#/$defs/nullableInteger" },
+        "total_time_ms": { "$ref": "#/$defs/nullableInteger" },
+        "max_speed_mps": { "$ref": "#/$defs/nullableNumber" },
+        "avg_moving_speed_mps": { "$ref": "#/$defs/nullableNumber" },
+        "elevation_gain_m": { "$ref": "#/$defs/nullableNumber" },
+        "elevation_loss_m": { "$ref": "#/$defs/nullableNumber" },
+        "min_alt_m": { "$ref": "#/$defs/nullableNumber" },
+        "max_alt_m": { "$ref": "#/$defs/nullableNumber" },
+        "bbox": { "oneOf": [ { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 }, { "type": "null" } ] }
+      }
+    },
+    "point": {
+      "type": "object",
+      "required": ["t", "t_utc_ms", "lat", "lon", "filtered"],
+      "additionalProperties": false,
+      "properties": {
+        "t": { "$ref": "#/$defs/localTime" },
+        "t_utc_ms": { "type": "integer" },
+        "lat": { "$ref": "#/$defs/lat" },
+        "lon": { "$ref": "#/$defs/lon" },
+        "alt_m": { "$ref": "#/$defs/nullableNumber" },
+        "h_acc_m": { "$ref": "#/$defs/nullableNumber" },
+        "speed_mps": { "$ref": "#/$defs/nullableNumber" },
+        "bearing_deg": { "$ref": "#/$defs/nullableNumber" },
+        "filtered": { "type": "boolean" }
+      }
+    },
+    "pause": {
+      "type": "object",
+      "required": ["id", "kind", "paused", "paused_utc_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["USER", "AUTO_REST", "NESTED"] },
+        "paused": { "$ref": "#/$defs/localTime" },
+        "paused_utc_ms": { "type": "integer" },
+        "resumed": { "$ref": "#/$defs/nullableLocalTime" },
+        "resumed_utc_ms": { "$ref": "#/$defs/nullableInteger" }
+      }
+    },
+    "stop": {
+      "type": "object",
+      "required": ["id", "start", "start_utc_ms", "end", "end_utc_ms", "lat", "lon", "radius_m"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "start": { "$ref": "#/$defs/localTime" },
+        "start_utc_ms": { "type": "integer" },
+        "end": { "$ref": "#/$defs/localTime" },
+        "end_utc_ms": { "type": "integer" },
+        "lat": { "$ref": "#/$defs/lat" },
+        "lon": { "$ref": "#/$defs/lon" },
+        "radius_m": { "type": "number" },
+        "place_id": { "$ref": "#/$defs/nullableString" },
+        "user_label": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": ["id", "kind", "source", "taken", "taken_utc_ms", "taken_time_source", "link_method", "link_confidence", "needs_review", "favorite", "excluded"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["PHOTO", "VIDEO"] },
+        "source": { "type": "string" },
+        "file": { "$ref": "#/$defs/nullableString" },
+        "display_name": { "$ref": "#/$defs/nullableString" },
+        "mime_type": { "$ref": "#/$defs/nullableString" },
+        "width": { "$ref": "#/$defs/nullableInteger" },
+        "height": { "$ref": "#/$defs/nullableInteger" },
+        "duration_ms": { "$ref": "#/$defs/nullableInteger" },
+        "taken": { "$ref": "#/$defs/localTime" },
+        "taken_utc_ms": { "type": "integer" },
+        "taken_time_source": { "enum": ["EXIF_WITH_OFFSET", "EXIF_LOCAL", "MEDIASTORE", "FILE_MTIME"] },
+        "lat": { "oneOf": [ { "$ref": "#/$defs/lat" }, { "type": "null" } ] },
+        "lon": { "oneOf": [ { "$ref": "#/$defs/lon" }, { "type": "null" } ] },
+        "link_method": { "enum": ["EXIF", "TRACK_INTERPOLATED", "TRACK_NEAREST", "MANUAL", "NONE"] },
+        "link_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "needs_review": { "type": "boolean" },
+        "camera": { "$ref": "#/$defs/nullableString" },
+        "caption": { "$ref": "#/$defs/nullableString" },
+        "favorite": { "type": "boolean" },
+        "excluded": { "type": "boolean" }
+      }
+    },
+    "voiceNote": {
+      "type": "object",
+      "required": ["id", "started", "started_utc_ms", "duration_ms", "transcript_status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "started": { "$ref": "#/$defs/localTime" },
+        "started_utc_ms": { "type": "integer" },
+        "duration_ms": { "type": "integer" },
+        "lat": { "oneOf": [ { "$ref": "#/$defs/lat" }, { "type": "null" } ] },
+        "lon": { "oneOf": [ { "$ref": "#/$defs/lon" }, { "type": "null" } ] },
+        "file": { "$ref": "#/$defs/nullableString" },
+        "transcript": { "$ref": "#/$defs/nullableString" },
+        "transcript_status": { "enum": ["PENDING", "RUNNING", "DONE", "FAILED"] },
+        "transcript_lang": { "$ref": "#/$defs/nullableString" },
+        "transcript_engine": { "$ref": "#/$defs/nullableString" },
+        "media_item_id": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "textNote": {
+      "type": "object",
+      "required": ["id", "kind", "time", "time_utc_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["NOTE", "MARKER", "HIGHLIGHT", "TRANSPORT_CHANGE"] },
+        "time": { "$ref": "#/$defs/localTime" },
+        "time_utc_ms": { "type": "integer" },
+        "lat": { "oneOf": [ { "$ref": "#/$defs/lat" }, { "type": "null" } ] },
+        "lon": { "oneOf": [ { "$ref": "#/$defs/lon" }, { "type": "null" } ] },
+        "text": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "required": ["id", "type", "started", "started_utc_ms", "tz_id", "sampling_profile", "recording_mode", "auto_created", "status", "stats", "points_file", "points", "pauses", "stops", "media", "voice_notes", "text_notes"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "parent_segment_id": { "$ref": "#/$defs/nullableString" },
+        "type": { "enum": ["TRIP_START", "STAGE", "EXCURSION", "TREKKING"] },
+        "transport": { "oneOf": [ { "enum": ["WALK", "BIKE", "CAR", "BUS", "TRAIN", "BOAT", "PLANE", "MIXED"] }, { "type": "null" } ] },
+        "title": { "$ref": "#/$defs/nullableString" },
+        "intent_text": { "$ref": "#/$defs/nullableString" },
+        "started": { "$ref": "#/$defs/localTime" },
+        "started_utc_ms": { "type": "integer" },
+        "ended": { "$ref": "#/$defs/nullableLocalTime" },
+        "ended_utc_ms": { "$ref": "#/$defs/nullableInteger" },
+        "tz_id": { "type": "string" },
+        "sampling_profile": { "type": "string" },
+        "recording_mode": { "enum": ["FULL", "ECONOMY"] },
+        "auto_created": { "type": "boolean" },
+        "status": { "enum": ["ACTIVE", "PAUSED", "FINISHED", "RECOVERED"] },
+        "stats": { "$ref": "#/$defs/stats" },
+        "points_file": { "type": "string" },
+        "points": { "type": "array", "items": { "$ref": "#/$defs/point" } },
+        "pauses": { "type": "array", "items": { "$ref": "#/$defs/pause" } },
+        "stops": { "type": "array", "items": { "$ref": "#/$defs/stop" } },
+        "media": { "type": "array", "items": { "$ref": "#/$defs/media" } },
+        "voice_notes": { "type": "array", "items": { "$ref": "#/$defs/voiceNote" } },
+        "text_notes": { "type": "array", "items": { "$ref": "#/$defs/textNote" } }
+      }
+    },
+    "place": {
+      "type": "object",
+      "required": ["id", "name", "lat", "lon"],
+      "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "lat": { "$ref": "#/$defs/lat" }, "lon": { "$ref": "#/$defs/lon" } }
+    },
+    "enrichment": {
+      "type": "object",
+      "required": ["place_id", "source", "license", "text"],
+      "properties": { "place_id": { "type": "string" }, "source": { "type": "string" }, "license": { "type": "string" }, "text": { "type": "string" } }
+    },
+    "attribution": {
+      "type": "object",
+      "required": ["name", "license", "url"],
+      "additionalProperties": false,
+      "properties": { "name": { "type": "string" }, "license": { "type": "string" }, "url": { "type": "string" } }
+    }
+  }
+}

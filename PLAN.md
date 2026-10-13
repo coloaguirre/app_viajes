@@ -290,12 +290,14 @@ su aceptación es la evidencia que él aporta, registrada en
       vehículo en el emulador hace que el filtro acepte 20 m/s sin rechazar.
 
 ### Fase 3 — Exportación, transcripción local y tareas largas  (est: 12 días)
-- [ ] 3.1 `core/export`: `trip.json` + JSON Schema, GPX 1.1 con
+- [x] 3.1 `core/export`: `trip.json` + JSON Schema, GPX 1.1 con
       extensiones propias y de Garmin validado contra XSD, KML/KMZ
       particionado por capa dentro de los límites de My Maps, GeoJSON,
       CSV UTF-8 con BOM, Markdown, HTML autocontenido con Leaflet, SRT.  (est: 4)
       Aceptación: tests validan cada formato; test de conciliación de
       conteos base = ZIP con faltantes listados en `LEEME.txt`.
+      Cerrado 2026-10-13 (`docs/notes/evidencia/fase-3/3.1-export.md`); sin
+      extensiones de Garmin: la app no tiene los datos de sensores que llevan.
 - [ ] 3.2 Gestor de tareas largas (servicios `dataSync` /
       `mediaProcessing` con tiempo límite y reanudación por checkpoint);
       `ExportWorker` con ZIP y destinos (SAF, compartir, Download).  (est: 2)
