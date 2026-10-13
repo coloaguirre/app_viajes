@@ -42,7 +42,43 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Long-press shortcuts (DISENO §14.3, PLAN 5.3): "Nota de voz" and "Nuevo registro". -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Quick Settings tiles (DISENO §14.3, PLAN 5.3). -->
+        <service
+            android:name=".quick.VoiceNoteTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_mic"
+            android:label="@string/tile_voice_note"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".quick.TrackingTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_tracking"
+            android:label="@string/tile_tracking"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        </service>
+
+        <!-- Home-screen widget: live status plus voice note and marker buttons (DISENO §14.3). -->
+        <receiver
+            android:name=".widget.BitacoraWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
 
         <activity
             android:name=".voice.VoiceNoteActivity"

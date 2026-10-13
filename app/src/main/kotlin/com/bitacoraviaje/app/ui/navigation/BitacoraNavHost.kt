@@ -51,8 +51,12 @@ sealed interface Route {
 }
 
 @Composable
-fun BitacoraNavHost(mapRenderer: MapRenderer) {
+fun BitacoraNavHost(mapRenderer: MapRenderer, newSessionRequest: Int = 0) {
     val navController = rememberNavController()
+    // A shortcut, tile or widget asked for a new session: navigate once per request (PLAN 5.3).
+    androidx.compose.runtime.LaunchedEffect(newSessionRequest) {
+        if (newSessionRequest > 0) navController.navigate(Route.NewSession) { launchSingleTop = true }
+    }
     NavHost(navController = navController, startDestination = Route.Home) {
         composable<Route.Home> {
             HomeRoute(

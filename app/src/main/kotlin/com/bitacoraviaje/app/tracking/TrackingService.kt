@@ -411,6 +411,7 @@ class TrackingService : LifecycleService() {
         lifecycleScope.launch(pipeline) {
             flush()
             stateHolder.update { it.copy(isRunning = false) }
+            com.bitacoraviaje.app.widget.WidgetUpdater.refresh(this@TrackingService)
             ServiceCompat.stopForeground(this@TrackingService, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }

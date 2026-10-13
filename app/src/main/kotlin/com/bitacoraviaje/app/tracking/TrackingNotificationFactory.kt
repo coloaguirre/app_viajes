@@ -63,7 +63,10 @@ class TrackingNotificationFactory @Inject constructor(@ApplicationContext privat
             .build()
     }
 
-    fun notify(state: LiveTrackingState, nowUtcMs: Long) = manager.notify(NOTIFICATION_ID, build(state, nowUtcMs))
+    fun notify(state: LiveTrackingState, nowUtcMs: Long) {
+        manager.notify(NOTIFICATION_ID, build(state, nowUtcMs))
+        com.bitacoraviaje.app.widget.WidgetUpdater.refresh(context) // the home-screen widget follows the notification (PLAN 5.3)
+    }
 
     /**
      * After a reboot a location foreground service cannot restart itself (DISENO §6.9):

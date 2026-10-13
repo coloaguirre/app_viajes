@@ -390,8 +390,11 @@ su aceptación es la evidencia que él aporta, registrada en
       Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.2-camara-integrada.md`
       (foto y video en el emulador vinculados con confianza 1,0 y EXIF GPS;
       el barrido no los re-vincula; la nota sobre la foto se prueba en el Pixel).
-- [ ] 5.3 Widget, mosaico de Configuración rápida y accesos directos.  (est: 1.5)
+- [x] 5.3 Widget, mosaico de Configuración rápida y accesos directos.  (est: 1.5)
       Aceptación: nota de voz iniciada desde el mosaico en el emulador.
+      Implementado 2026-10-13: `docs/notes/evidencia/fase-5/5.3-accesos-rapidos.md`
+      (nota de voz grabada desde el mosaico en el emulador; mosaico Iniciar/Pausar,
+      accesos directos y widget Glance con tests).
 - [ ] 5.4 Mapas offline con MapLibre (descarga de región).  (est: 1.5)
       Aceptación: con red desactivada en el emulador el mapa de la
       región descargada se muestra.
