@@ -3,7 +3,7 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **4 en curso: 4.1–4.5 mergeados en `dev` (PR #8, 2026-10-13); 4.6 (minivideo) en `feat/fase-4-minivideo`.** De la Fase 3 siguen abiertos 3.7 (usuario) y la medición de 3.4. Siguen abiertos los ítems de campo 1.7, 2.8 y 3.7, que cierran sus fases formalmente.
+- Fase: **4 implementada completa y mergeada en `dev` (PR #8 y PR #9, 2026-10-13).** Quedan en manos del usuario las mediciones de campo que cierran formalmente las fases: 1.7 (batería), 2.8 (salida con fotos y notas), 3.4 (motor de transcripción con ≥10 notas), 3.7 (abrir la exportación en la PC y My Maps) y 4.6 (tiempo del minivideo en el Pixel). Siguiente: retro de Fases 2–4 con el usuario y Fase 5 en rama nueva.
 - Última actualización: 2026-10-13
 
 ## Fases
@@ -13,7 +13,7 @@
 | 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
 | 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.7 y 2.9 cerrados (2.4 verificado con micrófono real en el Pixel el 2026-10-13); 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | 🟨 3.1–3.3, 3.5 y 3.6 cerrados; 3.4 hecho salvo la medición con ≥10 notas; 3.7 (usuario) pendiente | 3.1: `docs/notes/evidencia/fase-3/3.1-export.md` · 3.2: `3.2-export-worker.md` · 3.3: `3.3-import.md` · 3.4: `3.4-whisper.md` · 3.5: `3.5-respaldo.md` · 3.6: `3.6-nombre-de-ruta.md` (+captura) |
-| 4 — Enriquecimiento y video de escritorio | 🟨 4.1–4.5 cerrados; 4.6 implementado, falta la medición en el Pixel | 4.1: `docs/notes/evidencia/fase-4/4.1-lugares.md` (+captura) · 4.2: `4.2-pantalla-lugares.md` (+captura) · 4.3: `4.3-reescritura-ia.md` · 4.4: `4.4-videoplan.md` · 4.5: `4.5-desktop-renderer.md` (+2 cuadros) · 4.6: `4.6-minivideo.md` · 4.2 captura `4.2-pestana-lugares.png` |
+| 4 — Enriquecimiento y video de escritorio | 🟨 4.1–4.6 implementados y mergeados (PR #8, #9); falta la medición de 4.6 en el Pixel | 4.1: `docs/notes/evidencia/fase-4/4.1-lugares.md` (+captura) · 4.2: `4.2-pantalla-lugares.md` (+captura) · 4.3: `4.3-reescritura-ia.md` · 4.4: `4.4-videoplan.md` · 4.5: `4.5-desktop-renderer.md` (+2 cuadros) · 4.6: `4.6-minivideo.md` · 4.2 captura `4.2-pestana-lugares.png` |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
 | 6 — Pulido y publicación | ⬜ Pendiente | |
 
