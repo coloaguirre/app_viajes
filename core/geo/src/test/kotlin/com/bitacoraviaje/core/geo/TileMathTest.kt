@@ -45,6 +45,7 @@ class TileMathTest {
         assertEquals(14, TileMath.maxZoomWithin(calafate, 8, 14, 6_000))
         assertEquals(12, TileMath.maxZoomWithin(calafate, 8, 14, TileMath.tileCount(calafate, 8, 12)))
         assertNull(TileMath.maxZoomWithin(world, 8, 14, 6_000), "the world never fits")
+        assertTrue(runCatching { TileMath.tileCount(BoundingBox(10.0, 179.0, 11.0, -179.0), 5) }.isFailure, "a box across the antimeridian is refused, never a negative count")
         assertEquals(20_000_000L + 20_000L * 100, TileMath.estimateBytes(100))
         assertEquals(1_000L + 7L * 3, TileMath.estimateBytes(7, bytesPerTile = 3, fixedBytes = 1_000))
     }

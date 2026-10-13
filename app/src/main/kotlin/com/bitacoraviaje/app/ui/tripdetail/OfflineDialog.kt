@@ -29,6 +29,8 @@ data class OfflineUiState(
     /** A complete region already covers this trip. */
     val hasRegion: Boolean = false,
     val running: Boolean = false,
+    /** Another trip's download is in flight: only one at a time. */
+    val busyElsewhere: Boolean = false,
     val progress: OfflineProgress? = null,
 )
 
@@ -36,12 +38,14 @@ data class OfflineUiState(
 fun stageBoxesOf(tracks: List<List<com.bitacoraviaje.app.map.MapPoint>>): List<BoundingBox> =
     tracks.filter { it.isNotEmpty() }.map { pts -> BoundingBox(pts.minOf { it.lat }, pts.minOf { it.lon }, pts.maxOf { it.lat }, pts.maxOf { it.lon }) }
 
-fun formatMb(bytes: Long): String = if (bytes < 1_048_576) "%.1f MB".format(bytes / 1_048_576.0) else "%.0f MB".format(bytes / 1_048_576.0)
+private val APP_LOCALE: java.util.Locale = java.util.Locale.forLanguageTag("es-AR")
+
+fun formatMb(bytes: Long): String = if (bytes < 1_048_576) "%.1f MB".format(APP_LOCALE, bytes / 1_048_576.0) else "%.0f MB".format(APP_LOCALE, bytes / 1_048_576.0)
 
 /** Pick a detail level (with its estimated size), watch the download, see the result. */
 @Composable
 fun OfflineDialog(state: OfflineUiState, onStart: (Int) -> Unit, onCancel: () -> Unit, onDismiss: () -> Unit) {
-    val bounds = state.stageBoxes.takeIf { it.isNotEmpty() }?.let { OfflineMaps.regionBounds(it.reduce { a, b -> BoundingBox(minOf(a.minLat, b.minLat), minOf(a.minLon, b.minLon), maxOf(a.maxLat, b.maxLat), maxOf(a.maxLon, b.maxLon)) }) }
+    val bounds = OfflineMaps.wholeBounds(state.stageBoxes)
     val progress = state.progress
     AlertDialog(
         onDismissRequest = { if (!state.running) onDismiss() },
@@ -50,24 +54,26 @@ fun OfflineDialog(state: OfflineUiState, onStart: (Int) -> Unit, onCancel: () ->
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 when {
                     state.running && progress != null -> {
-                        val fraction = if (progress.requiredTiles > 0) (progress.completedTiles.toFloat() / progress.requiredTiles).coerceIn(0f, 1f) else 0f
-                        val line = if (progress.regions > 1) stringResource(R.string.offline_progress_with_region, progress.region, progress.regions, progress.completedTiles, progress.requiredTiles, formatMb(progress.sizeBytes))
-                        else stringResource(R.string.offline_progress, progress.completedTiles, progress.requiredTiles, formatMb(progress.sizeBytes))
+                        // Tiles and bytes accumulate over the finished regions; the bar is the current region's resources (review I1).
+                        val line = if (progress.regions > 1) stringResource(R.string.offline_progress_with_region, progress.region, progress.regions, progress.completedTiles, formatMb(progress.sizeBytes))
+                        else stringResource(R.string.offline_progress, progress.completedTiles, formatMb(progress.sizeBytes))
                         Text(line, modifier = Modifier.testTag("offline_progress"))
-                        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                        val f = progress.fraction
+                        if (f != null) LinearProgressIndicator(progress = { f }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
                     state.running -> Text(stringResource(R.string.offline_starting), modifier = Modifier.testTag("offline_progress"))
                     progress?.error != null -> Text(
-                        if (progress.error.startsWith("tile_limit")) stringResource(R.string.offline_too_big) else stringResource(R.string.offline_failed, progress.error),
+                        if (progress.error.startsWith("tile_limit")) stringResource(R.string.offline_too_big, OfflineMaps.TILE_LIMIT) else stringResource(R.string.offline_failed, progress.error),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.testTag("offline_error"),
                     )
                     progress?.done == true -> Text(stringResource(R.string.offline_done, progress.completedTiles, formatMb(progress.sizeBytes)), modifier = Modifier.testTag("offline_done"))
+                    state.busyElsewhere -> Text(stringResource(R.string.offline_busy), modifier = Modifier.testTag("offline_busy"))
                     bounds == null -> Text(stringResource(R.string.offline_no_track))
                     else -> {
                         val widthKm = haversineM(bounds.minLat, bounds.minLon, bounds.minLat, bounds.maxLon) / 1000
                         val heightKm = haversineM(bounds.minLat, bounds.minLon, bounds.maxLat, bounds.minLon) / 1000
-                        Text(stringResource(R.string.offline_body, "%.0f".format(widthKm), "%.0f".format(heightKm)), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.offline_body, "%.0f".format(APP_LOCALE, widthKm), "%.0f".format(APP_LOCALE, heightKm)), style = MaterialTheme.typography.bodyMedium)
                         if (state.hasRegion) Text(stringResource(R.string.offline_already), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("offline_already"))
                         var anyFits = false
                         OfflineMaps.DETAIL_ZOOMS.forEach { z ->
@@ -81,7 +87,7 @@ fun OfflineDialog(state: OfflineUiState, onStart: (Int) -> Unit, onCancel: () ->
                                 Text(if (fits) label else stringResource(R.string.offline_level_too_big, z))
                             }
                         }
-                        if (!anyFits) Text(stringResource(R.string.offline_too_big), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("offline_error"))
+                        if (!anyFits) Text(stringResource(R.string.offline_too_big, OfflineMaps.TILE_LIMIT), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("offline_error"))
                     }
                 }
             }

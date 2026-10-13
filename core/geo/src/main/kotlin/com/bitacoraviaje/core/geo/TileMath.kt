@@ -37,8 +37,9 @@ object TileMath {
         return lat to lon
     }
 
-    /** Tiles covering [bounds] at one zoom level (inclusive on both edges). */
+    /** Tiles covering [bounds] at one zoom level (inclusive on both edges). A box across the antimeridian is not supported. */
     fun tileCount(bounds: BoundingBox, zoom: Int): Long {
+        require(bounds.minLon <= bounds.maxLon && bounds.minLat <= bounds.maxLat) { "bounds must be ordered (no antimeridian crossing): $bounds" }
         val x0 = tileX(bounds.minLon, zoom)
         val x1 = tileX(bounds.maxLon, zoom)
         val y0 = tileY(bounds.maxLat, zoom)

@@ -38,6 +38,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun deleteOfflineRegion(id: Long) = viewModelScope.launch { offlineMaps.delete(id) }
+    fun resumeOfflineRegion(id: Long) = offlineMaps.resume(id)
+    val offlineActive: kotlinx.coroutines.flow.StateFlow<com.bitacoraviaje.app.map.OfflineProgress?> = offlineMaps.active
 
     /** PLAN 5.5: privacy zones. The position comes from the live session or the last recorded point; never from a network lookup. */
     val privacyMessage = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)

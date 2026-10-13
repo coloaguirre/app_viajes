@@ -71,6 +71,7 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
     val offline by viewModel.offline.collectAsStateWithLifecycle()
     var showOffline by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     val offlineBoxes = androidx.compose.runtime.remember(state.map.tracks) { stageBoxesOf(state.map.tracks) }
+    val offlineWithBoxes = offline.copy(stageBoxes = offlineBoxes)
     val export by viewModel.export.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     var showExport by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
@@ -92,12 +93,12 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
         onCreateVideo = { onCreateVideo(viewModel.tripId) },
         onPlaceAction = viewModel::onPlaceAction,
         map = { s, m -> mapRenderer.TrackMap(s, m) },
-        offline = offline.copy(stageBoxes = offlineBoxes),
+        offline = offlineWithBoxes,
         onOffline = { showOffline = true },
     )
     if (showOffline) {
         OfflineDialog(
-            state = offline.copy(stageBoxes = offlineBoxes),
+            state = offlineWithBoxes,
             onStart = viewModel::startOfflineDownload,
             onCancel = viewModel::cancelOfflineDownload,
             onDismiss = { showOffline = false; viewModel.clearOfflineResult() },
@@ -176,7 +177,7 @@ fun TripDetailScreen(
                     // PLAN 5.4: download this area for use without network (only when the map provider is configured).
                     if (offline.available) {
                         androidx.compose.material3.FilledTonalButton(onClick = onOffline, modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).testTag("trip_offline")) {
-                            Text(stringResource(if (offline.hasRegion) R.string.offline_title else R.string.offline_button))
+                            Text(stringResource(if (offline.hasRegion) R.string.offline_button_ready else R.string.offline_button))
                         }
                     }
                 }
