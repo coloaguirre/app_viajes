@@ -3,15 +3,15 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **1 — Recorrido continuo, en curso** (1.1 a 1.6 cerrados 2026-10-12; falta 1.7, la prueba real del usuario con el Pixel 8 Pro).
+- Fase: **2 — Fotos, voz y línea de tiempo, en curso** (iniciada el 2026-10-12 por decisión del usuario con el ítem 1.7 de la Fase 1 todavía abierto: la prueba de campo de 1 h se hace en paralelo y cierra la Fase 1 formalmente; la Fase 1 ya está mergeada en `dev`)..
 - Última actualización: 2026-10-12
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
 |---|---|---|
 | 0 — Esqueleto | ✅ Cerrada 2026-10-12 | `docs/notes/evidencia/fase-0/`: 0.1-0.3-emulador.md (+capturas), 0.2-build-test-lint.md, 0.4-ci.md (PR #1 verde) |
-| 1 — Recorrido | 🟨 En curso | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
-| 2 — Fotos, voz y línea de tiempo | ⬜ Pendiente | |
+| 1 — Recorrido | 🟨 1.1-1.6 cerrados y mergeados; 1.7 pendiente (campo) | 1.1: `docs/notes/evidencia/fase-1/1.1-room.md` · 1.2: `1.2-core-geo.md` · 1.3: `1.3-tracking.md` · 1.4: `1.4-continuidad.md` · 1.5: `1.5-recuperacion.md` · 1.6: `1.6-ui.md` · Requiere clave de MapTiler del usuario antes del ítem 1.6 |
+| 2 — Fotos, voz y línea de tiempo | 🟨 2.1-2.3, 2.5-2.7 cerrados; 2.4 cumplido en emulador (micrófono real pendiente con 2.8); 2.9 cerrado; 2.8 (campo) pendiente | 2.1-2.3: `docs/notes/evidencia/fase-2/2.1-2.3-fotos.md` · 2.4 y 2.5: `2.4-2.5-notas.md` · 2.6 y 2.7: `2.6-2.7-detalle.md` (+capturas) · 2.9: `2.9-cambio-de-medio.md` · fotos reales del test en `local-data/` (gitignorado) |
 | 3 — Exportación y transcripción local | ⬜ Pendiente | |
 | 4 — Enriquecimiento y video de escritorio | ⬜ Pendiente | |
 | 5 — Video en el dispositivo y extras | ⬜ Pendiente | |
@@ -39,6 +39,17 @@
 | 2026-10-12 | Cerrar etapa espera el volcado del búfer del servicio (tope 5 s) | Estadísticas sin los últimos puntos (0 m en una excursión corta) |
 | 2026-10-12 | Revisión de código de Fase 1 aplicada: pipeline del servicio en un solo hilo; volcado del búfer también por tiempo desde el ticker y limpieza solo tras persistir; `finishTrip` cierra todas las etapas abiertas del viaje; simplificación en lotes de 500 ids; corte diario con la zona horaria actual del teléfono; estado vivo rehidratado al retomar una etapa; primer tramo tras pausa/reinicio no suma; ClockGuard sembrado y con detección de reinicio; un solo nivel de anidado; nombre del viaje en el asistente | PR #4, revisión 2026-10-12 |
 | 2026-10-12 | Criterios adaptados en E2E: parada de 4 min (no 20) con umbral de 3 min en 1.4; relación Económico/Completo medida sobre 8 min a 1x en 1.3 | Límite de reproducción a 1x y de 10 min por comando |
+| 2026-10-12 | Fase 2 arranca con 1.7 pendiente (excepción a la regla "no empezar una fase sin cerrar la anterior") | Decisión del usuario; 1.7 depende de una salida de campo y no bloquea el código de Fase 2 |
+| 2026-10-12 | Ítem 2.9 agregado: cambiar medio de transporte durante la sesión | Pregunta del usuario en la prueba: hoy el medio se fija por etapa |
+| 2026-10-12 | Esquema v3: `media_item` (+`camera_make/model`, `needs_review` sobre §5.2); vinculación como tarea de WorkManager única por viaje, disparada al cerrar etapa y por el observador (2 s) | DISENO §4.4 paso 6, §7.3 |
+| 2026-10-12 | Fotos sintéticas con el escritor EXIF de Pillow (piexif no es legible por ExifInterface) | Hallazgo E2E 2.2 |
+| 2026-10-12 | Esquema v4: `voice_note` (+`media_item_id`), `text_note`; grabador AAC 16 kHz mono fuera del hilo principal con tope de 4 s; transcriptor del sistema desde archivo (API 33+) con stub de respaldo | DISENO §8, hallazgo ANR en emulador |
+| 2026-10-12 | Esquema v5: `camera_clock_offset` (viaje, cámara → desfase). La corrección de reloj de cámara se guarda y el vinculador la aplica en cada barrido; antes el barrido recalculaba la hora desde EXIF y deshacía el ajuste | DISENO §7.6 paso 4; hallazgo E2E 2.7 |
+| 2026-10-12 | Línea de tiempo (`core/timeline`): momentos de fotos con ventana 2 min / 100 m, resúmenes intermedios a partir de 300 m y 10 min, cambio de día por medianoche local de la etapa; eventos sin posición propia la toman del recorrido (`positionAt`) | DISENO §9 |
+| 2026-10-12 | Detalle del viaje: tocar un evento cambia a la pestaña Mapa y centra la cámara; la revisión de fotos ofrece la corrección de reloj solo si el desfase implícito supera 1 min | DISENO §14.1 |
+| 2026-10-12 | Cambio de medio en sesión (2.9) sin tabla nueva: `text_note.kind = TRANSPORT_CHANGE` con el medio en `text`; la etapa guarda el último medio y perfil; el servicio re-siembra el filtro con el último punto aceptado | Pedido del usuario 2026-10-12; evita esquema v6 |
+| 2026-10-12 | Revisión de código Fase 2 (PR #5) aplicada antes del merge: tope de 5 min guarda la nota (antes se borraba), rotación no cancela la grabación, grabador liberado si falla el arranque, solo reconocedor on-device (nunca el micrófono en segundo plano), escáner compatible API 26–28, ventana de barrido ensanchada por el desfase de cámara, re-vinculación con UPDATE condicionado (no pisa ubicaciones manuales), desfase automático por hora GPS, config de vinculación por medio de transporte | PR #5 |
+| 2026-10-12 | Diferidos con registro: barrido incremental por generación (Fase 3); claves foráneas de `camera_clock_offset`→`trip` y `voice_note.media_item_id` (entran con el próximo cambio de esquema); acceso solo-video en permisos; `creation_time` de MP4 asumido UTC hasta validarlo con un video real en 2.8 | Revisión PR #5 (NIT, M6) |
 | 2026-10-12 | compileSdk 37 (targetSdk sigue en 36) | 18 librerías AndroidX vigentes (Navigation 2.10, Hilt Compose 1.4...) exigen API 37 |
 
 ## Versiones fijadas
@@ -61,6 +72,7 @@
 | Coroutines / kotlinx-serialization | 1.11.0 / 1.11.0 | 2026-10-12 |
 | Play Services Location / lifecycle-service | 21.4.0 / 2.11.0 | 2026-10-12 |
 | MapLibre Android SDK | 13.6.1 | 2026-10-12 |
+| ExifInterface / hilt-work / Coil | 1.4.2 / 1.4.0 / 3.6.3 | 2026-10-12 |
 | hilt-navigation-compose | 1.4.0 | 2026-10-11 |
 | JUnit / androidx.test.ext junit / Espresso / Robolectric | 4.13.2 / 1.3.0 / 3.7.0 / 4.17 | 2026-10-11 |
 | ffmpeg (build estático, user space) | 7.0.2 | 2026-10-11 |
@@ -111,6 +123,14 @@ Observaciones de la verificación (ítem 0.1):
   (se decide en 1.1 con la base; ítem 3.5); el plugin de Room y
   `schemaDirectory` se aplican en 1.1; cuatro `build.gradle.kts` de
   `core/*` idénticos → convention plugin cuando entre `core/videoplan`.
+
+- Escribir en la base del emulador con `sqlite3` por fuera de Room no dispara
+  los `Flow` observados por las pantallas; cerrar la app antes de manipular
+  datos de prueba. El barrido de fotos al abrir el detalle re-vincula todo lo
+  que no sea manual o excluido.
+- Transcripción en el emulador: el reconocedor del sistema devuelve error 12
+  (sin modelo de español); el flujo completo se valida en el Pixel. Un cierre
+  temprano de la tubería de audio mataba el proceso (corregido 2026-10-12).
 
 ## Pendientes del usuario
 - [x] Definir nombre y `applicationId` (D1) — default confirmado 2026-10-11

@@ -238,19 +238,22 @@ su aceptación es la evidencia que él aporta, registrada en
       estadísticas registrados en `docs/PROGRESS.md`; si Full supera el
       8 %/h se abre un ítem de ajuste de perfiles.
 
-### Fase 2 — Fotos, voz y línea de tiempo (MVP 2)  (est: 12 días)
-- [ ] 2.1 Permisos de medios en contexto (Android 13/14+, acceso parcial,
+### Fase 2 — Fotos, voz y línea de tiempo (MVP 2)  (est: 12.5 días)
+- [x] 2.1 Permisos de medios en contexto (Android 13/14+, acceso parcial,
       `ACCESS_MEDIA_LOCATION` con original) con pantallas explicativas y
       funcionamiento degradado.  (est: 1)
       Aceptación: E2E en emulador con acceso parcial muestra el aviso y
       ofrece "seleccionar más"; sin permiso, el registro sigue.
-- [ ] 2.2 `MediaScanner` + observador + barrido incremental por
-      generación (excluyendo pendientes); lectura de hora EXIF con
-      offset y de la hora GPS UTC; videos con fecha de fin menos
-      duración; exclusiones configurables.  (est: 2)
+- [x] 2.2 `MediaScanner` + observador + barrido por ventana de la etapa
+      (excluyendo pendientes); lectura de hora EXIF con offset y de la
+      hora GPS UTC; videos con fecha de fin menos duración; exclusiones
+      configurables. (Ajuste 2026-10-12, revisión de código: el barrido
+      incremental por generación de MediaStore se difiere a Fase 3; el
+      observador dispara un barrido por ventana de la etapa abierta, que
+      alcanza para el volumen de un viaje.)  (est: 2)
       Aceptación: `tools/sample-trips/make_photos.py` genera fixtures
       que cubren todas las fuentes de hora de §7.5; tests verdes.
-- [ ] 2.3 Vinculación en `core/geo` (§7.6) con ventana configurable por
+- [x] 2.3 Vinculación en `core/geo` (§7.6) con ventana configurable por
       medio de transporte, desfase de reloj de cámara automático (GPS
       UTC) y manual, confianza por método.  (est: 1.5)
       Aceptación: un test por caso de §7.6, todos verdes.
@@ -261,18 +264,28 @@ su aceptación es la evidencia que él aporta, registrada en
       `Transcriber`.  (est: 2.5)
       Aceptación: nota grabada en el emulador aparece en la línea de
       tiempo con ubicación; tests de la interfaz con stub.
-- [ ] 2.5 Notas de texto, marcadores y destacados.  (est: 0.5)
+      Estado 2026-10-12: aceptación cumplida en el emulador (nota en la línea
+      de tiempo con ubicación, detalle editable, reintento); queda la prueba
+      con micrófono real y transcripción en el Pixel, que se hace junto con 2.8.
+- [x] 2.5 Notas de texto, marcadores y destacados.  (est: 0.5)
       Aceptación: tests de DAO; aparecen en la línea de tiempo.
-- [ ] 2.6 `core/timeline`: `buildTimeline` puro con agrupación de
+- [x] 2.6 `core/timeline`: `buildTimeline` puro con agrupación de
       momentos, resúmenes intermedios y cambio de día.  (est: 1.5)
       Aceptación: tests unitarios con fixture de etapa completa.
-- [ ] 2.7 UI: detalle de viaje con pestañas línea de tiempo / mapa /
+- [x] 2.7 UI: detalle de viaje con pestañas línea de tiempo / mapa /
       fotos sincronizadas; revisión de medios sin ubicación con
       ubicación manual; detalle de nota de voz editable.  (est: 2.5)
       Aceptación: prueba de Compose del flujo de revisión; capturas.
 - [ ] 2.8 **(usuario)** Salida real con fotos y notas de voz.  (est: 0.5)
       Aceptación: porcentaje de fotos vinculadas sin intervención y
       observaciones registrados en `docs/PROGRESS.md`.
+- [x] 2.9 Cambiar el medio de transporte durante la sesión (agregado
+      2026-10-12 a pedido del usuario): botón en la sesión activa que cambia
+      perfil de GPS y filtro sin cerrar la etapa; el cambio queda como evento
+      `TransportChange` para la línea de tiempo. La detección automática
+      sigue en Fase 3.  (est: 0.5)
+      Aceptación: test de repositorio del evento; E2E: cambiar de a pie a
+      vehículo en el emulador hace que el filtro acepte 20 m/s sin rechazar.
 
 ### Fase 3 — Exportación, transcripción local y tareas largas  (est: 12 días)
 - [ ] 3.1 `core/export`: `trip.json` + JSON Schema, GPX 1.1 con

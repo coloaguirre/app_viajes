@@ -52,6 +52,12 @@ class TrackingNotificationFactory @Inject constructor(@ApplicationContext privat
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(toggle)
+            .addAction(
+                NotificationCompat.Action(
+                    0, context.getString(R.string.action_voice_note),
+                    PendingIntent.getActivity(context, 4, com.bitacoraviaje.app.voice.VoiceNoteActivity.intent(context), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT),
+                ),
+            )
             // "Terminar" opens the app to confirm (DISENO §6.1): never ends a segment from the shade.
             .addAction(NotificationCompat.Action(0, context.getString(R.string.action_finish), open))
             .build()

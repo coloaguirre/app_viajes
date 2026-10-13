@@ -81,11 +81,28 @@ class TrackingController @Inject constructor(
 
     /** Recovery dialog, "close": the segment keeps what was saved and is marked RECOVERED. */
     suspend fun closeOpenSegmentAsRecovered(segmentId: String) {
-        repository.finishSegment(segmentId, SegmentStatus.RECOVERED)
+        val done = repository.finishSegment(segmentId, SegmentStatus.RECOVERED)
         notifications.cancelResumeNeeded()
+        done?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, it.tripId, it.id) }
     }
 
     fun pause() = send(TrackingService.ACTION_PAUSE)
+
+    /** PLAN item 2.9: persist the change (segment + timeline note) and retune the running service. */
+    suspend fun changeTransport(transport: Transport): Boolean {
+        val live = stateHolder.state.value
+        val id = live.segmentId ?: repository.getOpenSegment()?.id ?: return false
+        val updated = repository.changeTransport(id, transport, live.lastPoint?.lat, live.lastPoint?.lon) ?: return false
+        if (live.isRunning) {
+            context.startService(
+                Intent(context, TrackingService::class.java)
+                    .setAction(TrackingService.ACTION_CHANGE_TRANSPORT)
+                    .putExtra(TrackingService.EXTRA_TRANSPORT, transport.name)
+                    .putExtra(TrackingService.EXTRA_PROFILE, updated.samplingProfile),
+            )
+        }
+        return true
+    }
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
@@ -102,6 +119,7 @@ class TrackingController @Inject constructor(
         stopServiceAndAwaitFlush()
         val done = repository.finishSegment(segmentId, SegmentStatus.FINISHED)
         stateHolder.reset()
+        done?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, it.tripId, it.id) }
         val parentId = done?.parentSegmentId ?: return null
         val parent = repository.getSegment(parentId)?.takeIf { it.status == SegmentStatus.PAUSED } ?: return null
         repository.resume(parent.id)
@@ -113,6 +131,7 @@ class TrackingController @Inject constructor(
         stopServiceAndAwaitFlush()
         repository.finishTrip(tripId)
         stateHolder.reset()
+        com.bitacoraviaje.app.media.LinkMediaWorker.enqueue(context, tripId)
     }
 
     suspend fun pauseInDb(segmentId: String, kind: PauseKind) = repository.pause(segmentId, kind)

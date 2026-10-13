@@ -35,6 +35,12 @@ object DataModule {
     @Provides fun provideTrackPointDao(db: BitacoraDatabase): TrackPointDao = db.trackPointDao()
 
     @Provides fun provideStopDao(db: BitacoraDatabase): StopDao = db.stopDao()
+
+    @Provides fun provideMediaDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.MediaDao = db.mediaDao()
+
+    @Provides fun provideVoiceNoteDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.VoiceNoteDao = db.voiceNoteDao()
+
+    @Provides fun provideTextNoteDao(db: BitacoraDatabase): com.bitacoraviaje.data.db.dao.TextNoteDao = db.textNoteDao()
 }
 
 @Module

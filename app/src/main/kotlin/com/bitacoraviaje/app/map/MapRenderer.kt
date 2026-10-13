@@ -6,14 +6,26 @@ import androidx.compose.ui.Modifier
 /** A WGS84 position for the map layer; keeps the UI independent of the map SDK types. */
 data class MapPoint(val lat: Double, val lon: Double)
 
+enum class MarkerKind { PHOTO, VIDEO, VOICE, TEXT, HIGHLIGHT, PLACED }
+
+data class MapMarker(val id: String, val point: MapPoint, val kind: MarkerKind)
+
 /** What the live/detail map shows. All inputs are plain data so renderers are swappable. */
 data class TrackMapState(
-    val track: List<MapPoint> = emptyList(),
+    /** One polyline per segment. */
+    val tracks: List<List<MapPoint>> = emptyList(),
     val current: MapPoint? = null,
     val stops: List<MapPoint> = emptyList(),
+    val markers: List<MapMarker> = emptyList(),
     /** Follow the current position until the user pans; the renderer owns the "user moved" flag. */
     val follow: Boolean = true,
-)
+    /** When set, the camera eases to this point (timeline ↔ map sync). */
+    val focus: MapPoint? = null,
+) {
+    constructor(track: List<MapPoint>, current: MapPoint? = null, stops: List<MapPoint> = emptyList()) : this(tracks = listOf(track), current = current, stops = stops)
+
+    val track: List<MapPoint> get() = tracks.firstOrNull() ?: emptyList()
+}
 
 /**
  * DISENO §10.1: abstraction over the map SDK. v1 ships MapLibre + MapTiler; a Google
@@ -24,5 +36,5 @@ interface MapRenderer {
     val isConfigured: Boolean
 
     @Composable
-    fun TrackMap(state: TrackMapState, modifier: Modifier)
+    fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)? = null)
 }

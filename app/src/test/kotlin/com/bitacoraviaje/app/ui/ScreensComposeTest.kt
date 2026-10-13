@@ -94,7 +94,16 @@ class ScreensComposeTest {
         rule.onNodeWithText("Reanudar").assertExists()
         rule.onNodeWithTag("active_paused").assertExists()
         rule.onNodeWithTag("active_finish").performClick()
-        assertEquals(listOf(ActiveSessionAction.TogglePause, ActiveSessionAction.Finish), actions)
+        rule.onNodeWithTag("active_voice").performClick()
+        rule.onNodeWithTag("active_highlight").performClick()
+        rule.onNodeWithTag("active_marker").performClick()
+        rule.onNodeWithTag("marker_save").performClick()
+        rule.onNodeWithTag("active_transport").performClick()
+        rule.onNodeWithTag("transport_CAR").performClick()
+        assertEquals(
+            listOf(ActiveSessionAction.TogglePause, ActiveSessionAction.Finish, ActiveSessionAction.VoiceNote, ActiveSessionAction.Highlight, ActiveSessionAction.Marker(""), ActiveSessionAction.ChangeTransport(Transport.CAR)),
+            actions,
+        )
     }
 
     @Test

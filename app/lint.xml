@@ -15,4 +15,8 @@
     <!-- MapLibre pulls Timber transitively; this app logs through android.util.Log with the
          'Bitacora' tag by convention (CLAUDE.md). -->
     <issue id="LogNotTimber" severity="ignore" />
+    <!-- Visible texts are Spanish; lint's typo dictionary is English ("Momento" -> "Memento"). -->
+    <issue id="Typos">
+        <ignore path="src/main/res/values/strings.xml" />
+    </issue>
 </lint>

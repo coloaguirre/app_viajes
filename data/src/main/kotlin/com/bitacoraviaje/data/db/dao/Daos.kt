@@ -6,6 +6,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
+import com.bitacoraviaje.data.db.entity.MediaItemEntity
+import com.bitacoraviaje.data.db.entity.TextNoteEntity
+import com.bitacoraviaje.data.db.entity.VoiceNoteEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
 import com.bitacoraviaje.data.db.entity.StopEntity
@@ -115,6 +119,108 @@ interface TrackPointDao {
 }
 
 @Dao
+interface MediaDao {
+    /** Upsert by primary key; the unique index on mediastore_id makes duplicates from rescans impossible. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(items: List<MediaItemEntity>)
+
+    @Update
+    suspend fun update(item: MediaItemEntity)
+
+    /** New rows only: an existing mediastore_id is left untouched (review I6). */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIgnore(items: List<MediaItemEntity>): List<Long>
+
+    /**
+     * Re-link an existing row without clobbering what the user did meanwhile: manual
+     * placements and exclusions are skipped by the WHERE clause, caption/favourite are
+     * not in the SET list (review I6).
+     */
+    @Query(
+        "UPDATE media_item SET segment_id = :segmentId, taken_utc_ms = :takenUtcMs, taken_time_source = :takenTimeSource, " +
+            "exif_lat = :exifLat, exif_lon = :exifLon, camera_make = :cameraMake, camera_model = :cameraModel, " +
+            "linked_lat = :linkedLat, linked_lon = :linkedLon, link_method = :linkMethod, link_confidence = :linkConfidence, " +
+            "link_time_gap_ms = :linkTimeGapMs, needs_review = :needsReview " +
+            "WHERE id = :id AND link_method != 'MANUAL' AND is_excluded = 0",
+    )
+    suspend fun relink(
+        id: String, segmentId: String?, takenUtcMs: Long, takenTimeSource: String, exifLat: Double?, exifLon: Double?,
+        cameraMake: String?, cameraModel: String?, linkedLat: Double?, linkedLon: Double?, linkMethod: String,
+        linkConfidence: Double, linkTimeGapMs: Long?, needsReview: Boolean,
+    ): Int
+
+    @Query("SELECT * FROM media_item WHERE id = :id")
+    suspend fun getById(id: String): MediaItemEntity?
+
+    @Query("SELECT * FROM media_item WHERE mediastore_id = :mediaStoreId")
+    suspend fun getByMediaStoreId(mediaStoreId: Long): MediaItemEntity?
+
+    @Query("SELECT mediastore_id FROM media_item WHERE mediastore_id IS NOT NULL")
+    suspend fun knownMediaStoreIds(): List<Long>
+
+    @Query("SELECT * FROM media_item WHERE trip_id = :tripId AND is_excluded = 0 ORDER BY taken_utc_ms")
+    fun observeByTrip(tripId: String): Flow<List<MediaItemEntity>>
+
+    @Query("SELECT * FROM media_item WHERE segment_id = :segmentId AND is_excluded = 0 ORDER BY taken_utc_ms")
+    fun observeBySegment(segmentId: String): Flow<List<MediaItemEntity>>
+
+    @Query("SELECT * FROM media_item WHERE trip_id = :tripId ORDER BY taken_utc_ms")
+    suspend fun getByTrip(tripId: String): List<MediaItemEntity>
+
+    /** Review queue (DISENO §14.1 item 7): unplaced, low-confidence or flagged. */
+    @Query("SELECT * FROM media_item WHERE trip_id = :tripId AND is_excluded = 0 AND (link_method = 'NONE' OR link_confidence < 0.6 OR needs_review = 1) ORDER BY taken_utc_ms")
+    fun observeReviewQueue(tripId: String): Flow<List<MediaItemEntity>>
+
+    @Query("SELECT COUNT(*) FROM media_item WHERE trip_id = :tripId AND is_excluded = 0")
+    suspend fun countByTrip(tripId: String): Int
+}
+
+@Dao
+interface VoiceNoteDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(note: VoiceNoteEntity)
+
+    @Update
+    suspend fun update(note: VoiceNoteEntity)
+
+    @Query("SELECT * FROM voice_note WHERE id = :id")
+    suspend fun getById(id: String): VoiceNoteEntity?
+
+    @Query("SELECT * FROM voice_note WHERE id = :id")
+    fun observeById(id: String): Flow<VoiceNoteEntity?>
+
+    @Query("SELECT * FROM voice_note WHERE segment_id = :segmentId ORDER BY started_utc_ms")
+    fun observeBySegment(segmentId: String): Flow<List<VoiceNoteEntity>>
+
+    @Query("SELECT v.* FROM voice_note v JOIN segment s ON s.id = v.segment_id WHERE s.trip_id = :tripId ORDER BY v.started_utc_ms")
+    fun observeByTrip(tripId: String): Flow<List<VoiceNoteEntity>>
+
+    @Query("SELECT * FROM voice_note WHERE transcript_status IN ('PENDING','FAILED') ORDER BY started_utc_ms")
+    suspend fun pendingTranscriptions(): List<VoiceNoteEntity>
+
+    @Query("DELETE FROM voice_note WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
+interface TextNoteDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(note: TextNoteEntity)
+
+    @Update
+    suspend fun update(note: TextNoteEntity)
+
+    @Query("SELECT * FROM text_note WHERE segment_id = :segmentId ORDER BY time_utc_ms")
+    fun observeBySegment(segmentId: String): Flow<List<TextNoteEntity>>
+
+    @Query("SELECT t.* FROM text_note t JOIN segment s ON s.id = t.segment_id WHERE s.trip_id = :tripId ORDER BY t.time_utc_ms")
+    fun observeByTrip(tripId: String): Flow<List<TextNoteEntity>>
+
+    @Query("DELETE FROM text_note WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
 interface StopDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(stops: List<StopEntity>)
@@ -134,4 +240,13 @@ interface StopDao {
         deleteBySegment(segmentId)
         insertAll(stops)
     }
+}
+
+@Dao
+interface CameraClockOffsetDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: CameraClockOffsetEntity)
+
+    @Query("SELECT * FROM camera_clock_offset WHERE trip_id = :tripId")
+    suspend fun getByTrip(tripId: String): List<CameraClockOffsetEntity>
 }

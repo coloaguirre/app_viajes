@@ -76,9 +76,12 @@ def main() -> int:
     ap.add_argument(
         "--limit", type=int, default=None, help="replay only the first N fixes"
     )
+    ap.add_argument(
+        "--skip", type=int, default=0, help="skip the first N fixes (continue a replay)"
+    )
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
-    pts = read_gpx(a.gpx)
+    pts = read_gpx(a.gpx)[a.skip :]
     if a.limit:
         pts = pts[: a.limit]
     if not pts:

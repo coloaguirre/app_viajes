@@ -49,8 +49,46 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 2 to 3 adds media_item and keeps points`() {
+        helper.createDatabase(DB_NAME, 2).use { v2 ->
+            v2.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v2.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'ACTIVE')")
+            v2.execSQL("INSERT INTO track_point (segment_id,time_utc_ms,lat,lon,is_mock,monotonic_ms,is_filtered_out,is_simplified_keep) VALUES ('s',5,1.0,2.0,0,7,0,1)")
+        }
+        val v3 = helper.runMigrationsAndValidate(DB_NAME, 3, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v3.query("SELECT COUNT(*) FROM track_point").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+        v3.query("SELECT COUNT(*) FROM media_item").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+        v3.close()
+    }
+
+    @Test
+    fun `migrate 3 to 4 adds voice_note and text_note`() {
+        helper.createDatabase(DB_NAME, 3).use { v3 ->
+            v3.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+            v3.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'ACTIVE')")
+        }
+        val v4 = helper.runMigrationsAndValidate(DB_NAME, 4, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v4.execSQL("INSERT INTO voice_note (id,segment_id,started_utc_ms,duration_ms,audio_path,audio_format,transcript_status) VALUES ('v','s',5,1000,'audio/t/v.m4a','m4a-aac','PENDING')")
+        v4.execSQL("INSERT INTO text_note (id,segment_id,time_utc_ms,kind) VALUES ('n','s',6,'HIGHLIGHT')")
+        v4.query("SELECT COUNT(*) FROM voice_note").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+        v4.close()
+    }
+
+    @Test
+    fun `migrate 4 to 5 adds camera_clock_offset keyed by trip and camera`() {
+        helper.createDatabase(DB_NAME, 4).use { v4 ->
+            v4.execSQL("INSERT INTO trip (id,title,created_utc_ms,status) VALUES ('t','T',1,'ACTIVE')")
+        }
+        val v5 = helper.runMigrationsAndValidate(DB_NAME, 5, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v5.execSQL("INSERT INTO camera_clock_offset (trip_id,camera,offset_ms) VALUES ('t','Canon EOS',3720000)")
+        v5.execSQL("INSERT OR REPLACE INTO camera_clock_offset (trip_id,camera,offset_ms) VALUES ('t','Canon EOS',60000)")
+        v5.query("SELECT offset_ms FROM camera_clock_offset WHERE trip_id='t' AND camera='Canon EOS'").use { c -> c.moveToFirst(); assertEquals(60000L, c.getLong(0)) }
+        v5.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(2, BitacoraDatabase.VERSION)
+        assertEquals(5, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 
