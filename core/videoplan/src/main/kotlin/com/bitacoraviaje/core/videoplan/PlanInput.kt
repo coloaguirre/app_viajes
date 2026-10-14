@@ -31,6 +31,8 @@ data class PlanSegment(
     val highlightsUtcMs: List<Long> = emptyList(),
     /** Places with an approved text (DISENO §11.4 `user_approved`), best ranked first. */
     val places: List<PlanPlace> = emptyList(),
+    /** One line of weather for the chapter card, e.g. "Despejado, 8–17 °C" (backlog D3); null without data. */
+    val weather: String? = null,
 )
 
 data class PlanMedia(

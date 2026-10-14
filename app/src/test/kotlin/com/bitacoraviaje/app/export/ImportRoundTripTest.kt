@@ -71,6 +71,7 @@ class ImportRoundTripTest {
             appendLine("voice " + se.voiceNotes.joinToString(",") { "${it.startedUtcMs}:${it.durationMs}:${it.lat}:${it.lon}:${it.displayText}:${it.transcriptStatus}" })
             appendLine("text " + se.textNotes.joinToString(",") { "${it.kind}:${it.timeUtcMs}:${it.lat}:${it.lon}:${it.text}" })
             appendLine("places " + t.placesOf(se.segment.id).joinToString(",") { (p, sp) -> "${p.id}:${p.name}:${p.kind}:${p.source}:${sp.firstSeenUtcMs}:${sp.dwellMs}:${sp.relevance}" })
+            appendLine("weather " + se.weather.joinToString(",") { "${it.timeUtcMs}:${it.lat}:${it.lon}:${it.temperatureC}:${it.weatherCode}:${it.source}" })
         }
         appendLine("texts " + t.enrichments.joinToString(",") { "${it.id}:${it.summary}:${it.sourceName}:${it.license}:${it.userApproved}" })
         appendLine("credits " + t.attributions.joinToString(",") { "${it.name}:${it.license}" })
@@ -98,13 +99,15 @@ class ImportRoundTripTest {
             listOf(com.bitacoraviaje.core.model.SegmentPlace(s.id, "wd-Q1", t0 + 100_000, 60_000, 2.5)),
         )
 
-        val loader = ExportLoader(tracking, media, notes, placesRepo)
+        val weatherRepo = com.bitacoraviaje.data.repository.WeatherRepository(db)
+        weatherRepo.replace(s.id, listOf(com.bitacoraviaje.core.model.WeatherSample("wx-1", s.id, t0 + 1_800_000, -34.6, -58.4, 21.5, 20.0, 0.0, 8.0, 30, 1, fetchedUtcMs = now)))
+        val loader = ExportLoader(tracking, media, notes, placesRepo, weatherRepo)
         val original = assertNotNull(loader.load(s.tripId, ExportOptions(), nowUtcMs = now))
         val json = ByteArrayOutputStream().also { TripJsonWriter().write(original, it) }.toString(Charsets.UTF_8)
 
         val copy = TripJsonReader.read(json, regenerateIds = true)
         assertNotEquals(original.trip.id, copy.trip.id)
-        tracking.importTrip(copy.trip, copy.segments.map { it.segment }, copy.segments.associate { it.segment.id to it.points }, copy.segments.flatMap { it.pauses }, copy.segments.flatMap { it.stops }, placesToInsert = copy.places, enrichmentsToInsert = copy.enrichments, segmentPlacesToInsert = copy.segmentPlaces)
+        tracking.importTrip(copy.trip, copy.segments.map { it.segment }, copy.segments.associate { it.segment.id to it.points }, copy.segments.flatMap { it.pauses }, copy.segments.flatMap { it.stops }, placesToInsert = copy.places, enrichmentsToInsert = copy.enrichments, segmentPlacesToInsert = copy.segmentPlaces, weatherToInsert = copy.allWeather)
         media.upsertAll(copy.allMedia)
         notes.addVoiceNotes(copy.allVoiceNotes)
         notes.addTextNotes(copy.allTextNotes)
@@ -115,7 +118,7 @@ class ImportRoundTripTest {
 
         // Replace: importing the same id again over the existing trip leaves exactly one copy with the same content.
         val same = TripJsonReader.read(json)
-        tracking.importTrip(same.trip, same.segments.map { it.segment }, same.segments.associate { it.segment.id to it.points }, same.segments.flatMap { it.pauses }, same.segments.flatMap { it.stops }, replace = true, placesToInsert = same.places, enrichmentsToInsert = same.enrichments, segmentPlacesToInsert = same.segmentPlaces)
+        tracking.importTrip(same.trip, same.segments.map { it.segment }, same.segments.associate { it.segment.id to it.points }, same.segments.flatMap { it.pauses }, same.segments.flatMap { it.stops }, replace = true, placesToInsert = same.places, enrichmentsToInsert = same.enrichments, segmentPlacesToInsert = same.segmentPlaces, weatherToInsert = same.allWeather)
         media.upsertAll(same.allMedia)
         notes.addVoiceNotes(same.allVoiceNotes)
         notes.addTextNotes(same.allTextNotes)

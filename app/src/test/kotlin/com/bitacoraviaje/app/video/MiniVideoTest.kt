@@ -56,7 +56,7 @@ class MiniVideoTest {
     fun setUp() {
         db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext<Context>(), BitacoraDatabase::class.java).allowMainThreadQueries().build()
         tracking = TrackingRepository(db, Clock { now })
-        planner = MiniVideoPlanner(TripVideoPlanner(tracking, MediaRepository(db), NotesRepository(db), PlacesRepository(db)))
+        planner = MiniVideoPlanner(TripVideoPlanner(tracking, MediaRepository(db), NotesRepository(db), PlacesRepository(db), com.bitacoraviaje.data.repository.WeatherRepository(db)))
     }
 
     @AfterTest

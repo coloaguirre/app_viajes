@@ -74,7 +74,7 @@ object Planner {
         val photoScenes = ArrayList<Pair<VideoPlan.Photo, Double>>() // for fitting
         var kenIndex = 0
         for (s in segments) {
-            scenes += VideoPlan.Chapter(CHAPTER_MS, s.title, s.date, s.id)
+            scenes += VideoPlan.Chapter(CHAPTER_MS, s.title, s.date, s.id, s.weather)
             if (params.includeMap && s.hasTrack) scenes += VideoPlan.MapRoute(SEGMENT_MAP_MS, listOf(s.id), if (multi) "follow" else "overview")
             var remaining = share.getValue(s.id)
             if (params.includePlaces) {
@@ -215,6 +215,7 @@ object Planner {
             wiki.forEach { add("Texto: Wikipedia — ${it.name} (${it.license ?: "CC BY-SA 4.0"})${it.url?.let { u -> " $u" } ?: ""}") }
             if (segments.flatMap { it.places }.any { it.sourceName == "Wikidata" }) add("Datos: Wikidata (CC0)")
         }
+        if (segments.any { it.weather != null }) add("Datos meteorológicos: Open-Meteo (CC BY 4.0)")
         addAll(input.extraCredits)
         add("Hecho con Bitácora de Viaje")
     }

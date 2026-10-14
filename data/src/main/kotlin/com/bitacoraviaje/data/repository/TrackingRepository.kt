@@ -272,6 +272,7 @@ class TrackingRepository @Inject constructor(
         placesToInsert: List<com.bitacoraviaje.core.model.Place> = emptyList(),
         enrichmentsToInsert: List<com.bitacoraviaje.core.model.Enrichment> = emptyList(),
         segmentPlacesToInsert: List<com.bitacoraviaje.core.model.SegmentPlace> = emptyList(),
+        weatherToInsert: List<com.bitacoraviaje.core.model.WeatherSample> = emptyList(),
     ) = db.withTransaction {
         if (replace) {
             trips.delete(trip.id)
@@ -290,6 +291,7 @@ class TrackingRepository @Inject constructor(
         // Places are shared across trips (same id = same place): upsert, never replace (Phase 4).
         if (placesToInsert.isNotEmpty()) db.placeDao().upsertAll(placesToInsert.map { it.toEntity() })
         if (enrichmentsToInsert.isNotEmpty()) db.enrichmentDao().upsertAll(enrichmentsToInsert.map { it.toEntity() })
+        if (weatherToInsert.isNotEmpty()) db.weatherDao().insertAll(weatherToInsert.map { it.toEntity() })
         if (segmentPlacesToInsert.isNotEmpty()) db.segmentPlaceDao().upsertAll(segmentPlacesToInsert.map { it.toEntity() })
     }
 

@@ -47,6 +47,8 @@ data class UserSettings(
     val enrichPlaces: Boolean = true,
     /** DISENO §15: send coordinates rounded to ~1 km to Wikipedia/Nominatim for places. */
     val roundEnrichmentCoords: Boolean = false,
+    /** Backlog D3: fetch the hourly weather of each closed segment from Open-Meteo. */
+    val fetchWeather: Boolean = true,
     val llmModel: String = DEFAULT_LLM_MODEL,
     /** DISENO §15.3 / PLAN 5.5: circles the exports must not reveal. */
     val privacyZones: List<com.bitacoraviaje.core.model.PrivacyZone> = emptyList(),
@@ -69,6 +71,7 @@ data class UserSettings(
             overpassUrl: String? = null,
             enrichPlaces: Boolean? = null,
             roundEnrichmentCoords: Boolean? = null,
+            fetchWeather: Boolean? = null,
             llmModel: String? = null,
             privacyZonesJson: String? = null,
             onInvalid: (key: String, value: String) -> Unit = { _, _ -> },
@@ -96,6 +99,7 @@ data class UserSettings(
             overpassUrl = httpsOr(overpassUrl, DEFAULT_OVERPASS_URL) { onInvalid("overpass_url", it) },
             enrichPlaces = enrichPlaces ?: true,
             roundEnrichmentCoords = roundEnrichmentCoords ?: false,
+            fetchWeather = fetchWeather ?: true,
             llmModel = llmModel?.trim()?.takeIf { it.matches(Regex("^[A-Za-z0-9._-]{3,64}$")) } ?: run { if (llmModel != null) onInvalid("llm_model", llmModel); DEFAULT_LLM_MODEL },
             privacyZones = privacyZonesJson?.let { raw -> PrivacyZones.parse(raw) ?: run { onInvalid("privacy_zones", raw.take(80)); emptyList() } } ?: emptyList(),
         )
@@ -134,6 +138,7 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
         val OVERPASS_URL = stringPreferencesKey("overpass_url")
         val ENRICH_PLACES = androidx.datastore.preferences.core.booleanPreferencesKey("enrich_places")
         val ROUND_ENRICHMENT_COORDS = androidx.datastore.preferences.core.booleanPreferencesKey("round_enrichment_coords")
+        val FETCH_WEATHER = androidx.datastore.preferences.core.booleanPreferencesKey("fetch_weather")
         val LLM_MODEL = stringPreferencesKey("llm_model")
         val PRIVACY_ZONES = stringPreferencesKey("privacy_zones")
     }
@@ -152,6 +157,7 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
             overpassUrl = p[Keys.OVERPASS_URL],
             enrichPlaces = p[Keys.ENRICH_PLACES],
             roundEnrichmentCoords = p[Keys.ROUND_ENRICHMENT_COORDS],
+            fetchWeather = p[Keys.FETCH_WEATHER],
             llmModel = p[Keys.LLM_MODEL],
             privacyZonesJson = p[Keys.PRIVACY_ZONES],
         )
@@ -180,6 +186,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     suspend fun setEnrichPlaces(value: Boolean) = context.settingsStore.edit { it[Keys.ENRICH_PLACES] = value }
 
     suspend fun setRoundEnrichmentCoords(value: Boolean) = context.settingsStore.edit { it[Keys.ROUND_ENRICHMENT_COORDS] = value }
+
+    suspend fun setFetchWeather(value: Boolean) = context.settingsStore.edit { it[Keys.FETCH_WEATHER] = value }
 
     suspend fun setLlmModel(model: String) = context.settingsStore.edit { it[Keys.LLM_MODEL] = model.trim() }
 

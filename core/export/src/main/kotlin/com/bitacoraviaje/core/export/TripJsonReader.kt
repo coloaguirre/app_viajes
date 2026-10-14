@@ -26,6 +26,7 @@ import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.model.Trip
 import com.bitacoraviaje.core.model.TripStatus
 import com.bitacoraviaje.core.model.VoiceNote
+import com.bitacoraviaje.core.model.WeatherSample
 import java.util.UUID
 import kotlinx.serialization.json.Json
 
@@ -97,7 +98,8 @@ object TripJsonReader {
                 )
             }
             val text = s.text_notes.map { n -> TextNote(id(n.id), sid, n.time_utc_ms, n.lat, n.lon, enumOr(n.kind, TextNoteKind.NOTE), n.text) }
-            SegmentExport(segment, points, pauses, stops, media, voice, text)
+            val weather = s.weather.map { w -> WeatherSample(id(w.id), sid, w.time_utc_ms, w.lat, w.lon, w.temperature_c, w.apparent_c, w.precipitation_mm, w.wind_kmh, w.cloud_pct, w.weather_code, w.source) }
+            SegmentExport(segment, points, pauses, stops, media, voice, text, weather)
         }
         // Places keep their ids on a copy too: `wd-Q…` is the same place in every trip (validated like every id).
         val segIds = segments.map { it.segment.id }.toSet()

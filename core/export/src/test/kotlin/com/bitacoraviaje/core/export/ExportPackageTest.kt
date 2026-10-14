@@ -21,7 +21,7 @@ class ExportPackageTest {
         val folder = report.folder
         assertEquals("Patagonia-2026-Cafe-La-Nata-amigos-noche_2025-10-12", folder)
         val names = entries.keys.map { it.removePrefix("$folder/") }
-        for (expected in listOf("trip.json", "bitacora.md", "bitacora.html", "tracks/viaje-completo.gpx", "tracks/01_2025-10-09_caminata-inicial.gpx", "tracks/02_2025-10-10_etapa.gpx", "tracks/viaje.kml", "tracks/viaje.kmz", "tracks/viaje.geojson", "tablas/puntos.csv", "tablas/medios.csv", "tablas/notas.csv", "tablas/lugares.csv", "subtitulos/notas.srt", "LEEME.txt")) {
+        for (expected in listOf("trip.json", "bitacora.md", "bitacora.html", "tracks/viaje-completo.gpx", "tracks/01_2025-10-09_caminata-inicial.gpx", "tracks/02_2025-10-10_etapa.gpx", "tracks/viaje.kml", "tracks/viaje.kmz", "tracks/viaje.geojson", "tablas/puntos.csv", "tablas/medios.csv", "tablas/notas.csv", "tablas/lugares.csv", "tablas/clima.csv", "subtitulos/notas.srt", "LEEME.txt")) {
             assertTrue(expected in names, "missing $expected in $names")
         }
         assertEquals("LEEME.txt", names.last(), "LEEME is written last, with the final counts")

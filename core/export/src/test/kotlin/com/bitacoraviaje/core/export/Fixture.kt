@@ -25,6 +25,7 @@ import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.model.Trip
 import com.bitacoraviaje.core.model.TripStatus
 import com.bitacoraviaje.core.model.VoiceNote
+import com.bitacoraviaje.core.model.WeatherSample
 import java.io.ByteArrayOutputStream
 
 /** Synthetic two-segment trip with every entity kind and awkward characters in the texts. */
@@ -61,12 +62,17 @@ object Fixture {
             TextNote("n-2", "seg-1", T0 + 2_100_000, -34.581, -58.4, TextNoteKind.HIGHLIGHT),
             TextNote("n-3", "seg-1", T0 + 2_200_000, -34.58, -58.4, TextNoteKind.TRANSPORT_CHANGE, "BIKE"),
         )
+        // Backlog D3: two sampled hours of seg-1 (08:00 and 09:00 UTC = 05:00 / 06:00 local): clear then cloudy.
+        val weather1 = listOf(
+            WeatherSample("w-1", "seg-1", T0 - T0 % 3_600_000 + 1_800_000, -34.6, -58.4, 14.2, 12.0, 0.0, 12.0, 10, 0),
+            WeatherSample("w-2", "seg-1", T0 - T0 % 3_600_000 + 5_400_000, -34.59, -58.4, 16.8, 15.0, 0.4, 25.0, 60, 2),
+        )
         val s2start = T0 + 86_400_000
         val s2 = Segment("seg-2", "trip-1", null, SegmentType.STAGE, Transport.CAR, null, null, s2start, s2start + 7_200_000, TZ, "VEHICLE", RecordingMode.ECONOMY, false, SegmentStatus.FINISHED, SegmentStats(distanceM = 51_000.0, movingTimeMs = 6_000_000, totalTimeMs = 7_200_000))
         val p2 = walk("seg-2", s2start, 120, stepS = 60)
         return TripExport(
             trip = trip,
-            segments = listOf(SegmentExport(s1, p1, pauses1, stops1, media1, voice1, text1), SegmentExport(s2, p2)),
+            segments = listOf(SegmentExport(s1, p1, pauses1, stops1, media1, voice1, text1, weather1), SegmentExport(s2, p2)),
             appVersion = "0.1.0-test",
             exportedUtcMs = T0 + 3 * 86_400_000,
             mediaFiles = mapOf("m-1" to "media/fotos/2025-10-09/IMG_0001.jpg", "m-2" to "media/videos/2025-10-09/VID_0002.mp4", "m-3" to "media/fotos/2025-10-09/IMG_0003.jpg"),

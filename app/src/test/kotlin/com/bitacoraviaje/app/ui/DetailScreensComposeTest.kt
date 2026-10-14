@@ -364,4 +364,34 @@ class DetailScreensComposeTest {
         rule.onNodeWithTag("trip_map").performClick()
         assertEquals(listOf<com.bitacoraviaje.app.map.MapTap>(com.bitacoraviaje.app.map.MapTap.Marker("x")), taps)
     }
+
+    // Backlog D3: weather in the timeline rows and in the map card.
+
+    @Test
+    fun `timeline shows the weather block row and tags a photo with its hour, and the map card shows it too`() {
+        val sample = com.bitacoraviaje.core.model.WeatherSample("w1", "s1", photo.takenUtcMs, -34.6, -58.4, 22.6, 21.0, 0.0, 12.0, 20, 1)
+        val block = com.bitacoraviaje.core.timeline.WeatherDigest.blocks(listOf(sample), segment.tzId).single()
+        val withWeather = listOf(
+            events[0],
+            TimelineEvent.Weather(sample.timeUtcMs - 1, -34.6, -58.4, block),
+            TimelineEvent.Moment(photo.takenUtcMs, -34.61, -58.41, listOf(photo), weather = sample),
+            events[4],
+        )
+        rule.setContent {
+            var tab by remember { mutableStateOf(0) }
+            BitacoraTheme {
+                TripDetailScreen(
+                    state = TripDetailUiState(
+                        trip = trip, segments = listOf(SegmentTimeline(segment, withWeather, emptyList())), map = TrackMapState(), selectedTab = tab,
+                        mapSelection = MapSelection(segment, photo.takenUtcMs, 100.0, null, null, withWeather[2], weather = com.bitacoraviaje.core.timeline.WeatherDigest.brief(sample)),
+                    ),
+                    onBack = {}, onTab = { tab = it }, onEvent = {}, onReview = {},
+                )
+            }
+        }
+        rule.onNodeWithText("Mañana: Mayormente despejado, 23 °C").assertIsDisplayed()
+        rule.onNodeWithText("Foto · ☀️ 23 °C").assertIsDisplayed()
+        rule.onNodeWithTag("trip_tab_1").performClick()
+        rule.onNodeWithTag("map_selection_facts").assertTextEquals("06:03 · 100 m de la etapa · ☀️ 23 °C")
+    }
 }

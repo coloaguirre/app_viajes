@@ -11,6 +11,10 @@ import dagger.hilt.components.SingletonComponent
 abstract class EnrichmentModule {
     @Binds
     abstract fun bindWikipedia(impl: WikipediaClient): WikipediaSource
+
+    /** Backlog D3: the weather provider behind the enricher. */
+    @Binds
+    abstract fun bindWeather(impl: com.bitacoraviaje.app.weather.OpenMeteoClient): com.bitacoraviaje.app.weather.WeatherSource
 }
 
 @Module

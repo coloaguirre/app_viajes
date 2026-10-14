@@ -27,6 +27,7 @@ class ExportLoader @Inject constructor(
     private val media: MediaRepository,
     private val notes: NotesRepository,
     private val places: com.bitacoraviaje.data.repository.PlacesRepository,
+    private val weather: com.bitacoraviaje.data.repository.WeatherRepository,
 ) {
     data class ForExport(val trip: TripExport, val privacy: com.bitacoraviaje.core.export.PrivacyReport?, val blankedMediaIds: Set<String>)
 
@@ -57,6 +58,7 @@ class ExportLoader @Inject constructor(
                 media = mediaBySegment[s.id].orEmpty() + if (i == 0) orphan else emptyList(),
                 voiceNotes = notes.voiceNotesOf(s.id),
                 textNotes = notes.textNotesOf(s.id),
+                weather = weather.samplesOf(s.id),
             )
         }
         val tzBy = { segId: String? -> segments.firstOrNull { it.id == segId }?.tzId ?: segments.firstOrNull()?.tzId ?: "UTC" }

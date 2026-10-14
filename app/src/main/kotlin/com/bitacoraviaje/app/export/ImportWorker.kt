@@ -218,6 +218,7 @@ class ImportWorker @AssistedInject constructor(
             placesToInsert = t.places,
             enrichmentsToInsert = t.enrichments,
             segmentPlacesToInsert = t.segmentPlaces,
+            weatherToInsert = t.allWeather,
         )
     }
 

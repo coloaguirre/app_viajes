@@ -221,6 +221,29 @@ data class StopEntity(
     @ColumnInfo(name = "user_label") val userLabel: String?,
 )
 
+// ---- Backlog D3: hourly weather along a segment (Open-Meteo) ----
+
+@Entity(
+    tableName = "weather_sample",
+    foreignKeys = [ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["segment_id", "time_utc_ms"], name = "idx_weather_segment_time")],
+)
+data class WeatherSampleEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "segment_id") val segmentId: String,
+    @ColumnInfo(name = "time_utc_ms") val timeUtcMs: Long,
+    val lat: Double,
+    val lon: Double,
+    @ColumnInfo(name = "temperature_c") val temperatureC: Double?,
+    @ColumnInfo(name = "apparent_c") val apparentC: Double?,
+    @ColumnInfo(name = "precipitation_mm") val precipitationMm: Double?,
+    @ColumnInfo(name = "wind_kmh") val windKmh: Double?,
+    @ColumnInfo(name = "cloud_pct") val cloudPct: Int?,
+    @ColumnInfo(name = "weather_code") val weatherCode: Int?,
+    val source: String,
+    @ColumnInfo(name = "fetched_utc_ms") val fetchedUtcMs: Long?,
+)
+
 // ---- Phase 4: places and enrichment (DISENO §5.2 "Lugares", §11) ----
 
 @Entity(tableName = "place")

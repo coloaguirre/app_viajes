@@ -129,6 +129,7 @@ class PlanSegment:
     voice_notes: list[PlanVoice] = field(default_factory=list)
     highlights_utc_ms: list[int] = field(default_factory=list)
     places: list[PlanPlace] = field(default_factory=list)
+    weather: str | None = None
 
 
 @dataclass
@@ -141,6 +142,90 @@ class PlanInput:
 
 
 _KIND = {"TREKKING": "Trekking", "EXCURSION": "Excursión"}
+
+# WMO codes in Spanish and the coarse families, mirror of core/model WeatherCodes (keep both in step).
+_WMO = {
+    0: "Despejado",
+    1: "Mayormente despejado",
+    2: "Parcialmente nublado",
+    3: "Nublado",
+    45: "Niebla",
+    48: "Niebla con escarcha",
+    51: "Llovizna",
+    53: "Llovizna",
+    55: "Llovizna",
+    56: "Llovizna helada",
+    57: "Llovizna helada",
+    61: "Lluvia ligera",
+    63: "Lluvia",
+    65: "Lluvia intensa",
+    66: "Lluvia helada",
+    67: "Lluvia helada",
+    71: "Nevada ligera",
+    73: "Nevada",
+    75: "Nevada intensa",
+    77: "Granos de nieve",
+    80: "Chaparrones ligeros",
+    81: "Chaparrones",
+    82: "Chaparrones fuertes",
+    85: "Chaparrones de nieve",
+    86: "Chaparrones de nieve",
+    95: "Tormenta",
+    96: "Tormenta con granizo",
+    99: "Tormenta con granizo",
+}
+
+
+def _family(code: int) -> str:
+    if code in (0, 1):
+        return "CLEAR"
+    if code in (2, 3):
+        return "CLOUDY"
+    if code in (45, 48):
+        return "FOG"
+    if 51 <= code <= 57 or 61 <= code <= 67 or 80 <= code <= 82:
+        return "RAIN"
+    if 71 <= code <= 77 or code in (85, 86):
+        return "SNOW"
+    if code in (95, 96, 99):
+        return "STORM"
+    return "UNKNOWN"
+
+
+def _dominant(codes: list[int], min_share: float = 0.3) -> int | None:
+    """Mirror of WeatherCodes.dominant: the worst family covering ≥ 30 % of the hours, else the most frequent code."""
+    if not codes:
+        return None
+
+    def most_frequent(cs: list[int]) -> int:
+        counts: dict[int, int] = {}
+        for c in cs:
+            counts[c] = counts.get(c, 0) + 1
+        best = max(counts.values())
+        return next(c for c in cs if counts[c] == best)
+
+    for fam in ("STORM", "SNOW", "RAIN", "FOG", "CLOUDY", "CLEAR"):
+        hits = [c for c in codes if _family(c) == fam]
+        if hits and len(hits) >= len(codes) * min_share:
+            return most_frequent(hits)
+    return most_frequent(codes)
+
+
+def _round_half_up(x: float) -> int:
+    return int(math.floor(x + 0.5))
+
+
+def weather_text(samples) -> str | None:
+    """Mirror of core/timeline WeatherDigest.segmentText: dominant weather plus the temperature range."""
+    if not samples:
+        return None
+    code = _dominant([s.weather_code for s in samples if s.weather_code is not None])
+    text = _WMO.get(code, "Sin dato") if code is not None else "Sin dato"
+    temps = [s.temperature_c for s in samples if s.temperature_c is not None]
+    if temps:
+        lo, hi = _round_half_up(min(temps)), _round_half_up(max(temps))
+        text += f", {lo} °C" if lo == hi else f", {lo}–{hi} °C"
+    return text
 
 
 def plan_input_of(trip: Trip, extra_credits: list[str] | None = None) -> PlanInput:
@@ -174,6 +259,7 @@ def plan_input_of(trip: Trip, extra_credits: list[str] | None = None) -> PlanInp
                 ],
                 highlights_utc_ms=sorted(n.time_utc_ms for n in s.text_notes if n.kind == "HIGHLIGHT"),
                 places=places,
+                weather=weather_text(s.weather),
             )
         )
     return PlanInput(trip.trip.id, trip.trip.title, trip.trip.cover_media_id, segments, list(extra_credits or []))
@@ -277,6 +363,8 @@ def _credits(inp: PlanInput, segments: list[PlanSegment], params: PlanParams) ->
             lines.append(f"Texto: Wikipedia — {p.name} ({p.license or 'CC BY-SA 4.0'})" + (f" {p.url}" if p.url else ""))
         if any(p.source_name == "Wikidata" for p in all_places):
             lines.append("Datos: Wikidata (CC0)")
+    if any(s.weather is not None for s in segments):
+        lines.append("Datos meteorológicos: Open-Meteo (CC BY 4.0)")
     lines.extend(inp.extra_credits)
     lines.append("Hecho con Bitácora de Viaje")
     return lines
@@ -361,7 +449,7 @@ def plan(inp: PlanInput, params: PlanParams) -> VideoPlan:
     photo_scores: list[tuple[Photo, float]] = []
     ken_index = 0
     for s in segments:
-        scenes.append(Chapter(duration_ms=CHAPTER_MS, title=s.title, date=s.date, segment=s.id))
+        scenes.append(Chapter(duration_ms=CHAPTER_MS, title=s.title, date=s.date, segment=s.id, weather=s.weather))
         if params.include_map and s.has_track:
             scenes.append(MapRoute(duration_ms=SEGMENT_MAP_MS, segments=[s.id], style="follow" if multi else "overview"))
         remaining = share[s.id]

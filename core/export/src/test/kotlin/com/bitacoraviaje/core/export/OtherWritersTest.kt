@@ -100,6 +100,9 @@ class OtherWritersTest {
         assertEquals("5", places[1][10])
         assertEquals(listOf("lugar", "Wikipedia", "CC BY-SA 4.0"), listOf(places[2][2], places[2][14], places[2][16]))
         assertEquals("OVERPASS", places[4][14])
+        val weather = parseCsv(Fixture.render(WeatherCsvWriter()))
+        assertEquals(1 + 2, weather.size, "header and the two sampled hours of seg-1")
+        assertEquals(listOf("14.2", "0", "Despejado", "Open-Meteo"), listOf(weather[1][6], weather[1][11], weather[1][12], weather[1][13]))
     }
 
     @Test
@@ -119,6 +122,9 @@ class OtherWritersTest {
         assertTrue(md.contains("#### Lugares") && md.contains("- **Mirador ${Fixture.TRICKY}**") && md.contains("_Wikipedia (CC BY-SA 4.0)_ <https://es.wikipedia.org/wiki/Mirador>"), "places with source and license")
         assertTrue(md.contains("- Texto: Wikipedia — Mirador — CC BY-SA 4.0 — https://es.wikipedia.org/wiki/Mirador") && md.contains("- Datos: Wikidata — CC0"), "attributions")
         assertTrue(md.contains("Cambio de medio: en bici"))
+        // 08:30Z / 09:30Z are 05:30 / 06:30 in Buenos Aires: one night hour, one morning hour (backlog D3).
+        assertTrue(md.contains("Noche: Despejado, 14 °C") && md.contains("Mañana: Parcialmente nublado, 17 °C"), "weather blocks")
+        assertTrue(md.contains("- Datos meteorológicos: Open-Meteo — CC BY 4.0 — https://open-meteo.com/"), "weather attribution")
     }
 
     @Test

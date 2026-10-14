@@ -76,13 +76,13 @@ class BackupRulesTest {
             tracking.insertPoints((0 until 10).map { i -> TrackPoint(segmentId = s.id, timeUtcMs = now + i * 10_000L, lat = -34.6 + i * 1e-4, lon = -58.4) })
             now += 100_000
             tracking.finishSegment(s.id)
-            val f = assertNotNull(BackupFiles.write(ctx, ExportLoader(tracking, MediaRepository(db), NotesRepository(db), com.bitacoraviaje.data.repository.PlacesRepository(db)), s.tripId))
+            val f = assertNotNull(BackupFiles.write(ctx, ExportLoader(tracking, MediaRepository(db), NotesRepository(db), com.bitacoraviaje.data.repository.PlacesRepository(db), com.bitacoraviaje.data.repository.WeatherRepository(db)), s.tripId))
             assertTrue(f.isFile && f.parentFile!!.name == "backup")
             val back = TripJsonReader.read(java.util.zip.GZIPInputStream(f.inputStream()).readBytes().toString(Charsets.UTF_8))
             assertEquals("Respaldo", back.trip.title)
             assertEquals(10, back.segments.single().points.size)
             // Second write replaces atomically (no .tmp left behind).
-            assertNotNull(BackupFiles.write(ctx, ExportLoader(tracking, MediaRepository(db), NotesRepository(db), com.bitacoraviaje.data.repository.PlacesRepository(db)), s.tripId))
+            assertNotNull(BackupFiles.write(ctx, ExportLoader(tracking, MediaRepository(db), NotesRepository(db), com.bitacoraviaje.data.repository.PlacesRepository(db), com.bitacoraviaje.data.repository.WeatherRepository(db)), s.tripId))
             assertEquals(listOf("${s.tripId}.json.gz"), f.parentFile!!.list()!!.toList())
         } finally {
             db.close()

@@ -257,6 +257,7 @@ private fun MapSelectionCard(sel: MapSelection, stageLabel: String?, modifier: M
         sel.distanceM?.let { add(stringResource(R.string.map_sel_km, if (it < 1000) "%.0f m".format(APP_LOCALE, it) else "%.1f km".format(APP_LOCALE, it / 1000))) }
         sel.speedMps?.let { add(stringResource(R.string.map_sel_speed, "%.1f".format(APP_LOCALE, it * 3.6))) }
         sel.altM?.let { add(stringResource(R.string.map_sel_alt, Math.round(it).toInt())) }
+        sel.weather?.let { add(it) }
     }
     androidx.compose.material3.Card(modifier = modifier.fillMaxWidth().testTag("map_selection")) {
         Column(Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 12.dp)) {
@@ -277,6 +278,9 @@ private fun MapSelectionCard(sel: MapSelection, stageLabel: String?, modifier: M
     }
 }
 
+/** " · ☀️ 23 °C" after a photo, a stop or a note when the hour's weather is known (backlog D3). */
+private fun wx(sample: com.bitacoraviaje.core.model.WeatherSample?): String = com.bitacoraviaje.core.timeline.WeatherDigest.brief(sample)?.let { " · $it" } ?: ""
+
 /** Icon and one-line label of a timeline event, shared by the list rows and the map card. */
 @Composable
 private fun eventLabel(e: TimelineEvent): Pair<String, String> = when (e) {
@@ -284,10 +288,11 @@ private fun eventLabel(e: TimelineEvent): Pair<String, String> = when (e) {
         is TimelineEvent.SegmentEnd -> "■" to stringResource(R.string.ev_end)
         is TimelineEvent.Pause -> (if (e.kind == PauseKind.AUTO_REST) "💤" else "⏸") to stringResource(if (e.kind == PauseKind.AUTO_REST) R.string.ev_rest else if (e.kind == PauseKind.NESTED) R.string.ev_nested else R.string.ev_pause)
         is TimelineEvent.Resume -> "⏵" to stringResource(R.string.ev_resume, TrackingNotificationFactory.formatElapsed(e.pausedMs))
-        is TimelineEvent.StopArrived -> "📍" to stringResource(R.string.ev_stop_arrived)
+        is TimelineEvent.StopArrived -> "📍" to stringResource(R.string.ev_stop_arrived) + wx(e.weather)
         is TimelineEvent.StopLeft -> "🚶" to stringResource(R.string.ev_stop_left, TrackingNotificationFactory.formatElapsed(e.dwellMs))
-        is TimelineEvent.Moment -> (if (e.hasVideo) "🎬" else "📷") to (if (e.isSingle) stringResource(R.string.ev_photo) else stringResource(R.string.ev_moment, e.media.size))
-        is TimelineEvent.Voice -> "🎙" to (e.note.displayText ?: stringResource(if (e.note.transcriptStatus == TranscriptStatus.FAILED) R.string.ev_voice_failed else R.string.ev_voice_pending))
+        is TimelineEvent.Moment -> (if (e.hasVideo) "🎬" else "📷") to (if (e.isSingle) stringResource(R.string.ev_photo) else stringResource(R.string.ev_moment, e.media.size)) + wx(e.weather)
+        is TimelineEvent.Voice -> "🎙" to (e.note.displayText ?: stringResource(if (e.note.transcriptStatus == TranscriptStatus.FAILED) R.string.ev_voice_failed else R.string.ev_voice_pending)) + wx(e.weather)
+        is TimelineEvent.Weather -> com.bitacoraviaje.core.model.WeatherCodes.icon(e.block.weatherCode) to stringResource(R.string.ev_weather, e.block.block.label, e.block.text)
         is TimelineEvent.Text -> "📝" to (e.note.text ?: stringResource(R.string.ev_marker))
         is TimelineEvent.Highlight -> "⭐" to stringResource(R.string.ev_highlight)
         is TimelineEvent.TransportChange -> "🔀" to stringResource(R.string.ev_transport_change, e.transport?.let { stringResource(transportLabelRes(it)) } ?: (e.note.text ?: ""))

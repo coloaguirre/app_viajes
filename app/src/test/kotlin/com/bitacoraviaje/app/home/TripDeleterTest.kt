@@ -49,7 +49,7 @@ class TripDeleterTest {
         db = Room.inMemoryDatabaseBuilder(context, BitacoraDatabase::class.java).allowMainThreadQueries().build()
         tracking = TrackingRepository(db, Clock { now })
         notes = NotesRepository(db)
-        deleter = TripDeleter(context, tracking, ExportLoader(tracking, MediaRepository(db), notes, PlacesRepository(db)), VideoPlanStore(context))
+        deleter = TripDeleter(context, tracking, ExportLoader(tracking, MediaRepository(db), notes, PlacesRepository(db), com.bitacoraviaje.data.repository.WeatherRepository(db)), VideoPlanStore(context))
         BackupFiles.dir(context).deleteRecursively()
     }
 
@@ -109,7 +109,7 @@ class TripDeleterTest {
         val outcome = deleter.delete(id) { tripId ->
             // The segment opens between the backup and the transaction (review N2); getActive() finds the same trip.
             tracking.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC")
-            BackupFiles.write(context, ExportLoader(tracking, MediaRepository(db), notes, PlacesRepository(db)), tripId)
+            BackupFiles.write(context, ExportLoader(tracking, MediaRepository(db), notes, PlacesRepository(db), com.bitacoraviaje.data.repository.WeatherRepository(db)), tripId)
         }
         assertEquals(TripDeleter.Outcome.IN_USE, outcome)
         assertEquals(id, tracking.getOpenSegment()?.tripId)

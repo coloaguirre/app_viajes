@@ -97,7 +97,7 @@ def title_card(w: int, h: int, title: str, subtitle: str | None, background: Pat
     return img
 
 
-def chapter_card(w: int, h: int, title: str, date: str | None) -> Image.Image:
+def chapter_card(w: int, h: int, title: str, date: str | None, weather: str | None = None) -> Image.Image:
     img = Image.new("RGB", (w, h), PAPER)
     d = ImageDraw.Draw(img)
     d.rectangle((0, int(h * 0.44), int(w * 0.03), int(h * 0.56)), fill=ACCENT)
@@ -109,6 +109,9 @@ def chapter_card(w: int, h: int, title: str, date: str | None) -> Image.Image:
         y += int(big.size * 1.2)
     if date:
         d.text((int(w * 0.08), y + 6), date, font=font(int(h * 0.035)), fill=INK)
+        y += int(h * 0.035 * 1.4)
+    if weather:
+        d.text((int(w * 0.08), y + 6), weather, font=font(int(h * 0.03)), fill=INK)
     return img
 
 

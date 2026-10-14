@@ -4044,6 +4044,36 @@
                     "excluded": false
                 }
             ],
+            "weather": [
+                {
+                    "id": "w-1",
+                    "time": "2025-10-09T05:30:00-03:00",
+                    "time_utc_ms": 1759998600000,
+                    "lat": -34.6,
+                    "lon": -58.4,
+                    "temperature_c": 14.2,
+                    "apparent_c": 12.0,
+                    "precipitation_mm": 0.0,
+                    "wind_kmh": 12.0,
+                    "cloud_pct": 10,
+                    "weather_code": 0,
+                    "source": "Open-Meteo"
+                },
+                {
+                    "id": "w-2",
+                    "time": "2025-10-09T06:30:00-03:00",
+                    "time_utc_ms": 1760002200000,
+                    "lat": -34.59,
+                    "lon": -58.4,
+                    "temperature_c": 16.8,
+                    "apparent_c": 15.0,
+                    "precipitation_mm": 0.4,
+                    "wind_kmh": 25.0,
+                    "cloud_pct": 60,
+                    "weather_code": 2,
+                    "source": "Open-Meteo"
+                }
+            ],
             "voice_notes": [
                 {
                     "id": "v-1",
@@ -5459,6 +5489,7 @@
             "pauses": [],
             "stops": [],
             "media": [],
+            "weather": [],
             "voice_notes": [],
             "text_notes": []
         }
@@ -5562,6 +5593,11 @@
             "name": "Datos: Wikidata",
             "license": "CC0",
             "url": "https://www.wikidata.org"
+        },
+        {
+            "name": "Datos meteorológicos: Open-Meteo",
+            "license": "CC BY 4.0",
+            "url": "https://open-meteo.com/"
         }
     ]
 }

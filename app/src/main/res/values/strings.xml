@@ -102,6 +102,7 @@
     <string name="places_no_text">Sin texto en internet; solo el nombre del mapa.</string>
     <string name="places_rewritten">Texto reescrito</string>
     <string name="ev_place">Lugar: %1$s</string>
+    <string name="ev_weather">%1$s: %2$s</string>
     <string name="render_channel">Video de la etapa</string>
     <string name="render_notif_title">Creando el video de la etapa</string>
     <string name="render_notif_progress">%1$d %%</string>
@@ -350,6 +351,8 @@
     <string name="settings_enrich_places">Buscar lugares en internet</string>
     <string name="settings_enrich_places_desc">Al terminar una etapa, busca información de las paradas y localidades en Wikipedia (CC BY-SA), Wikidata (CC0) y OpenStreetMap (ODbL). Siempre se cita la fuente.</string>
     <string name="settings_round_coords">Redondear coordenadas a ~1 km</string>
+    <string name="settings_fetch_weather">Clima del recorrido</string>
+    <string name="settings_fetch_weather_desc">Al terminar una etapa, consulta el clima de cada hora donde estuviste en Open-Meteo (CC BY 4.0), con la posición redondeada a 1 km. Aparece en la bitácora, las fotos y el video.</string>
     <string name="settings_round_coords_desc">También las paradas salen con precisión de 1 km. Se pierden los puntos de interés cercanos.</string>
     <string name="settings_nominatim">Instancia de Nominatim</string>
     <string name="settings_overpass">Instancia de Overpass</string>

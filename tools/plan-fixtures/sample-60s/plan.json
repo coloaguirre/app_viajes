@@ -28,7 +28,8 @@
             "duration_ms": 2500,
             "title": "Caminata inicial",
             "date": "2025-10-09",
-            "segment": "seg-1"
+            "segment": "seg-1",
+            "weather": "Parcialmente nublado, 14–17 °C"
         },
         {
             "type": "map_route",
@@ -127,6 +128,7 @@
             "lines": [
                 "Datos del mapa © colaboradores de OpenStreetMap (ODbL)",
                 "Datos: Wikidata (CC0)",
+                "Datos meteorológicos: Open-Meteo (CC BY 4.0)",
                 "Hecho con Bitácora de Viaje"
             ]
         }

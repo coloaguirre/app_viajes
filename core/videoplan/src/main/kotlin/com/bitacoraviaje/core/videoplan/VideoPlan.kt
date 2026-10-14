@@ -46,7 +46,7 @@ data class VideoPlan(
 
     @Serializable
     @SerialName("chapter")
-    data class Chapter(val duration_ms: Long, val title: String, val date: String? = null, val segment: String) : Scene {
+    data class Chapter(val duration_ms: Long, val title: String, val date: String? = null, val segment: String, val weather: String? = null) : Scene {
         override val durationMs get() = duration_ms
     }
 

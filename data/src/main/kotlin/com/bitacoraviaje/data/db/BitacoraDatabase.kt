@@ -8,6 +8,7 @@ import com.bitacoraviaje.data.db.dao.CameraClockOffsetDao
 import com.bitacoraviaje.data.db.dao.EnrichmentDao
 import com.bitacoraviaje.data.db.dao.PlaceDao
 import com.bitacoraviaje.data.db.dao.SegmentPlaceDao
+import com.bitacoraviaje.data.db.dao.WeatherDao
 import com.bitacoraviaje.data.db.dao.MediaDao
 import com.bitacoraviaje.data.db.dao.SegmentDao
 import com.bitacoraviaje.data.db.dao.StopDao
@@ -19,6 +20,7 @@ import com.bitacoraviaje.data.db.entity.CameraClockOffsetEntity
 import com.bitacoraviaje.data.db.entity.EnrichmentEntity
 import com.bitacoraviaje.data.db.entity.PlaceEntity
 import com.bitacoraviaje.data.db.entity.SegmentPlaceEntity
+import com.bitacoraviaje.data.db.entity.WeatherSampleEntity
 import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
@@ -42,7 +44,7 @@ import com.bitacoraviaje.data.db.entity.TripEntity
  *  9 — PR #8 review: segment_place.dismissed (a discarded place stays discarded across re-runs).
  */
 @Database(
-    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class, PlaceEntity::class, EnrichmentEntity::class, SegmentPlaceEntity::class],
+    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class, PlaceEntity::class, EnrichmentEntity::class, SegmentPlaceEntity::class, WeatherSampleEntity::class],
     version = BitacoraDatabase.VERSION,
     exportSchema = true,
 )
@@ -58,9 +60,10 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun placeDao(): PlaceDao
     abstract fun enrichmentDao(): EnrichmentDao
     abstract fun segmentPlaceDao(): SegmentPlaceDao
+    abstract fun weatherDao(): WeatherDao
 
     companion object {
-        const val VERSION = 10
+        const val VERSION = 11
         const val NAME = "bitacora.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -227,6 +230,18 @@ abstract class BitacoraDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+        /** Backlog D3: hourly weather samples per segment (Open-Meteo), fetched after the segment closes. */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `weather_sample` (`id` TEXT NOT NULL, `segment_id` TEXT NOT NULL, `time_utc_ms` INTEGER NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, " +
+                        "`temperature_c` REAL, `apparent_c` REAL, `precipitation_mm` REAL, `wind_kmh` REAL, `cloud_pct` INTEGER, `weather_code` INTEGER, `source` TEXT NOT NULL, `fetched_utc_ms` INTEGER, " +
+                        "PRIMARY KEY(`id`), FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_weather_segment_time` ON `weather_sample` (`segment_id`, `time_utc_ms`)")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
     }
 }

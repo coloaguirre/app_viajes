@@ -3,6 +3,7 @@ package com.bitacoraviaje.core.export
 import com.bitacoraviaje.core.model.PauseKind
 import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.timeline.TimelineEvent
+import com.bitacoraviaje.core.timeline.WeatherDigest
 import com.bitacoraviaje.core.timeline.TimelineInput
 import com.bitacoraviaje.core.timeline.buildTimeline
 import java.io.OutputStream
@@ -15,7 +16,7 @@ internal object Diary {
 
     fun days(trip: TripExport): List<Day> {
         val bySeg = trip.segments.map { se ->
-            se to buildTimeline(TimelineInput(se.segment, se.points.filter { !it.isFilteredOut }, se.pauses, se.stops, se.media, se.voiceNotes, se.textNotes, places = trip.placesOf(se.segment.id), nowUtcMs = trip.exportedUtcMs))
+            se to buildTimeline(TimelineInput(se.segment, se.points.filter { !it.isFilteredOut }, se.pauses, se.stops, se.media, se.voiceNotes, se.textNotes, places = trip.placesOf(se.segment.id), nowUtcMs = trip.exportedUtcMs, weather = se.weather))
         }
         return bySeg.groupBy { (se, _) -> Iso.localDate(se.segment.startedUtcMs, se.segment.tzId) }.toSortedMap().map { (d, l) -> Day(d, l) }
     }
@@ -40,15 +41,19 @@ internal object Diary {
     }
 
     /** One line of plain text per event, without media links (callers add those). */
+    /** " · ☀️ 23 °C" after a photo, a stop or a note when the hour's weather is known (backlog D3). */
+    private fun wx(sample: com.bitacoraviaje.core.model.WeatherSample?): String = WeatherDigest.brief(sample)?.let { " · $it" } ?: ""
+
     fun line(e: TimelineEvent): String = when (e) {
         is TimelineEvent.SegmentStart -> "Inicio"
         is TimelineEvent.SegmentEnd -> "Fin"
         is TimelineEvent.Pause -> when (e.kind) { PauseKind.AUTO_REST -> "Reposo automático"; PauseKind.NESTED -> "Pausa por excursión"; PauseKind.USER -> "Pausa"; PauseKind.PRIVACY -> "Tramo omitido por una zona de privacidad" }
         is TimelineEvent.Resume -> if (e.kind == PauseKind.PRIVACY) "Fin del tramo omitido (${dur(e.pausedMs)})" else "Reanudado tras ${dur(e.pausedMs)}"
-        is TimelineEvent.StopArrived -> e.stop.userLabel?.let { "Llegada a $it" } ?: "Llegada a una parada"
+        is TimelineEvent.StopArrived -> (e.stop.userLabel?.let { "Llegada a $it" } ?: "Llegada a una parada") + wx(e.weather)
         is TimelineEvent.StopLeft -> "Salida tras ${dur(e.dwellMs)}"
-        is TimelineEvent.Moment -> if (e.isSingle) (e.media.first().userCaption ?: if (e.hasVideo) "Video" else "Foto") else "${e.media.size} fotos y videos"
-        is TimelineEvent.Voice -> e.note.displayText ?: "Nota de voz (sin transcripción)"
+        is TimelineEvent.Moment -> (if (e.isSingle) (e.media.first().userCaption ?: if (e.hasVideo) "Video" else "Foto") else "${e.media.size} fotos y videos") + wx(e.weather)
+        is TimelineEvent.Voice -> (e.note.displayText ?: "Nota de voz (sin transcripción)") + wx(e.weather)
+        is TimelineEvent.Weather -> "${e.block.block.label}: ${e.block.text}"
         is TimelineEvent.Text -> e.note.text ?: "Lugar marcado"
         is TimelineEvent.Highlight -> "Momento destacado"
         is TimelineEvent.TransportChange -> "Cambio de medio: ${transport(e.transport)}"
@@ -143,6 +148,7 @@ footer{font-size:.75rem;color:#666;margin-top:24px}
     if(piece.length)pieces.push(piece);
     pieces.filter(l=>l.length>1).forEach(line=>{L.polyline(line,{color:colors[i%colors.length],weight:4}).addTo(map);line.forEach(p=>bounds.push(p));});
     const h2=document.createElement('h2');h2.textContent=(s.started||'').slice(0,10)+' · '+(s.title||s.type.toLowerCase())+(s.stats.distance_m?' · '+(s.stats.distance_m/1000).toFixed(1)+' km':'');side.appendChild(h2);
+    if((s.weather||[]).length){const ts=s.weather.map(x=>x.temperature_c).filter(x=>x!=null);const codes=s.weather.map(x=>x.weather_code).filter(x=>x!=null);const cnt={};codes.forEach(c=>cnt[c]=(cnt[c]||0)+1);const code=codes.length?+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]:null;const ic=code==null?'🌡️':code<=1?'☀️':code<=3?'⛅':code<=48?'🌫️':code<=67||(code>=80&&code<=82)?'🌧️':code<=86?'🌨️':'⛈️';const p=document.createElement('p');p.className='wx';p.textContent='Clima: '+ic+(ts.length?' '+Math.round(Math.min(...ts))+'–'+Math.round(Math.max(...ts))+' °C':'')+' · '+s.weather.length+' h (Open-Meteo)';side.appendChild(p);}
     const events=[];
     s.media.forEach(m=>events.push({t:m.taken,lat:m.lat,lon:m.lon,label:m.caption||(m.kind==='VIDEO'?'Video':'Foto'),file:m.file,kind:'photo'}));
     s.voice_notes.forEach(v=>events.push({t:v.started,lat:v.lat,lon:v.lon,label:v.transcript||'Nota de voz',kind:'voice',file:v.file}));
