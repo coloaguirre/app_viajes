@@ -10,6 +10,17 @@ enum class MarkerKind { PHOTO, VIDEO, VOICE, TEXT, HIGHLIGHT, PLACED, PLACE }
 
 data class MapMarker(val id: String, val point: MapPoint, val kind: MarkerKind)
 
+/**
+ * What was under the finger on a tap (backlog D2). A [Marker] is resolved by the renderer from its own
+ * marker list; any other tap is a [Spot] with the geographic tolerance that a finger-sized box covers at
+ * the current zoom, so the caller can decide whether the track was hit without asking the renderer
+ * (MapLibre's rendered-feature query blocks the UI thread on the render thread).
+ */
+sealed interface MapTap {
+    data class Marker(val id: String) : MapTap
+    data class Spot(val point: MapPoint, val toleranceM: Double) : MapTap
+}
+
 /** What the live/detail map shows. All inputs are plain data so renderers are swappable. */
 data class TrackMapState(
     /** One polyline per segment. */
@@ -36,5 +47,9 @@ interface MapRenderer {
     val isConfigured: Boolean
 
     @Composable
-    fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)? = null)
+    /**
+     * [onMapClick] receives every tap as a position (media review places a photo). [onTap] receives what
+     * the tap hit (trip detail opens the event/point card); a renderer without hit-testing reports a [MapTap.Spot].
+     */
+    fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)? = null, onTap: ((MapTap) -> Unit)? = null)
 }

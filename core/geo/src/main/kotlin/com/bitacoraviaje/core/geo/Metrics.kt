@@ -12,7 +12,7 @@ data class TimeInterval(val startUtcMs: Long, val endUtcMs: Long)
 fun List<SegmentPause>.toIntervals(nowUtcMs: Long): List<TimeInterval> =
     map { TimeInterval(it.pausedUtcMs, it.resumedUtcMs ?: nowUtcMs) }
 
-private fun List<TimeInterval>.covers(t0: Long, t1: Long): Boolean = any { t0 < it.endUtcMs && t1 > it.startUtcMs }
+internal fun List<TimeInterval>.covers(t0: Long, t1: Long): Boolean = any { t0 < it.endUtcMs && t1 > it.startUtcMs }
 
 /**
  * Elevation gain/loss with a 5-point moving average and hysteresis: changes smaller
@@ -58,6 +58,47 @@ fun boundingBox(points: List<TrackPoint>): BoundingBox? {
  *
  * Altitude source: [TrackPoint.altMslM] when present (barometer/MSL), else [TrackPoint.altM].
  */
+/** Speed under which a leg is "still" for the distance and moving-time rules: walkers drift at 0.5 m/s, vehicles at 1.5 m/s. */
+fun movingThresholdMps(transport: Transport?): Double = if (transport == null || transport == Transport.WALK) 0.5 else 1.5
+
+/**
+ * Distance covered up to each point (`[0]` is 0.0), with the rules of [computeSegmentStats]: legs with
+ * non-increasing time or overlapping a pause add nothing, and still-noise legs (slower than the moving
+ * threshold and within [stillRadiusM] of the last counted point) add nothing. The last value is the
+ * segment distance; the array feeds the interactive map (backlog D2) so the card and the stage agree.
+ */
+fun cumulativeDistanceM(
+    points: List<TrackPoint>,
+    pauses: List<TimeInterval> = emptyList(),
+    transport: Transport? = null,
+    stillRadiusM: Double = 15.0,
+): DoubleArray {
+    val out = DoubleArray(points.size)
+    if (points.isEmpty()) return out
+    val movingThreshold = movingThresholdMps(transport)
+    var anchor = points[0]
+    for (i in 1 until points.size) {
+        val a = points[i - 1]
+        val b = points[i]
+        out[i] = out[i - 1]
+        val dt = b.timeUtcMs - a.timeUtcMs
+        if (dt <= 0) continue
+        if (pauses.covers(a.timeUtcMs, b.timeUtcMs)) {
+            anchor = b
+            continue
+        }
+        val d = haversineM(a.lat, a.lon, b.lat, b.lon)
+        val speed = d / (dt / 1000.0)
+        // Still-noise rule: movement inside the still radius at still speed adds nothing.
+        val still = speed < movingThreshold && haversineM(anchor.lat, anchor.lon, b.lat, b.lon) <= stillRadiusM
+        if (!still) {
+            out[i] += d
+            anchor = b
+        }
+    }
+    return out
+}
+
 fun computeSegmentStats(
     points: List<TrackPoint>,
     pauses: List<TimeInterval> = emptyList(),
@@ -67,28 +108,18 @@ fun computeSegmentStats(
     stillRadiusM: Double = 15.0,
 ): SegmentStats {
     if (points.isEmpty()) return SegmentStats(totalTimeMs = totalTimeMs)
-    val movingThreshold = if (transport == null || transport == Transport.WALK) 0.5 else 1.5
-    var distance = 0.0
+    val movingThreshold = movingThresholdMps(transport)
+    val distance = cumulativeDistanceM(points, pauses, transport, stillRadiusM).last()
     var movingTime = 0L
     val legSpeeds = ArrayList<Double>(points.size)
-    var anchor = points[0]
     for (i in 1 until points.size) {
         val a = points[i - 1]
         val b = points[i]
         val dt = b.timeUtcMs - a.timeUtcMs
         if (dt <= 0) continue
+        if (pauses.covers(a.timeUtcMs, b.timeUtcMs)) continue
         val d = haversineM(a.lat, a.lon, b.lat, b.lon)
         val speed = d / (dt / 1000.0)
-        if (pauses.covers(a.timeUtcMs, b.timeUtcMs)) {
-            anchor = b
-            continue
-        }
-        // Still-noise rule: movement inside the still radius at still speed adds nothing.
-        val still = speed < movingThreshold && haversineM(anchor.lat, anchor.lon, b.lat, b.lon) <= stillRadiusM
-        if (!still) {
-            distance += d
-            anchor = b
-        }
         if (dt < maxLegMs) {
             legSpeeds += speed
             if (speed >= movingThreshold) movingTime += dt

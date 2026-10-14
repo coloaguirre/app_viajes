@@ -56,7 +56,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
     internal val styleUrl = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
 
     @Composable
-    override fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)?) {
+    override fun TrackMap(state: TrackMapState, modifier: Modifier, onMapClick: ((MapPoint) -> Unit)?, onTap: ((MapTap) -> Unit)?) {
         if (!isConfigured) {
             Box(modifier, contentAlignment = Alignment.Center) {
                 Text(
@@ -71,7 +71,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
         val mapView = remember { MapView(context) }
-        val holder = remember { MapHolder() }
+        val holder = remember { MapHolder(context.resources.displayMetrics.density) }
 
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
@@ -102,17 +102,22 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
                         map.addOnCameraMoveStartedListener { reason ->
                             if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) holder.userMoved = true
                         }
-                        map.addOnMapClickListener { ll -> holder.onClick?.invoke(MapPoint(ll.latitude, ll.longitude)); holder.onClick != null }
+                        map.addOnMapClickListener { ll ->
+                            val p = MapPoint(ll.latitude, ll.longitude)
+                            holder.onClick?.invoke(p)
+                            holder.onTap?.invoke(holder.hitTest(map, ll, p))
+                            holder.onClick != null || holder.onTap != null
+                        }
                     }
                 }
             },
-            update = { holder.onClick = onMapClick; holder.latest = state; holder.render(state) },
+            update = { holder.onClick = onMapClick; holder.onTap = onTap; holder.latest = state; holder.render(state) },
             modifier = modifier.fillMaxSize(),
         )
     }
 
     /** Keeps the GeoJSON sources in sync with the latest state; created once per MapView. */
-    private class MapHolder {
+    private class MapHolder(private val density: Float) {
         private var map: MapLibreMap? = null
         private var trackSource: GeoJsonSource? = null
         private var pointSource: GeoJsonSource? = null
@@ -123,6 +128,32 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         private var lastMarkers: List<MapMarker>? = null
         private var lastFocus: MapPoint? = null
         var onClick: ((MapPoint) -> Unit)? = null
+        var onTap: ((MapTap) -> Unit)? = null
+
+        /**
+         * Hit-test without `queryRenderedFeatures` (it waits for the render thread and froze the UI, ANR on the
+         * emulator): markers are projected to the screen and the closest within the slop wins; otherwise the tap
+         * is a [MapTap.Spot] with the tolerance in metres that the slop covers at this zoom (backlog D2).
+         */
+        fun hitTest(m: MapLibreMap, ll: LatLng, p: MapPoint): MapTap {
+            val px = m.projection.toScreenLocation(ll)
+            val markerReach = (MARKER_RADIUS_DP + MARKER_SLOP_DP) * density
+            var best: MapMarker? = null
+            var bestD2 = markerReach * markerReach
+            var nearestD2 = Float.MAX_VALUE
+            lastMarkers?.forEach { mk ->
+                val fp = m.projection.toScreenLocation(LatLng(mk.point.lat, mk.point.lon))
+                val d2 = (fp.x - px.x) * (fp.x - px.x) + (fp.y - px.y) * (fp.y - px.y)
+                if (d2 < nearestD2) nearestD2 = d2
+                if (d2 <= bestD2) { bestD2 = d2; best = mk }
+            }
+            if (BuildConfig.DEBUG) android.util.Log.d("Bitacora", "map tap px=(${px.x.toInt()},${px.y.toInt()}) markers=${lastMarkers?.size} nearestPx=${"%.0f".format(Math.sqrt(nearestD2.toDouble()))} hit=${best?.id}")
+            best?.let { return MapTap.Marker(it.id) }
+            val metersPerPx = m.projection.getMetersPerPixelAtLatitude(ll.latitude)
+            val tolerance = (TRACK_SLOP_DP + TRACK_WIDTH_DP / 2) * density * metersPerPx
+            if (BuildConfig.DEBUG) android.util.Log.d("Bitacora", "map tap spot toleranceM=${"%.1f".format(tolerance)}")
+            return MapTap.Spot(p, tolerance)
+        }
         private var lastCurrent: MapPoint? = null
         private var lastStops: List<MapPoint>? = null
         var userMoved = false
@@ -225,6 +256,10 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
             const val LAYER_STOPS = "stops"
             const val LAYER_MARKERS = "markers"
             const val LAYER_CURRENT = "current"
+            const val MARKER_RADIUS_DP = 8f
+            const val MARKER_SLOP_DP = 6f
+            const val TRACK_WIDTH_DP = 5f
+            const val TRACK_SLOP_DP = 9f
         }
     }
 }

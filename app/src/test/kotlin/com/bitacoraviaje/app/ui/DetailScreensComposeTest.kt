@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -21,6 +22,7 @@ import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.ui.review.MediaReviewScreen
 import com.bitacoraviaje.app.ui.review.MediaReviewUiState
 import com.bitacoraviaje.app.ui.theme.BitacoraTheme
+import com.bitacoraviaje.app.ui.tripdetail.MapSelection
 import com.bitacoraviaje.app.ui.tripdetail.SegmentTimeline
 import com.bitacoraviaje.app.ui.tripdetail.TripDetailScreen
 import com.bitacoraviaje.app.ui.tripdetail.TripDetailUiState
@@ -303,5 +305,63 @@ class DetailScreensComposeTest {
         rule.onNodeWithTag("place_rewrite_wd-Q1-wikipedia-es").performScrollTo().performClick()
         rule.onNodeWithTag("place_restore_wd-Q1-wikipedia-es").performScrollTo().performClick()
         assertEquals(listOf(com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Rewrite("wd-Q1-wikipedia-es"), com.bitacoraviaje.app.ui.tripdetail.PlaceAction.Restore("wd-Q1-wikipedia-es")), actions)
+    }
+
+    // Backlog D2: the map card for a tapped marker or track point.
+
+    @Test
+    fun `map tab shows the selection card with time, progress, speed and altitude and reports close`() {
+        var closed = 0
+        val sel = MapSelection(segment, photo.takenUtcMs, distanceM = 1_250.0, speedMps = 1.25, altM = 812.6, event = events[1])
+        rule.setContent {
+            BitacoraTheme {
+                TripDetailScreen(
+                    state = TripDetailUiState(trip = trip, segments = listOf(SegmentTimeline(segment, events, emptyList())), map = TrackMapState(), selectedTab = 1, mapSelection = sel),
+                    onBack = {}, onTab = {}, onEvent = {}, onReview = {},
+                    onCloseSelection = { closed++ },
+                )
+            }
+        }
+        rule.onNodeWithTag("map_selection").assertIsDisplayed()
+        rule.onNodeWithText("Foto").assertIsDisplayed()
+        // t0 + 10 min in Buenos Aires: 2025-10-09 06:03 local for t0 = 1_760_000_000_000.
+        rule.onNodeWithTag("map_selection_facts").assertTextEquals("06:03 · 1,3 km de la etapa · 4,5 km/h · 813 m de altitud")
+        rule.onNodeWithTag("map_selection_close").performClick()
+        assertEquals(1, closed)
+    }
+
+    @Test
+    fun `map card for a bare track point has no event title and omits unknown facts`() {
+        val sel = MapSelection(segment, t0, distanceM = 0.0, speedMps = null, altM = null, event = null)
+        rule.setContent {
+            BitacoraTheme {
+                TripDetailScreen(
+                    state = TripDetailUiState(trip = trip, segments = emptyList(), map = TrackMapState(), selectedTab = 1, mapSelection = sel),
+                    onBack = {}, onTab = {}, onEvent = {}, onReview = {},
+                )
+            }
+        }
+        rule.onNodeWithText("Punto del recorrido").assertIsDisplayed()
+        rule.onNodeWithTag("map_selection_facts").assertTextEquals("05:53 · 0 m de la etapa")
+    }
+
+    @Test
+    fun `map card names the stage when the trip has several and the map slot forwards taps`() {
+        val taps = mutableListOf<com.bitacoraviaje.app.map.MapTap>()
+        val other = segment.copy(id = "s2", title = "Día 2")
+        val sel = MapSelection(other, t0, distanceM = 2_000.0, speedMps = null, altM = null, event = null)
+        rule.setContent {
+            BitacoraTheme {
+                TripDetailScreen(
+                    state = TripDetailUiState(trip = trip, segments = listOf(SegmentTimeline(segment, events, emptyList()), SegmentTimeline(other, emptyList(), emptyList())), map = TrackMapState(), selectedTab = 1, mapSelection = sel),
+                    onBack = {}, onTab = {}, onEvent = {}, onReview = {},
+                    map = { _, m, tap -> androidx.compose.material3.Button(onClick = { tap(com.bitacoraviaje.app.map.MapTap.Marker("x")) }, modifier = m) { androidx.compose.material3.Text("mapa") } },
+                    onMapTap = { taps += it },
+                )
+            }
+        }
+        rule.onNodeWithTag("map_selection_facts").assertTextEquals("jue 9 oct. 05:53 · Día 2 · 05:53 · 2,0 km de la etapa")
+        rule.onNodeWithTag("trip_map").performClick()
+        assertEquals(listOf<com.bitacoraviaje.app.map.MapTap>(com.bitacoraviaje.app.map.MapTap.Marker("x")), taps)
     }
 }

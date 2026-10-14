@@ -6,6 +6,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.bitacoraviaje.app.map.MapMarker
 import com.bitacoraviaje.app.map.MapPoint
+import com.bitacoraviaje.app.map.MapTap
+import com.bitacoraviaje.core.geo.TrackLocator
+import com.bitacoraviaje.core.geo.cumulativeDistanceM
+import com.bitacoraviaje.core.geo.toIntervals
 import com.bitacoraviaje.app.map.MarkerKind
 import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.export.ExportDestination
@@ -43,7 +47,29 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** One segment's timeline plus what the map needs for it. */
-data class SegmentTimeline(val segment: Segment, val events: List<TimelineEvent>, val track: List<MapPoint>)
+data class SegmentTimeline(
+    val segment: Segment,
+    val events: List<TimelineEvent>,
+    val track: List<MapPoint>,
+    /** Accepted fixes in time order, for the interactive map (backlog D2). */
+    val points: List<com.bitacoraviaje.core.model.TrackPoint> = emptyList(),
+    val pauses: List<com.bitacoraviaje.core.geo.TimeInterval> = emptyList(),
+    /** Distance covered up to each point, precomputed off the main thread (same rule as the stage stats). */
+    val cumulativeM: DoubleArray = DoubleArray(0),
+)
+
+/** What the user selected on the map, by stable keys: resolved against the current segments on every emission (backlog D2). */
+data class MapSelectionRef(val segmentId: String, val eventKey: String?, val timeUtcMs: Long)
+
+/** The card the map shows for a tapped marker or track point (backlog D2). [event] is null for a bare track point. */
+data class MapSelection(
+    val segment: Segment,
+    val timeUtcMs: Long,
+    val distanceM: Double?,
+    val speedMps: Double?,
+    val altM: Double?,
+    val event: TimelineEvent?,
+)
 
 /** A card of the Places tab (DISENO §14 "Lugares"): the place, how this segment saw it and its texts. */
 data class PlaceCard(val segment: Segment, val place: com.bitacoraviaje.core.model.Place, val visit: com.bitacoraviaje.core.model.SegmentPlace, val texts: List<com.bitacoraviaje.core.model.Enrichment>)
@@ -70,6 +96,7 @@ data class TripDetailUiState(
     val map: TrackMapState = TrackMapState(),
     val selectedTab: Int = 0,
     val focusedEventKey: String? = null,
+    val mapSelection: MapSelection? = null,
     val places: List<PlaceCard> = emptyList(),
     val placesWork: PlacesWork = PlacesWork.IDLE,
     val placesEnabled: Boolean = true,
@@ -159,6 +186,7 @@ class TripDetailViewModel @Inject constructor(
     }
     private val tab = MutableStateFlow(0)
     private val focus = MutableStateFlow<Pair<String, MapPoint>?>(null)
+    private val selection = MutableStateFlow<MapSelectionRef?>(null)
 
     init {
         // Reconciliation sweep on every open of the trip detail (DISENO §7.3).
@@ -196,7 +224,8 @@ class TripDetailViewModel @Inject constructor(
         placesFlow.map { l -> l.filter { it.first.segmentId == s.id }.map { it.second to it.first } },
     ) { d, pl ->
         val events = buildTimeline(TimelineInput(s, d.pts, d.pauses, d.stops, d.media, d.voice, d.text, places = pl, nowUtcMs = System.currentTimeMillis()))
-        SegmentTimeline(s, events, d.pts.map { MapPoint(it.lat, it.lon) })
+        val intervals = d.pauses.toIntervals(System.currentTimeMillis())
+        SegmentTimeline(s, events, d.pts.map { MapPoint(it.lat, it.lon) }, d.pts, intervals, cumulativeDistanceM(d.pts, intervals, s.transport))
     }.flowOn(kotlinx.coroutines.Dispatchers.Default) // timeline building off the main thread (review M5)
 
     /** Only this trip's enrichment jobs (tagged per segment), not every trip's (review M2). */
@@ -215,8 +244,10 @@ class TripDetailViewModel @Inject constructor(
     }
 
     private val llmFlow = combine(secrets.has(com.bitacoraviaje.app.settings.Secrets.LLM_API_KEY), rewriting, placesMessage) { k, r, m -> Triple(k, r, m) }
+    private class FocusState(val focus: Pair<String, MapPoint>?, val selection: MapSelectionRef?)
+    private val focusFlow = combine(focus, selection) { f, sel -> FocusState(f, sel) }
 
-    val state: StateFlow<TripDetailUiState> = combine(tripFlow, segmentsFlow, media.observeByTrip(tripId), media.observeReviewQueue(tripId), tab, focus, placeCards, placesWorkFlow, prefs.settings.map { it.enrichPlaces }, llmFlow) { arr ->
+    val state: StateFlow<TripDetailUiState> = combine(tripFlow, segmentsFlow, media.observeByTrip(tripId), media.observeReviewQueue(tripId), tab, focusFlow, placeCards, placesWorkFlow, prefs.settings.map { it.enrichPlaces }, llmFlow) { arr ->
         @Suppress("UNCHECKED_CAST")
         val trip = arr[0] as Trip?
         @Suppress("UNCHECKED_CAST")
@@ -226,8 +257,9 @@ class TripDetailViewModel @Inject constructor(
         @Suppress("UNCHECKED_CAST")
         val review = arr[3] as List<MediaItem>
         val selected = arr[4] as Int
-        @Suppress("UNCHECKED_CAST")
-        val f = arr[5] as Pair<String, MapPoint>?
+        val fs = arr[5] as FocusState
+        val f = fs.focus
+        val sel = fs.selection?.let { resolveSelection(segs, it) }
         @Suppress("UNCHECKED_CAST")
         val cards = arr[6] as List<PlaceCard>
         val work = arr[7] as PlacesWork
@@ -239,7 +271,7 @@ class TripDetailViewModel @Inject constructor(
         TripDetailUiState(
             trip = trip, segments = segs, media = med, reviewCount = review.size,
             map = TrackMapState(tracks = segs.map { it.track }, stops = stops, markers = markers, follow = false, focus = f?.second),
-            selectedTab = selected, focusedEventKey = f?.first,
+            selectedTab = selected, focusedEventKey = f?.first, mapSelection = sel,
             places = cards, placesWork = work, placesEnabled = enabled, llmAvailable = llm.first, rewriting = llm.second, placesMessage = llm.third,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TripDetailUiState())
@@ -269,12 +301,50 @@ class TripDetailViewModel @Inject constructor(
         }
     }
 
-    /** Timeline → map: center on the event and switch to the map tab. */
+    /** Timeline → map: center on the event, show its card and switch to the map tab. */
     fun focusOn(event: TimelineEvent) {
         val la = event.lat ?: return
         val lo = event.lon ?: return
-        focus.value = eventKey(event) to MapPoint(la, lo)
+        val key = eventKey(event)
+        focus.value = key to MapPoint(la, lo)
+        // By key, not identity: the list may have re-emitted between the render and the tap (review I4).
+        state.value.segments.firstOrNull { st -> st.events.any { eventKey(it) == key } }?.let { selection.value = MapSelectionRef(it.segment.id, key, event.timeUtcMs) }
         tab.value = 1
+    }
+
+    /**
+     * Backlog D2: a marker opens its event, the track opens the nearest point of the line, anything else closes the card.
+     * `state.value` is current because the screen collecting it is the one that delivers the tap. The nearest-fix
+     * scan is O(n) per segment, so it runs off the main thread.
+     */
+    fun onMapTap(tap: MapTap) {
+        val segs = state.value.segments
+        when (tap) {
+            is MapTap.Marker -> {
+                val hit = segs.firstNotNullOfOrNull { st -> st.events.firstOrNull { eventKey(it) == tap.id }?.let { st to it } } ?: return
+                focus.value = tap.id to MapPoint(hit.second.lat ?: return, hit.second.lon ?: return)
+                selection.value = MapSelectionRef(hit.first.segment.id, tap.id, hit.second.timeUtcMs)
+            }
+            is MapTap.Spot -> viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                val best = segs.mapNotNull { st -> TrackLocator.nearest(st.points, tap.point.lat, tap.point.lon, st.pauses, st.segment.transport, st.cumulativeM)?.let { st to it } }
+                    .minByOrNull { it.second.offsetM }
+                // On the track (within what a finger covers at this zoom) → its card; anywhere else closes the card.
+                if (com.bitacoraviaje.app.BuildConfig.DEBUG) android.util.Log.d("Bitacora", "map spot best=${best?.first?.segment?.id?.take(8)} offsetM=${best?.second?.offsetM?.let { "%.1f".format(it) }} toleranceM=${"%.1f".format(tap.toleranceM)}")
+                selection.value = if (best != null && best.second.offsetM <= tap.toleranceM) MapSelectionRef(best.first.segment.id, null, best.second.timeUtcMs) else null
+            }
+        }
+    }
+
+    fun clearSelection() {
+        selection.value = null
+    }
+
+    /** A selection whose segment or event is gone resolves to nothing, so the card never shows stale rows (review M5). */
+    private fun resolveSelection(segs: List<SegmentTimeline>, ref: MapSelectionRef): MapSelection? {
+        val st = segs.firstOrNull { it.segment.id == ref.segmentId } ?: return null
+        val event = ref.eventKey?.let { key -> st.events.firstOrNull { eventKey(it) == key } ?: return null }
+        val pos = TrackLocator.atTime(st.points, ref.timeUtcMs, st.pauses, st.segment.transport, st.cumulativeM.takeIf { it.size == st.points.size })
+        return MapSelection(st.segment, ref.timeUtcMs, pos?.distanceM, pos?.speedMps, pos?.altM, event)
     }
 
     /** DISENO §11.4: only the fetched text and the Wikidata facts go to the model; the result replaces the summary, the original stays. */
