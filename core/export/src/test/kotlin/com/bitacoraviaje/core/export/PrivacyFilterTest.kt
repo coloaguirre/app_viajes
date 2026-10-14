@@ -126,4 +126,17 @@ class PrivacyFilterTest {
         val leeme = LeemeWriter.text(Fixture.trip(), ExportReport("f", emptyList(), 1, 1, 0, 0, emptyList(), 0, 0, emptyList(), 0, 0, privacy = report), true, true)
         assertTrue(leeme.contains("verificadas sin GPS en su EXIF: 1") && leeme.contains("1 copias de adentro de una zona conservan la ubicación") && leeme.contains("VID_0002.mp4 (video)"))
     }
+
+    @Test
+    fun `weather hours inside a zone leave the package and the Open-Meteo credit survives the filter`() {
+        val original = Fixture.trip()
+        assertEquals(2, original.segments[0].weather.size)
+        // "Casa" covers the first sample (-34.6); the second sits 1.1 km north, outside.
+        val (filtered, _) = PrivacyFilter.apply(original, listOf(home))
+        assertEquals(listOf("w-2"), filtered.segments[0].weather.map { it.id })
+        assertTrue(filtered.attributions.any { it.name.startsWith("Datos meteorológicos: Open-Meteo") }, "credit recomputed with the weather that is left")
+        val (all, _) = PrivacyFilter.apply(original, listOf(home, PrivacyZone("z-2", "Dos", -34.59, -58.4, 600.0)))
+        assertTrue(all.segments[0].weather.isEmpty())
+        assertTrue(all.attributions.none { it.name.startsWith("Datos meteorológicos") }, "no weather left, no credit")
+    }
 }

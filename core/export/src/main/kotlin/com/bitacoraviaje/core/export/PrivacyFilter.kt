@@ -77,7 +77,9 @@ object PrivacyFilter {
             }
             val voice = se.voiceNotes.map { v -> if (inside(v.lat, v.lon, zones)) { notesBlanked++; v.copy(lat = null, lon = null) } else v }
             val text = se.textNotes.map { n -> if (inside(n.lat, n.lon, zones)) { notesBlanked++; n.copy(lat = null, lon = null) } else n }
-            se.copy(segment = se.segment.copy(stats = stats), points = kept, pauses = pauses.sortedBy { it.pausedUtcMs }, stops = stops, media = media, voiceNotes = voice, textNotes = text)
+            // Weather samples sit at ~1 km, but one placed inside a zone still names the hour the user was there (backlog D3).
+            val weather = se.weather.filter { !inside(it.lat, it.lon, zones) }
+            se.copy(segment = se.segment.copy(stats = stats), points = kept, pauses = pauses.sortedBy { it.pausedUtcMs }, stops = stops, media = media, voiceNotes = voice, textNotes = text, weather = weather)
         }
         val enrichments = trip.enrichments.filter { it.placeId !in removedPlaceIds }
         val filtered = trip.copy(
@@ -85,8 +87,8 @@ object PrivacyFilter {
             places = trip.places.filter { it.id !in removedPlaceIds },
             enrichments = enrichments,
             segmentPlaces = trip.segmentPlaces.filter { it.placeId !in removedPlaceIds },
-            // Credits name the article (and so the place): recompute them from what is left (review I1).
-            attributions = TripExport.attributionsFor(enrichments),
+            // Credits name the article (and so the place): recompute them from what is left (review I1), weather included (D3).
+            attributions = TripExport.attributionsFor(enrichments, segments.any { it.weather.isNotEmpty() }),
         )
         return filtered to PrivacyReport(zones.size, pointsRemoved, cuts, stopsRemoved, removedPlaceIds.size, mediaBlanked, notesBlanked)
     }
