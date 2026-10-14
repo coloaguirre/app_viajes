@@ -115,6 +115,7 @@ class ImportRoundTripTest {
         val reloaded = assertNotNull(loader.load(copy.trip.id, ExportOptions(), nowUtcMs = now))
         assertEquals(fingerprint(original), fingerprint(reloaded))
         assertEquals(2, tracking.observeTrips().first().size, "original and copy coexist")
+        assertNotNull(weatherRepo.fetchedAt(copy.segments.single().segment.id), "imported hours count as looked up (review N3)")
 
         // Replace: importing the same id again over the existing trip leaves exactly one copy with the same content.
         val same = TripJsonReader.read(json)

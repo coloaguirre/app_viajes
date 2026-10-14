@@ -42,7 +42,8 @@ mañana, tarde y noche y sumarlo al registro, u otro esquema horario si hay algo
 
 ## Pruebas
 - `WeatherSamplingTest` (core/geo): plan vacío; una muestra por hora en el centro, redondeada, con
-  ubicaciones deduplicadas; huecos sin fijo saltados.
+  ubicaciones deduplicadas; huecos sin fijo saltados; última hora acotada al fin de la etapa; tope
+  de horas; dentro de una pausa nunca se interpola a través de ella.
 - `WeatherDigestTest` (core/timeline): bloques por día local (las horas antes de las 6 pertenecen a
   la noche del día anterior), rango/lluvia/viento/dominante, `at` dentro de 90 min, `brief`, códigos.
 - `TimelineTest`: filas de bloque, foto etiquetada con su hora, sin partir los resúmenes de tramo.
@@ -51,7 +52,15 @@ mañana, tarde y noche y sumarlo al registro, u otro esquema horario si hay algo
   genéricas): dos ubicaciones en una llamada, archivo para días viejos, error del servicio.
 - `WeatherEnricherTest` (Room en memoria, fuente falsa): una llamada por día, una muestra por hora
   (10–13 UTC de una caminata de 3 h), idempotencia y `force`, sin red → parcial y reintento, apagado
-  en Ajustes → ninguna llamada.
+  en Ajustes → ninguna llamada; etapa que cruza dos días UTC con un día caído (se guarda el otro y
+  sigue pendiente); hora cuyo centro no pasó (queda para el reintento); rechazo definitivo del
+  servicio (marcada sin datos, no se vuelve a pedir, `force` sí); una recarga forzada sin resultado
+  no borra las horas guardadas; etapa sin puntos marcada sin ninguna llamada. `WeatherWorkerTest`:
+  la espera hasta el fin de la última hora. `OpenMeteoClientTest`: 503 y 403 de portal cautivo
+  reintentables, respuesta ilegible como error de red.
+- `PrivacyFilterTest`: las horas cuya celda de ~1 km toca una zona salen del paquete y se cuentan en
+  el reporte (LEEME); el crédito de Open-Meteo sigue si queda clima e importar un paquete con clima
+  marca la etapa como consultada.
 - `core/export`: escritor y lector de `trip.json` (validación contra el esquema), `clima.csv`, bloques
   y atribución en Markdown, `PlanInputs` (fixtures); `ImportTest`/`ImportRoundTripTest` con clima en
   la huella; `DetailScreensComposeTest` (fila del bloque, sufijo en la foto, tarjeta del mapa).

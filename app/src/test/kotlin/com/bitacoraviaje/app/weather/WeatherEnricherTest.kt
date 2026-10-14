@@ -159,6 +159,9 @@ class WeatherEnricherTest {
         assertTrue(assertNotNull(enricher().enrich(id)).skipped, "no retry on its own")
         assertEquals(1, calls.size)
         assertEquals(4, assertNotNull(enricher().enrich(id, force = true)).samples, "force asks again")
+        permanent = true
+        assertEquals(0, assertNotNull(enricher().enrich(id, force = true)).samples)
+        assertEquals(4, weather.samplesOf(id).size, "a forced refresh that gets nothing keeps the stored hours (review N2)")
     }
 
     @Test

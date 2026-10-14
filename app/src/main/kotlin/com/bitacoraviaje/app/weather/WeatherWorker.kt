@@ -58,8 +58,11 @@ class WeatherWorker @AssistedInject constructor(
          * [endedUtcMs]: when the segment closed. A segment closed minutes ago waits until its last hour has
          * passed (plus [SETTLE_MS]) so the model answers with observations rather than a forecast (review I2).
          */
+        /** Milliseconds to wait so the segment's last hour is over (+ [SETTLE_MS]); 0 when it already is or no end is known. */
+        fun delayMs(endedUtcMs: Long?, nowUtcMs: Long): Long = endedUtcMs?.let { ((it / 3_600_000 + 1) * 3_600_000 + SETTLE_MS - nowUtcMs).coerceAtLeast(0L) } ?: 0L
+
         fun enqueue(context: Context, segmentId: String, force: Boolean = false, endedUtcMs: Long? = null, nowUtcMs: Long = System.currentTimeMillis()) {
-            val delay = endedUtcMs?.let { ((it / 3_600_000 + 1) * 3_600_000 + SETTLE_MS - nowUtcMs).coerceAtLeast(0L) } ?: 0L
+            val delay = delayMs(endedUtcMs, nowUtcMs)
             val req = OneTimeWorkRequestBuilder<WeatherWorker>()
                 .setInputData(workDataOf(KEY_SEGMENT_ID to segmentId, KEY_FORCE to force))
                 .setInitialDelay(delay, TimeUnit.MILLISECONDS)

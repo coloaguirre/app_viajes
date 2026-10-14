@@ -291,7 +291,12 @@ class TrackingRepository @Inject constructor(
         // Places are shared across trips (same id = same place): upsert, never replace (Phase 4).
         if (placesToInsert.isNotEmpty()) db.placeDao().upsertAll(placesToInsert.map { it.toEntity() })
         if (enrichmentsToInsert.isNotEmpty()) db.enrichmentDao().upsertAll(enrichmentsToInsert.map { it.toEntity() })
-        if (weatherToInsert.isNotEmpty()) db.weatherDao().insertAll(weatherToInsert.map { it.toEntity() })
+        if (weatherToInsert.isNotEmpty()) {
+            db.weatherDao().insertAll(weatherToInsert.map { it.toEntity() })
+            // Imported hours count as a complete lookup: the trip detail must not ask the service again (review N3).
+            val now = clock.nowUtcMs()
+            weatherToInsert.groupBy { it.segmentId }.forEach { (sid, rows) -> db.weatherDao().markFetched(com.bitacoraviaje.data.db.entity.WeatherFetchEntity(sid, now, rows.size)) }
+        }
         if (segmentPlacesToInsert.isNotEmpty()) db.segmentPlaceDao().upsertAll(segmentPlacesToInsert.map { it.toEntity() })
     }
 

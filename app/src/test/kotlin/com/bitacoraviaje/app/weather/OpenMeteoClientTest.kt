@@ -79,6 +79,9 @@ class OpenMeteoClientTest {
         server.enqueue(MockResponse(code = 503, body = "busy"))
         val busy = assertFailsWith<IOException> { client.hourly(listOf(0.0 to 0.0), LocalDate.of(2026, 10, 12), now) }
         assertTrue(busy !is PermanentWeatherError, "a 503 is retried later, not refused for good")
+        server.enqueue(MockResponse(code = 403, body = "<html>hotel wifi login</html>"))
+        val portal = assertFailsWith<IOException> { client.hourly(listOf(0.0 to 0.0), LocalDate.of(2026, 10, 12), now) }
+        assertTrue(portal !is PermanentWeatherError, "a captive portal's 403 is not the service refusing: retry later")
         server.enqueue(MockResponse(body = "<html>captive portal</html>"))
         val junk = assertFailsWith<IOException> { client.hourly(listOf(0.0 to 0.0), LocalDate.of(2026, 10, 12), now) }
         assertTrue(junk.message!!.contains("unreadable"), junk.message)

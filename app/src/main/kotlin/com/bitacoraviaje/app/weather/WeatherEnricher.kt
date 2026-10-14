@@ -75,9 +75,10 @@ class WeatherEnricher @Inject constructor(
                 )
             }
         }
-        // A partial answer never replaces a fuller one already stored (review M7); a complete run always does.
+        // A partial answer never replaces a fuller one already stored (review M7), and an empty answer never wipes
+        // stored hours (review N2): a forced refresh that gets nothing keeps what the segment had.
         val existing = weather.samplesOf(segmentId).size
-        if (!partial || out.size >= existing) weather.replace(segmentId, out)
+        if (out.isNotEmpty() && (!partial || out.size >= existing)) weather.replace(segmentId, out)
         if (!partial) weather.markFetched(segmentId, now, out.size)
         Log.i(TAG, "weather segment=$segmentId hours=${out.size}/${plan.samples.size} requests=$requests partial=$partial")
         return Outcome(out.size, skipped = false, requests = requests, partial = partial)

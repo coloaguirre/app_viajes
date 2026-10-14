@@ -33,9 +33,9 @@ object WeatherDigest {
     ) {
         /** "Despejado, 8–17 °C" plus rain and wind when worth saying. */
         val text: String get() = buildString {
-            append(WeatherCodes.label(weatherCode))
+            if (weatherCode != null) append(WeatherCodes.label(weatherCode))
             if (minTempC != null && maxTempC != null) {
-                append(", ")
+                if (isNotEmpty()) append(", ")
                 val lo = Math.round(minTempC)
                 val hi = Math.round(maxTempC)
                 append(if (lo == hi) "$lo °C" else "$lo–$hi °C")

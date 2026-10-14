@@ -24,7 +24,7 @@ data class HourlyWeather(
     val weatherCode: Int?,
 )
 
-/** The service refused the request for good (4xx other than 429): retrying will not help, the segment is done without data. */
+/** Open-Meteo itself refused the request (its `{"error":true,"reason":…}` body on a 4xx): retrying will not help, the segment is done without data. */
 class PermanentWeatherError(message: String) : IOException(message)
 
 /** Hourly weather for a set of locations on one UTC day; the result list follows the input order. */
@@ -51,8 +51,10 @@ class OpenMeteoClient @Inject constructor(private val http: OsmHttp) : WeatherSo
         http.client.newCall(OsmHttp.get(url)).execute().use { resp ->
             val body = resp.body.string()
             if (!resp.isSuccessful) {
-                val msg = "Open-Meteo HTTP ${resp.code}: ${errorReason(body) ?: ""}".trim()
-                if (resp.code in 400..499 && resp.code != 429) throw PermanentWeatherError(msg) else throw IOException(msg)
+                val reason = errorReason(body)
+                val msg = "Open-Meteo HTTP ${resp.code}: ${reason ?: ""}".trim()
+                // Only the service's own error object is final; a 401/403 from a captive portal or proxy is retried later (review N1).
+                if (resp.code in 400..499 && resp.code != 429 && reason != null) throw PermanentWeatherError(msg) else throw IOException(msg)
             }
             // Anything the parser cannot read is an IOException too: the caller keeps the other days (review I3).
             return try { parse(body, locations.size) } catch (e: IOException) { throw e } catch (e: Exception) { throw IOException("Open-Meteo: unreadable answer (${e.javaClass.simpleName})", e) }
