@@ -50,4 +50,15 @@ class WeatherRepositoryTest {
         repo.replace("s1", emptyList())
         assertFalse(repo.hasWeather("s1"))
     }
+
+    @Test
+    fun `the fetch marker says a segment was looked up even with no hours, until it is cleared`() = runTest {
+        assertEquals(null, repo.fetchedAt("s1"))
+        repo.markFetched("s1", 123L, 0)
+        assertEquals(123L, repo.fetchedAt("s1"))
+        repo.markFetched("s1", 456L, 2)
+        assertEquals(456L, repo.fetchedAt("s1"), "re-marking replaces")
+        repo.clearFetched("s1")
+        assertEquals(null, repo.fetchedAt("s1"))
+    }
 }

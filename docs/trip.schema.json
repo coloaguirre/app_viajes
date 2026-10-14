@@ -911,7 +911,8 @@
         "source": {
           "type": "string"
         }
-      }
+      },
+      "description": "One hourly weather sample (Open-Meteo, CC BY 4.0) where the traveller was: `time`/`time_utc_ms` is the centre of the hour (HH:30), `lat`/`lon` are rounded to 2 decimals (~1 km), `weather_code` is a WMO 4677 code."
     }
   }
 }

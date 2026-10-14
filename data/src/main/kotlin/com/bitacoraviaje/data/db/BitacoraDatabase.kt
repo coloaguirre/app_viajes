@@ -21,6 +21,7 @@ import com.bitacoraviaje.data.db.entity.EnrichmentEntity
 import com.bitacoraviaje.data.db.entity.PlaceEntity
 import com.bitacoraviaje.data.db.entity.SegmentPlaceEntity
 import com.bitacoraviaje.data.db.entity.WeatherSampleEntity
+import com.bitacoraviaje.data.db.entity.WeatherFetchEntity
 import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
@@ -44,7 +45,7 @@ import com.bitacoraviaje.data.db.entity.TripEntity
  *  9 — PR #8 review: segment_place.dismissed (a discarded place stays discarded across re-runs).
  */
 @Database(
-    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class, PlaceEntity::class, EnrichmentEntity::class, SegmentPlaceEntity::class, WeatherSampleEntity::class],
+    entities = [TripEntity::class, SegmentEntity::class, SegmentPauseEntity::class, TrackPointEntity::class, StopEntity::class, MediaItemEntity::class, VoiceNoteEntity::class, TextNoteEntity::class, CameraClockOffsetEntity::class, PlaceEntity::class, EnrichmentEntity::class, SegmentPlaceEntity::class, WeatherSampleEntity::class, WeatherFetchEntity::class],
     version = BitacoraDatabase.VERSION,
     exportSchema = true,
 )
@@ -63,7 +64,7 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun weatherDao(): WeatherDao
 
     companion object {
-        const val VERSION = 11
+        const val VERSION = 12
         const val NAME = "bitacora.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -242,6 +243,16 @@ abstract class BitacoraDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+        /** Backlog D3 (review I4): a segment looked up without any usable hour must not be looked up forever. */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `weather_fetch` (`segment_id` TEXT NOT NULL, `fetched_utc_ms` INTEGER NOT NULL, `hours` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`segment_id`), FOREIGN KEY(`segment_id`) REFERENCES `segment`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
     }
 }

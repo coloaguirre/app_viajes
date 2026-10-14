@@ -177,7 +177,7 @@ object LeemeWriter {
         }
         appendLine()
         if (trip.places.isNotEmpty()) appendLine("Lugares con información de internet: ${trip.places.size} (textos en tablas/lugares.csv y en la bitácora, cada uno con su fuente y licencia).")
-        if (trip.allWeather.isNotEmpty()) appendLine("Clima: ${trip.allWeather.size} horas con datos de Open-Meteo (tablas/clima.csv; resumen por mañana, tarde y noche en la bitácora).")
+        if (trip.allWeather.isNotEmpty()) appendLine("Clima: ${trip.allWeather.size} horas con datos de Open-Meteo (tablas/clima.csv, una fila por hora en su punto medio, HH:30; resumen por mañana, tarde y noche en la bitácora).")
         appendLine()
         appendLine("ATRIBUCIONES")
         trip.attributions.forEach { appendLine("- ${it.name} (${it.license}) ${it.url}") }

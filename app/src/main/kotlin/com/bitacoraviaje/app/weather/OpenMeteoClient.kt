@@ -24,6 +24,9 @@ data class HourlyWeather(
     val weatherCode: Int?,
 )
 
+/** The service refused the request for good (4xx other than 429): retrying will not help, the segment is done without data. */
+class PermanentWeatherError(message: String) : IOException(message)
+
 /** Hourly weather for a set of locations on one UTC day; the result list follows the input order. */
 interface WeatherSource {
     fun hourly(locations: List<Pair<Double, Double>>, dayUtc: LocalDate, nowUtcMs: Long): List<List<HourlyWeather>>
@@ -47,8 +50,12 @@ class OpenMeteoClient @Inject constructor(private val http: OsmHttp) : WeatherSo
             "&hourly=$HOURLY&start_date=$dayUtc&end_date=$dayUtc&timezone=UTC"
         http.client.newCall(OsmHttp.get(url)).execute().use { resp ->
             val body = resp.body.string()
-            if (!resp.isSuccessful) throw IOException("Open-Meteo HTTP ${resp.code}: ${errorReason(body) ?: ""}".trim())
-            return parse(body, locations.size)
+            if (!resp.isSuccessful) {
+                val msg = "Open-Meteo HTTP ${resp.code}: ${errorReason(body) ?: ""}".trim()
+                if (resp.code in 400..499 && resp.code != 429) throw PermanentWeatherError(msg) else throw IOException(msg)
+            }
+            // Anything the parser cannot read is an IOException too: the caller keeps the other days (review I3).
+            return try { parse(body, locations.size) } catch (e: IOException) { throw e } catch (e: Exception) { throw IOException("Open-Meteo: unreadable answer (${e.javaClass.simpleName})", e) }
         }
     }
 

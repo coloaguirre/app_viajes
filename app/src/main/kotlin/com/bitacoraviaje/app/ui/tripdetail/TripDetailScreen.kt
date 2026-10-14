@@ -292,7 +292,17 @@ private fun eventLabel(e: TimelineEvent): Pair<String, String> = when (e) {
         is TimelineEvent.StopLeft -> "🚶" to stringResource(R.string.ev_stop_left, TrackingNotificationFactory.formatElapsed(e.dwellMs))
         is TimelineEvent.Moment -> (if (e.hasVideo) "🎬" else "📷") to (if (e.isSingle) stringResource(R.string.ev_photo) else stringResource(R.string.ev_moment, e.media.size)) + wx(e.weather)
         is TimelineEvent.Voice -> "🎙" to (e.note.displayText ?: stringResource(if (e.note.transcriptStatus == TranscriptStatus.FAILED) R.string.ev_voice_failed else R.string.ev_voice_pending)) + wx(e.weather)
-        is TimelineEvent.Weather -> com.bitacoraviaje.core.model.WeatherCodes.icon(e.block.weatherCode) to stringResource(R.string.ev_weather, e.block.block.label, e.block.text)
+        is TimelineEvent.Weather -> com.bitacoraviaje.core.model.WeatherCodes.icon(e.block.weatherCode) to stringResource(
+            R.string.ev_weather,
+            stringResource(
+                when (e.block.block) {
+                    com.bitacoraviaje.core.timeline.WeatherDigest.Block.MORNING -> R.string.weather_block_morning
+                    com.bitacoraviaje.core.timeline.WeatherDigest.Block.AFTERNOON -> R.string.weather_block_afternoon
+                    com.bitacoraviaje.core.timeline.WeatherDigest.Block.NIGHT -> R.string.weather_block_night
+                },
+            ),
+            e.block.text,
+        )
         is TimelineEvent.Text -> "📝" to (e.note.text ?: stringResource(R.string.ev_marker))
         is TimelineEvent.Highlight -> "⭐" to stringResource(R.string.ev_highlight)
         is TimelineEvent.TransportChange -> "🔀" to stringResource(R.string.ev_transport_change, e.transport?.let { stringResource(transportLabelRes(it)) } ?: (e.note.text ?: ""))

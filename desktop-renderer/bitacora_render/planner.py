@@ -220,11 +220,15 @@ def weather_text(samples) -> str | None:
     if not samples:
         return None
     code = _dominant([s.weather_code for s in samples if s.weather_code is not None])
-    text = _WMO.get(code, "Sin dato") if code is not None else "Sin dato"
     temps = [s.temperature_c for s in samples if s.temperature_c is not None]
+    if code is None and not temps:
+        return None
+    text = _WMO.get(code, "Sin dato") if code is not None else ""
     if temps:
         lo, hi = _round_half_up(min(temps)), _round_half_up(max(temps))
-        text += f", {lo} °C" if lo == hi else f", {lo}–{hi} °C"
+        if text:
+            text += ", "
+        text += f"{lo} °C" if lo == hi else f"{lo}–{hi} °C"
     return text
 
 

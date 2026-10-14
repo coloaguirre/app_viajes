@@ -49,6 +49,16 @@ class WeatherDigestTest {
     }
 
     @Test
+    fun `segmentText mirrors planner_py weather_text on ties, rounding and missing data`() {
+        fun s(i: Int, code: Int?, t: Double?) = WeatherSample("x$i", "s", i * 3_600_000L, 0.0, 0.0, t, null, null, null, null, code)
+        assertEquals("Lluvia ligera, 10–13 °C", WeatherDigest.segmentText(listOf(s(0, 61, 10.4), s(1, 63, 12.5))), "tie inside the rain family: first seen wins; 12.5 rounds up")
+        assertEquals("Parcialmente nublado, 8 °C", WeatherDigest.segmentText(listOf(s(0, 0, 7.5), s(1, 2, 8.0), s(2, 2, 8.4), s(3, 0, 7.6))), "two cloudy hours of four (≥ 30 %) outrank the clear ones; 7.5 rounds half up to 8")
+        assertEquals("-2–2 °C", WeatherDigest.segmentText(listOf(s(0, null, -2.5), s(1, null, 1.5))), "no code at all: only the temperatures, no Sin dato; -2.5 rounds half up to -2 on both sides")
+        assertNull(WeatherDigest.segmentText(listOf(s(0, null, null))))
+        assertEquals("Nublado", WeatherDigest.segmentText(listOf(s(0, 3, null))))
+    }
+
+    @Test
     fun `codes map to labels, families and a dominant code`() {
         assertEquals("Tormenta", WeatherCodes.label(95))
         assertEquals(WeatherCodes.Family.SNOW, WeatherCodes.family(73))

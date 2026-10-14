@@ -148,7 +148,11 @@ footer{font-size:.75rem;color:#666;margin-top:24px}
     if(piece.length)pieces.push(piece);
     pieces.filter(l=>l.length>1).forEach(line=>{L.polyline(line,{color:colors[i%colors.length],weight:4}).addTo(map);line.forEach(p=>bounds.push(p));});
     const h2=document.createElement('h2');h2.textContent=(s.started||'').slice(0,10)+' · '+(s.title||s.type.toLowerCase())+(s.stats.distance_m?' · '+(s.stats.distance_m/1000).toFixed(1)+' km':'');side.appendChild(h2);
-    if((s.weather||[]).length){const ts=s.weather.map(x=>x.temperature_c).filter(x=>x!=null);const codes=s.weather.map(x=>x.weather_code).filter(x=>x!=null);const cnt={};codes.forEach(c=>cnt[c]=(cnt[c]||0)+1);const code=codes.length?+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]:null;const ic=code==null?'🌡️':code<=1?'☀️':code<=3?'⛅':code<=48?'🌫️':code<=67||(code>=80&&code<=82)?'🌧️':code<=86?'🌨️':'⛈️';const p=document.createElement('p');p.className='wx';p.textContent='Clima: '+ic+(ts.length?' '+Math.round(Math.min(...ts))+'–'+Math.round(Math.max(...ts))+' °C':'')+' · '+s.weather.length+' h (Open-Meteo)';side.appendChild(p);}
+    if((s.weather||[]).length){const ts=s.weather.map(x=>x.temperature_c).filter(x=>x!=null);const codes=s.weather.map(x=>x.weather_code).filter(x=>x!=null);
+      // Same rule as WeatherCodes.dominant: the worst family covering ≥ 30 % of the hours, else the most frequent code (first seen on ties).
+      const fam=c=>c<=1?'CLEAR':c<=3?'CLOUDY':c<=48?'FOG':(c<=67||(c>=80&&c<=82))?'RAIN':c<=86?'SNOW':'STORM';const freq=cs=>{const n={};cs.forEach(c=>n[c]=(n[c]||0)+1);const m=Math.max(...cs.map(c=>n[c]));return cs.find(c=>n[c]===m);};
+      let code=null;if(codes.length){for(const f of ['STORM','SNOW','RAIN','FOG','CLOUDY','CLEAR']){const h=codes.filter(c=>fam(c)===f);if(h.length&&h.length>=codes.length*0.3){code=freq(h);break;}}if(code==null)code=freq(codes);}
+      const ic=code==null?'🌡️':{CLEAR:'☀️',CLOUDY:'⛅',FOG:'🌫️',RAIN:'🌧️',SNOW:'🌨️',STORM:'⛈️'}[fam(code)];const p=document.createElement('p');p.className='wx';p.textContent='Clima: '+ic+(ts.length?' '+Math.round(Math.min(...ts))+'–'+Math.round(Math.max(...ts))+' °C':'')+' · '+s.weather.length+' h (Open-Meteo)';side.appendChild(p);}
     const events=[];
     s.media.forEach(m=>events.push({t:m.taken,lat:m.lat,lon:m.lon,label:m.caption||(m.kind==='VIDEO'?'Video':'Foto'),file:m.file,kind:'photo'}));
     s.voice_notes.forEach(v=>events.push({t:v.started,lat:v.lat,lon:v.lon,label:v.transcript||'Nota de voz',kind:'voice',file:v.file}));

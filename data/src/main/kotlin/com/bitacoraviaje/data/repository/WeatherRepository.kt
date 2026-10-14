@@ -28,4 +28,12 @@ class WeatherRepository @Inject constructor(private val db: BitacoraDatabase) {
         dao.deleteBySegment(segmentId)
         if (samples.isNotEmpty()) dao.insertAll(samples.map { it.copy(segmentId = segmentId).toEntity() })
     }
+
+    /** When the segment was last looked up completely (every day answered), null if never: the "pending" test. */
+    suspend fun fetchedAt(segmentId: String): Long? = dao.fetchedAt(segmentId)
+
+    suspend fun markFetched(segmentId: String, atUtcMs: Long, hours: Int) = dao.markFetched(com.bitacoraviaje.data.db.entity.WeatherFetchEntity(segmentId, atUtcMs, hours))
+
+    /** Forget the lookup so the next open of the trip asks again (a manual "volver a consultar"). */
+    suspend fun clearFetched(segmentId: String) = dao.clearFetched(segmentId)
 }

@@ -12,8 +12,11 @@ import com.bitacoraviaje.core.model.TrackPoint
 object WeatherSampling {
     const val HOUR_MS = 3_600_000L
 
-    /** @property hourUtcMs start of the UTC hour; @property lat/lon rounded; @property locationIndex into [Plan.locations]. */
-    data class Sample(val hourUtcMs: Long, val lat: Double, val lon: Double, val locationIndex: Int)
+    /**
+     * @property hourStartUtcMs start of the UTC hour (the stored sample sits at its centre, +30 min);
+     * @property lat/lon rounded; @property locationIndex into [Plan.locations].
+     */
+    data class Sample(val hourStartUtcMs: Long, val lat: Double, val lon: Double, val locationIndex: Int)
 
     data class Plan(val samples: List<Sample>, val locations: List<Pair<Double, Double>>) {
         val isEmpty: Boolean get() = samples.isEmpty()
@@ -27,6 +30,8 @@ object WeatherSampling {
         maxNearestMs: Long = 45 * 60_000L,
         maxInterpGapMs: Long = 2 * HOUR_MS,
         maxHours: Int = 24 * 14,
+        /** Pauses (including nested excursions): inside one, only a real fix nearby counts, never a line across it. */
+        pauses: List<TimeInterval> = emptyList(),
     ): Plan {
         if (points.isEmpty() || endUtcMs <= startUtcMs) return Plan(emptyList(), emptyList())
         val firstHour = startUtcMs / HOUR_MS * HOUR_MS
@@ -37,7 +42,8 @@ object WeatherSampling {
         var hour = firstHour
         while (hour <= lastHour && samples.size < maxHours) {
             val centre = (hour + HOUR_MS / 2).coerceIn(startUtcMs, endUtcMs)
-            val pos = when (val p = positionAt(points, centre, LinkConfig(maxInterpGapMs = maxInterpGapMs, maxNearestMs = maxNearestMs))) {
+            val paused = pauses.any { centre in it.startUtcMs..it.endUtcMs }
+            val pos = when (val p = positionAt(points, centre, LinkConfig(maxInterpGapMs = if (paused) 0 else maxInterpGapMs, maxNearestMs = maxNearestMs))) {
                 is PositionAt.Interpolated -> p.lat to p.lon
                 is PositionAt.Nearest -> p.lat to p.lon
                 PositionAt.None -> null

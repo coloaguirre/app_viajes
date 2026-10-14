@@ -71,8 +71,17 @@ class OpenMeteoClientTest {
     @Test
     fun `the service's error object becomes an IOException with its reason and a count mismatch is refused`() {
         server.enqueue(MockResponse(code = 400, body = fixture("open_meteo_error.json")))
-        val e = assertFailsWith<IOException> { client.hourly(listOf(0.0 to 0.0), LocalDate.of(2026, 10, 12), now) }
+        val e = assertFailsWith<PermanentWeatherError> { client.hourly(listOf(0.0 to 0.0), LocalDate.of(2026, 10, 12), now) }
         assertTrue(e.message!!.contains("out of allowed range"), e.message)
+        server.enqueue(MockResponse(code = 503, body = "busy"))
+        server.enqueue(MockResponse(code = 503, body = "busy"))
+        server.enqueue(MockResponse(code = 503, body = "busy"))
+        server.enqueue(MockResponse(code = 503, body = "busy"))
+        val busy = assertFailsWith<IOException> { client.hourly(listOf(0.0 to 0.0), LocalDate.of(2026, 10, 12), now) }
+        assertTrue(busy !is PermanentWeatherError, "a 503 is retried later, not refused for good")
+        server.enqueue(MockResponse(body = "<html>captive portal</html>"))
+        val junk = assertFailsWith<IOException> { client.hourly(listOf(0.0 to 0.0), LocalDate.of(2026, 10, 12), now) }
+        assertTrue(junk.message!!.contains("unreadable"), junk.message)
         assertFailsWith<IOException> { OpenMeteoClient.parse(fixture("open_meteo_forecast_two_locations.json"), expected = 1) }
         assertTrue(OpenMeteoClient.parse(fixture("open_meteo_error.json").let { "{\"hourly\":{\"time\":[]}}" }, 1).single().isEmpty())
     }

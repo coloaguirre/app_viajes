@@ -51,9 +51,18 @@ class WeatherWorker @AssistedInject constructor(
 
         fun workName(segmentId: String) = "weather-$segmentId"
 
-        fun enqueue(context: Context, segmentId: String, force: Boolean = false) {
+        /** Minutes after the segment's last hour ends before asking: by then the hour is an observation, not a forecast. */
+        const val SETTLE_MS = 15 * 60_000L
+
+        /**
+         * [endedUtcMs]: when the segment closed. A segment closed minutes ago waits until its last hour has
+         * passed (plus [SETTLE_MS]) so the model answers with observations rather than a forecast (review I2).
+         */
+        fun enqueue(context: Context, segmentId: String, force: Boolean = false, endedUtcMs: Long? = null, nowUtcMs: Long = System.currentTimeMillis()) {
+            val delay = endedUtcMs?.let { ((it / 3_600_000 + 1) * 3_600_000 + SETTLE_MS - nowUtcMs).coerceAtLeast(0L) } ?: 0L
             val req = OneTimeWorkRequestBuilder<WeatherWorker>()
                 .setInputData(workDataOf(KEY_SEGMENT_ID to segmentId, KEY_FORCE to force))
+                .setInitialDelay(delay, TimeUnit.MILLISECONDS)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
                 .addTag(TAG_WORK)

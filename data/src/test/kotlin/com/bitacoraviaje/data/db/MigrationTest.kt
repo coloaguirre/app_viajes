@@ -179,8 +179,22 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrate 11 to 12 adds the weather fetch marker that cascades with its segment`() {
+        helper.createDatabase(DB_NAME, 11).use { v11 ->
+            v11.execSQL("INSERT INTO trip (id,title,created_utc_ms,status,archived) VALUES ('t','T',1,'FINISHED',0)")
+            v11.execSQL("INSERT INTO segment (id,trip_id,type,started_utc_ms,tz_id,sampling_profile,recording_mode,auto_created,status) VALUES ('s','t','STAGE',1,'UTC','WALK','FULL',0,'FINISHED')")
+        }
+        val v12 = helper.runMigrationsAndValidate(DB_NAME, 12, true, *BitacoraDatabase.ALL_MIGRATIONS)
+        v12.execSQL("PRAGMA foreign_keys = ON")
+        v12.execSQL("INSERT INTO weather_fetch (segment_id,fetched_utc_ms,hours) VALUES ('s',5,0)")
+        v12.execSQL("DELETE FROM segment WHERE id='s'")
+        v12.query("SELECT COUNT(*) FROM weather_fetch").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+        v12.close()
+    }
+
+    @Test
     fun `current version has an exported schema and every bump a migration`() {
-        assertEquals(11, BitacoraDatabase.VERSION)
+        assertEquals(12, BitacoraDatabase.VERSION)
         assertEquals(BitacoraDatabase.VERSION - 1, BitacoraDatabase.ALL_MIGRATIONS.size)
     }
 

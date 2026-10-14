@@ -66,12 +66,13 @@ object WeatherDigest {
         if (samples.isEmpty()) return null
         val code = WeatherCodes.dominant(samples.mapNotNull { it.weatherCode })
         val temps = samples.mapNotNull { it.temperatureC }
+        if (code == null && temps.isEmpty()) return null
         return buildString {
-            append(WeatherCodes.label(code))
+            if (code != null) append(WeatherCodes.label(code))
             if (temps.isNotEmpty()) {
                 val lo = Math.round(temps.min())
                 val hi = Math.round(temps.max())
-                append(", ")
+                if (isNotEmpty()) append(", ")
                 append(if (lo == hi) "$lo °C" else "$lo–$hi °C")
             }
         }

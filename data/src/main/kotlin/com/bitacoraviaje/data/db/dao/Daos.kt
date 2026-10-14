@@ -351,6 +351,15 @@ interface WeatherDao {
 
     @Query("DELETE FROM weather_sample WHERE segment_id = :segmentId")
     suspend fun deleteBySegment(segmentId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun markFetched(row: com.bitacoraviaje.data.db.entity.WeatherFetchEntity)
+
+    @Query("SELECT fetched_utc_ms FROM weather_fetch WHERE segment_id = :segmentId")
+    suspend fun fetchedAt(segmentId: String): Long?
+
+    @Query("DELETE FROM weather_fetch WHERE segment_id = :segmentId")
+    suspend fun clearFetched(segmentId: String)
 }
 
 @Dao

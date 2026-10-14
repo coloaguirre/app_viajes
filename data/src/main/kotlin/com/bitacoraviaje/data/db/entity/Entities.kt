@@ -244,6 +244,17 @@ data class WeatherSampleEntity(
     @ColumnInfo(name = "fetched_utc_ms") val fetchedUtcMs: Long?,
 )
 
+/** When the weather of a segment was last looked up completely, even if no hour had data (so "no data" is not "pending"). */
+@Entity(
+    tableName = "weather_fetch",
+    foreignKeys = [ForeignKey(entity = SegmentEntity::class, parentColumns = ["id"], childColumns = ["segment_id"], onDelete = ForeignKey.CASCADE)],
+)
+data class WeatherFetchEntity(
+    @PrimaryKey @ColumnInfo(name = "segment_id") val segmentId: String,
+    @ColumnInfo(name = "fetched_utc_ms") val fetchedUtcMs: Long,
+    val hours: Int,
+)
+
 // ---- Phase 4: places and enrichment (DISENO §5.2 "Lugares", §11) ----
 
 @Entity(tableName = "place")

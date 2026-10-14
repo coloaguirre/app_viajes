@@ -103,6 +103,9 @@
     <string name="places_rewritten">Texto reescrito</string>
     <string name="ev_place">Lugar: %1$s</string>
     <string name="ev_weather">%1$s: %2$s</string>
+    <string name="weather_block_morning">Mañana</string>
+    <string name="weather_block_afternoon">Tarde</string>
+    <string name="weather_block_night">Noche</string>
     <string name="render_channel">Video de la etapa</string>
     <string name="render_notif_title">Creando el video de la etapa</string>
     <string name="render_notif_progress">%1$d %%</string>

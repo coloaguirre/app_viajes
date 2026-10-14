@@ -196,10 +196,12 @@ class TripDetailViewModel @Inject constructor(
     init {
         // Reconciliation sweep on every open of the trip detail (DISENO §7.3).
         LinkMediaWorker.enqueue(context, tripId)
-        // Backlog D3: segments closed before the feature existed (or offline at the time) get their weather now.
+        // Backlog D3: segments closed before the feature existed (or offline at the time) get their weather now;
+        // a segment already looked up (even with no usable hour) is not asked again (review I4).
         viewModelScope.launch {
-            tracking.segmentsOf(tripId).filter { it.endedUtcMs != null && !weather.hasWeather(it.id) }
-                .forEach { com.bitacoraviaje.app.weather.WeatherWorker.enqueue(context, it.id) }
+            if (!prefs.settings.first().fetchWeather) return@launch
+            tracking.segmentsOf(tripId).filter { it.endedUtcMs != null && weather.fetchedAt(it.id) == null }
+                .forEach { com.bitacoraviaje.app.weather.WeatherWorker.enqueue(context, it.id, endedUtcMs = it.endedUtcMs) }
         }
     }
 
