@@ -16,29 +16,64 @@ class TrackLocatorTest {
     fun `empty track answers null everywhere`() {
         assertNull(TrackLocator.nearest(emptyList(), 0.0, 0.0))
         assertNull(TrackLocator.atTime(emptyList(), 0L))
-        assertEquals(0, TrackLocator.cumulative(emptyList()).size)
+        assertEquals(0, cumulativeDistanceM(emptyList()).size)
     }
 
     @Test
-    fun `cumulative distance grows by the leg length and skips pause legs`() {
-        val cum = TrackLocator.cumulative(walk)
+    fun `cumulative distance grows by the leg length, skips pause legs and matches the segment stats`() {
+        val cum = cumulativeDistanceM(walk)
         assertEquals(0.0, cum[0])
         assertEquals(5.5, cum[1], 0.05)
         assertEquals(99 * 5.5, cum.last(), 1.0)
         val pause = listOf(TimeInterval(walk[10].timeUtcMs, walk[20].timeUtcMs))
-        val paused = TrackLocator.cumulative(walk, pause)
+        val paused = cumulativeDistanceM(walk, pause)
         assertEquals(cum.last() - 10 * 5.5, paused.last(), 1.0)
+        assertEquals(assertNotNull(computeSegmentStats(walk, pause).distanceM), paused.last(), "one rule for the card and the stage header")
+        // A still episode: 72 jittery fixes within 1 m (0.2 m/s) add nothing, as in the stats.
+        val still = (0 until 72).map { i -> walk.last().copy(timeUtcMs = walk.last().timeUtcMs + (i + 1) * 5_000L, lat = walk.last().lat + (if (i % 2 == 0) 1 else -1) * 0.5 / 111_320.0) }
+        val withStill = cumulativeDistanceM(walk + still)
+        assertEquals(cum.last(), withStill.last(), 1.0)
+        assertEquals(assertNotNull(computeSegmentStats(walk + still).distanceM), withStill.last(), 1e-9)
     }
 
     @Test
-    fun `nearest picks the closest fix and reports its offset and progress`() {
+    fun `duplicate timestamps add nothing and an instant inside a pause keeps the distance flat`() {
+        val dup = walk.take(5) + walk[4].copy(lat = walk[4].lat + 0.01) + walk.drop(5)
+        val cum = cumulativeDistanceM(dup)
+        assertEquals(cum[4], cum[5], "a fix with the same time as the previous one does not count")
+        val pause = listOf(TimeInterval(walk[10].timeUtcMs, walk[20].timeUtcMs))
+        val at = assertNotNull(TrackLocator.atTime(walk, walk[15].timeUtcMs, pause))
+        assertEquals(10 * 5.5, at.distanceM, 0.1)
+        assertEquals(assertNotNull(TrackLocator.atTime(walk, walk[20].timeUtcMs, pause)).distanceM, at.distanceM, 0.1)
+    }
+
+    @Test
+    fun `a precomputed cumulative array gives the same answers`() {
+        val cum = cumulativeDistanceM(walk)
+        assertEquals(TrackLocator.nearest(walk, walk[40].lat, walk[40].lon), TrackLocator.nearest(walk, walk[40].lat, walk[40].lon, cum = cum))
+        assertEquals(TrackLocator.atTime(walk, walk[10].timeUtcMs + 2_500), TrackLocator.atTime(walk, walk[10].timeUtcMs + 2_500, cum = cum))
+    }
+
+    @Test
+    fun `nearest projects onto the line and reports offset and progress`() {
         val target = walk[40]
         val pos = assertNotNull(TrackLocator.nearest(walk, target.lat, target.lon + 0.0001))
-        assertEquals(40, pos.index)
         assertEquals(target.timeUtcMs, pos.timeUtcMs)
         assertEquals(40 * 5.5, pos.distanceM, 0.5)
         assertEquals(9.1, pos.offsetM, 0.5, "0.0001° of longitude at 34.6°S ≈ 9.1 m")
         assertEquals(1.1, assertNotNull(pos.speedMps), 0.05)
+        // Halfway along leg 10→11, 20 m to the side: the foot of the perpendicular, not vertex 10 or 11.
+        val mid = assertNotNull(TrackLocator.nearest(walk, (walk[10].lat + walk[11].lat) / 2, walk[10].lon + 20 / (111_320.0 * Math.cos(Math.toRadians(-34.6)))))
+        assertEquals(10, mid.index)
+        assertEquals(walk[10].timeUtcMs + 2_500, mid.timeUtcMs)
+        assertEquals(10.5 * 5.5, mid.distanceM, 0.1)
+        assertEquals(20.0, mid.offsetM, 0.5)
+        // Beyond the end of the track the answer is clamped to the last vertex, with the real offset.
+        val past = assertNotNull(TrackLocator.nearest(walk, walk.last().lat + 100 / 111_320.0, walk.last().lon))
+        assertEquals(walk.last().timeUtcMs, past.timeUtcMs)
+        assertEquals(100.0, past.offsetM, 0.5)
+        val lone = assertNotNull(TrackLocator.nearest(walk.take(1), walk[0].lat, walk[0].lon))
+        assertEquals(0.0, lone.offsetM, 1e-6)
     }
 
     @Test
@@ -72,5 +107,7 @@ class TrackLocatorTest {
         assertNull(TrackLocator.speedAround(lone.map { it.copy(speedMps = null) }, 0))
         assertNull(TrackLocator.speedAround(walk, 500))
         assertTrue(assertNotNull(TrackLocator.speedAround(walk, 0)) > 0)
+        val pause = listOf(TimeInterval(walk[48].timeUtcMs, walk[52].timeUtcMs))
+        assertEquals(1.1, assertNotNull(TrackLocator.speedAround(walk, 50, pause)), 0.05, "pause legs are left out of the window")
     }
 }

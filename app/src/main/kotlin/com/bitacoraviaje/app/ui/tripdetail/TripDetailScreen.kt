@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import com.bitacoraviaje.app.map.MapTap
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Badge
@@ -52,6 +51,7 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.app.export.ExportDestination
 import com.bitacoraviaje.app.export.ExportOptions
 import com.bitacoraviaje.app.map.MapRenderer
+import com.bitacoraviaje.app.map.MapTap
 import com.bitacoraviaje.app.map.TrackMapState
 import com.bitacoraviaje.app.tracking.TrackingNotificationFactory
 import com.bitacoraviaje.app.ui.common.transportLabelRes
@@ -182,12 +182,13 @@ fun TripDetailScreen(
                     map(state.map, Modifier.fillMaxSize().testTag("trip_map"), onMapTap)
                     // PLAN 5.4: download this area for use without network (only when the map provider is configured).
                     if (offline.available) {
-                        androidx.compose.material3.FilledTonalButton(onClick = onOffline, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).testTag("trip_offline")) {
+                        androidx.compose.material3.FilledTonalButton(onClick = onOffline, modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).testTag("trip_offline")) {
                             Text(stringResource(if (offline.hasRegion) R.string.offline_button_ready else R.string.offline_button))
                         }
                     }
-                    // Backlog D2: what the user tapped on the map (marker or track point).
-                    state.mapSelection?.let { sel -> MapSelectionCard(sel, Modifier.align(Alignment.BottomCenter).padding(12.dp), onCloseSelection) }
+                    // Backlog D2: what the user tapped on the map (marker or track point). At the top, so the
+                    // tile provider's attribution at the bottom-left stays visible (licence, CLAUDE.md).
+                    state.mapSelection?.let { sel -> MapSelectionCard(sel, stageLabel = if (state.segments.size > 1) segmentLabel(sel.segment) else null, modifier = Modifier.align(Alignment.TopCenter).padding(12.dp), onClose = onCloseSelection) }
                 }
                 2 -> PhotosTab(state, onReview)
                 else -> PlacesTab(state, onPlaceAction)
@@ -230,17 +231,32 @@ private fun segmentTitle(st: SegmentTimeline): String {
     return "${DateTimeFormatter.ofPattern("EEE d MMM", APP_LOCALE).format(date)} · ${s.displayName ?: kind}$dist"
 }
 
-/** Backlog D2: time, progress along the stage, speed and altitude of the tapped point, plus the event (photos, note text). */
+/** Stage as the map card names it: local start (date and time) plus the user's title, the derived name, or the kind; two stages of one day often share a name. */
 @Composable
-private fun MapSelectionCard(sel: MapSelection, modifier: Modifier, onClose: () -> Unit) {
+private fun segmentLabel(s: com.bitacoraviaje.core.model.Segment): String {
+    val start = Instant.ofEpochMilli(s.startedUtcMs).atZone(ZoneId.of(s.tzId))
+    val name = s.displayName ?: stringResource(
+        when (s.type) {
+            com.bitacoraviaje.core.model.SegmentType.TREKKING -> R.string.type_trekking
+            com.bitacoraviaje.core.model.SegmentType.EXCURSION -> R.string.type_excursion
+            else -> R.string.type_stage
+        },
+    )
+    return "${DateTimeFormatter.ofPattern("EEE d MMM HH:mm", APP_LOCALE).format(start)} · $name"
+}
+
+/** Backlog D2: time, progress along the stage, speed and altitude of the tapped point, plus the event (photos, place). */
+@Composable
+private fun MapSelectionCard(sel: MapSelection, stageLabel: String?, modifier: Modifier, onClose: () -> Unit) {
     val zone = ZoneId.of(sel.segment.tzId)
     val time = DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(sel.timeUtcMs).atZone(zone))
     val (icon, title) = sel.event?.let { eventLabel(it) } ?: ("📍" to stringResource(R.string.map_sel_track_point))
     val facts = buildList {
+        stageLabel?.let { add(it) }
         add(time)
-        sel.distanceM?.let { add(stringResource(R.string.map_sel_km, TrackingNotificationFactory.formatKm(it))) }
-        sel.speedMps?.let { add(stringResource(R.string.map_sel_speed, "%.1f".format(it * 3.6))) }
-        sel.altM?.let { add(stringResource(R.string.map_sel_alt, it.toInt())) }
+        sel.distanceM?.let { add(stringResource(R.string.map_sel_km, if (it < 1000) "%.0f m".format(APP_LOCALE, it) else "%.1f km".format(APP_LOCALE, it / 1000))) }
+        sel.speedMps?.let { add(stringResource(R.string.map_sel_speed, "%.1f".format(APP_LOCALE, it * 3.6))) }
+        sel.altM?.let { add(stringResource(R.string.map_sel_alt, Math.round(it).toInt())) }
     }
     androidx.compose.material3.Card(modifier = modifier.fillMaxWidth().testTag("map_selection")) {
         Column(Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 12.dp)) {

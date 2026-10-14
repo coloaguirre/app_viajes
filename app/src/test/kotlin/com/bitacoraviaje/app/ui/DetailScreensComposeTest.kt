@@ -325,7 +325,7 @@ class DetailScreensComposeTest {
         rule.onNodeWithTag("map_selection").assertIsDisplayed()
         rule.onNodeWithText("Foto").assertIsDisplayed()
         // t0 + 10 min in Buenos Aires: 2025-10-09 06:03 local for t0 = 1_760_000_000_000.
-        rule.onNodeWithTag("map_selection_facts").assertTextEquals("06:03 · 1.3 km de la etapa · 4.5 km/h · 812 m de altitud")
+        rule.onNodeWithTag("map_selection_facts").assertTextEquals("06:03 · 1,3 km de la etapa · 4,5 km/h · 813 m de altitud")
         rule.onNodeWithTag("map_selection_close").performClick()
         assertEquals(1, closed)
     }
@@ -343,5 +343,25 @@ class DetailScreensComposeTest {
         }
         rule.onNodeWithText("Punto del recorrido").assertIsDisplayed()
         rule.onNodeWithTag("map_selection_facts").assertTextEquals("05:53 · 0 m de la etapa")
+    }
+
+    @Test
+    fun `map card names the stage when the trip has several and the map slot forwards taps`() {
+        val taps = mutableListOf<com.bitacoraviaje.app.map.MapTap>()
+        val other = segment.copy(id = "s2", title = "Día 2")
+        val sel = MapSelection(other, t0, distanceM = 2_000.0, speedMps = null, altM = null, event = null)
+        rule.setContent {
+            BitacoraTheme {
+                TripDetailScreen(
+                    state = TripDetailUiState(trip = trip, segments = listOf(SegmentTimeline(segment, events, emptyList()), SegmentTimeline(other, emptyList(), emptyList())), map = TrackMapState(), selectedTab = 1, mapSelection = sel),
+                    onBack = {}, onTab = {}, onEvent = {}, onReview = {},
+                    map = { _, m, tap -> androidx.compose.material3.Button(onClick = { tap(com.bitacoraviaje.app.map.MapTap.Marker("x")) }, modifier = m) { androidx.compose.material3.Text("mapa") } },
+                    onMapTap = { taps += it },
+                )
+            }
+        }
+        rule.onNodeWithTag("map_selection_facts").assertTextEquals("jue 9 oct. 05:53 · Día 2 · 05:53 · 2,0 km de la etapa")
+        rule.onNodeWithTag("trip_map").performClick()
+        assertEquals(listOf<com.bitacoraviaje.app.map.MapTap>(com.bitacoraviaje.app.map.MapTap.Marker("x")), taps)
     }
 }

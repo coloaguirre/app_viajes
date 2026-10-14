@@ -71,7 +71,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
         val mapView = remember { MapView(context) }
-        val holder = remember { MapHolder() }
+        val holder = remember { MapHolder(context.resources.displayMetrics.density) }
 
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
@@ -117,7 +117,7 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
     }
 
     /** Keeps the GeoJSON sources in sync with the latest state; created once per MapView. */
-    private class MapHolder {
+    private class MapHolder(private val density: Float) {
         private var map: MapLibreMap? = null
         private var trackSource: GeoJsonSource? = null
         private var pointSource: GeoJsonSource? = null
@@ -130,17 +130,29 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
         var onClick: ((MapPoint) -> Unit)? = null
         var onTap: ((MapTap) -> Unit)? = null
 
-        /** Markers win over the track; both are hit-tested on a finger-sized box around the tap (backlog D2). */
+        /**
+         * Hit-test without `queryRenderedFeatures` (it waits for the render thread and froze the UI, ANR on the
+         * emulator): markers are projected to the screen and the closest within the slop wins; otherwise the tap
+         * is a [MapTap.Spot] with the tolerance in metres that the slop covers at this zoom (backlog D2).
+         */
         fun hitTest(m: MapLibreMap, ll: LatLng, p: MapPoint): MapTap {
             val px = m.projection.toScreenLocation(ll)
-            fun box(r: Float) = android.graphics.RectF(px.x - r, px.y - r, px.x + r, px.y + r)
-            // Markers are already 8 dp circles, so a small slop keeps the track between two close markers reachable.
-            val marker = m.queryRenderedFeatures(box(MARKER_SLOP_PX), LAYER_MARKERS).firstOrNull { it.hasProperty("id") }?.getStringProperty("id")
-            if (marker != null) return MapTap.Marker(marker)
-            val onTrack = m.queryRenderedFeatures(box(TRACK_SLOP_PX), LAYER_TRACK).isNotEmpty()
-            if (BuildConfig.DEBUG) android.util.Log.d("Bitacora", "map tap px=(${px.x.toInt()},${px.y.toInt()}) marker=$marker track=$onTrack")
-            if (onTrack) return MapTap.Track(p)
-            return MapTap.Empty(p)
+            val markerReach = (MARKER_RADIUS_DP + MARKER_SLOP_DP) * density
+            var best: MapMarker? = null
+            var bestD2 = markerReach * markerReach
+            var nearestD2 = Float.MAX_VALUE
+            lastMarkers?.forEach { mk ->
+                val fp = m.projection.toScreenLocation(LatLng(mk.point.lat, mk.point.lon))
+                val d2 = (fp.x - px.x) * (fp.x - px.x) + (fp.y - px.y) * (fp.y - px.y)
+                if (d2 < nearestD2) nearestD2 = d2
+                if (d2 <= bestD2) { bestD2 = d2; best = mk }
+            }
+            if (BuildConfig.DEBUG) android.util.Log.d("Bitacora", "map tap px=(${px.x.toInt()},${px.y.toInt()}) markers=${lastMarkers?.size} nearestPx=${"%.0f".format(Math.sqrt(nearestD2.toDouble()))} hit=${best?.id}")
+            best?.let { return MapTap.Marker(it.id) }
+            val metersPerPx = m.projection.getMetersPerPixelAtLatitude(ll.latitude)
+            val tolerance = (TRACK_SLOP_DP + TRACK_WIDTH_DP / 2) * density * metersPerPx
+            if (BuildConfig.DEBUG) android.util.Log.d("Bitacora", "map tap spot toleranceM=${"%.1f".format(tolerance)}")
+            return MapTap.Spot(p, tolerance)
         }
         private var lastCurrent: MapPoint? = null
         private var lastStops: List<MapPoint>? = null
@@ -244,8 +256,10 @@ class MapLibreRenderer @Inject constructor(@ApplicationContext context: Context)
             const val LAYER_STOPS = "stops"
             const val LAYER_MARKERS = "markers"
             const val LAYER_CURRENT = "current"
-            const val MARKER_SLOP_PX = 14f
-            const val TRACK_SLOP_PX = 24f
+            const val MARKER_RADIUS_DP = 8f
+            const val MARKER_SLOP_DP = 6f
+            const val TRACK_WIDTH_DP = 5f
+            const val TRACK_SLOP_DP = 9f
         }
     }
 }
