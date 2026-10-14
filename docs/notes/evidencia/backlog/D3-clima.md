@@ -14,9 +14,13 @@ mañana, tarde y noche y sumarlo al registro, u otro esquema horario si hay algo
   sirve el pasado reciente (unos 92 días) y el archivo ERA5 lo anterior (se usa para días de más de
   60 días). Variables: temperatura, sensación térmica, precipitación, viento, nubosidad y código
   WMO. Pasa por `OsmHttp` (User-Agent identificable, 15 s, caché, backoff en 429/5xx).
-- Las horas se guardan en la tabla **`weather_sample`** (Room v11, migración 10→11 con test y
-  esquema `11.json`), una fila por hora y etapa, en el centro de la hora. `WeatherRepository.replace`
-  reemplaza las horas de una etapa en una transacción; una etapa con clima se salta salvo `force`.
+- Las horas se guardan en la tabla **`weather_sample`** (Room v11, migración 10→11 con test), una
+  fila por hora y etapa, en el centro de la hora (HH:30). `WeatherRepository.replace` reemplaza las
+  horas de una etapa en una transacción. La tabla **`weather_fetch`** (v12, migración 11→12 con
+  test) marca cada etapa consultada por completo, aun sin horas útiles, para no re-consultarla
+  (salvo `force`); una consulta parcial (un día sin red, una hora cuyo centro todavía no pasó) no
+  marca y el worker reintenta. El worker de una etapa recién cerrada espera a que termine su última
+  hora (+15 min) para que el modelo conteste con observaciones y no con un pronóstico.
 - **Bitácora** (`WeatherDigest`, `core/timeline`): bloques del día local **Mañana (6–12) / Tarde
   (12–20) / Noche (20–6)** con rango de temperatura, lluvia acumulada, viento máximo y el tiempo
   dominante (la familia más severa que cubra ≥ 30 % de las horas, si no la más frecuente), como
@@ -69,11 +73,17 @@ mañana, tarde y noche y sumarlo al registro, u otro esquema horario si hay algo
    zona de privacidad ya no salen en el paquete), con test.
 5. Ajustes: fila "Clima del recorrido" con su interruptor (`D3-ajustes.png`).
 
+6. Revisión del código (dos pasadas, informes en el PR): tras el arreglo, instalar la versión con
+   Room v12 sobre la base v11 del emulador migró sin error, el detalle encoló una sola vez y dejó 4
+   filas en `weather_fetch`, y la exportación **con zonas de privacidad** lleva el crédito de
+   Open-Meteo en `trip.json`, LEEME y bitácora (antes lo perdía).
+
 ## Decisiones y límites
 - Etapa **en curso**: no se consulta hasta cerrarla (offline primero; nada de la sesión activa
-  depende de red). Etapas cerradas **hoy** usan el pronóstico de la hora, que en Open-Meteo ya está
-  ajustado con observaciones recientes; no se vuelve a consultar más tarde (se puede forzar
-  borrando la fila; no hay botón aún).
+  depende de red). Una etapa recién cerrada espera a que pase su última hora. No hay botón para
+  volver a consultar (queda `force` interno y `WeatherRepository.clearFetched`).
+- Un error definitivo del servicio (4xx) deja la etapa marcada sin datos; un 429/5xx o la falta de
+  red reintentan con backoff (hasta 3 intentos del worker, y de nuevo al abrir el detalle).
 - Resolución: malla de ~9–11 km del modelo; sirve para "llovió / hizo frío", no para microclimas.
 - Los textos de los códigos WMO y de los bloques viven en `core` (en español, como las líneas de la
   bitácora exportada) porque los usan la exportación y el video, no solo la app.
