@@ -126,4 +126,23 @@ class PrivacyFilterTest {
         val leeme = LeemeWriter.text(Fixture.trip(), ExportReport("f", emptyList(), 1, 1, 0, 0, emptyList(), 0, 0, emptyList(), 0, 0, privacy = report), true, true)
         assertTrue(leeme.contains("verificadas sin GPS en su EXIF: 1") && leeme.contains("1 copias de adentro de una zona conservan la ubicación") && leeme.contains("VID_0002.mp4 (video)"))
     }
+
+    @Test
+    fun `weather hours inside a zone leave the package and the Open-Meteo credit survives the filter`() {
+        val original = Fixture.trip()
+        assertEquals(2, original.segments[0].weather.size)
+        // "Casa" (600 m) covers the first sample (-34.6); the second sits 1.1 km north: outside even with the 800 m cell margin? no → 1.1 km < 600 + 800, so it goes too.
+        val (filtered, report) = PrivacyFilter.apply(original, listOf(home))
+        assertEquals(emptyList(), filtered.segments[0].weather.map { it.id }, "a cell centre 1.1 km away may still cover the zone's edge")
+        assertEquals(2, report.weatherRemoved)
+        assertTrue(!report.isEmpty)
+        // A small zone 1.5 km away from both cells leaves them in.
+        val (kept, r2) = PrivacyFilter.apply(original, listOf(PrivacyZone("z-far", "Lejos", -34.615, -58.4, 100.0)))
+        assertEquals(listOf("w-1", "w-2"), kept.segments[0].weather.map { it.id })
+        assertEquals(0, r2.weatherRemoved)
+        val (one, _) = PrivacyFilter.apply(original, listOf(PrivacyZone("z-top", "Arriba", -34.5985, -58.4, 100.0)))
+        assertEquals(listOf("w-2"), one.segments[0].weather.map { it.id }, "a 100 m zone 170 m from w-1's cell centre removes w-1 (within the 800 m margin) and keeps w-2 (1.1 km away)")
+        assertTrue(kept.attributions.any { it.name.startsWith("Datos meteorológicos: Open-Meteo") }, "credit recomputed with the weather that is left")
+        assertTrue(filtered.attributions.none { it.name.startsWith("Datos meteorológicos") }, "no weather left, no credit")
+    }
 }

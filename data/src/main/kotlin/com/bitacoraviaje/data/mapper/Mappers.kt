@@ -10,6 +10,7 @@ import com.bitacoraviaje.core.model.TextNote
 import com.bitacoraviaje.core.model.TextNoteKind
 import com.bitacoraviaje.core.model.TranscriptStatus
 import com.bitacoraviaje.core.model.VoiceNote
+import com.bitacoraviaje.core.model.WeatherSample
 import com.bitacoraviaje.core.model.PauseKind
 import com.bitacoraviaje.core.model.RecordingMode
 import com.bitacoraviaje.core.model.Segment
@@ -26,6 +27,7 @@ import com.bitacoraviaje.data.db.entity.MediaItemEntity
 import com.bitacoraviaje.data.db.entity.SegmentEntity
 import com.bitacoraviaje.data.db.entity.SegmentPauseEntity
 import com.bitacoraviaje.data.db.entity.StopEntity
+import com.bitacoraviaje.data.db.entity.WeatherSampleEntity
 import com.bitacoraviaje.data.db.entity.TextNoteEntity
 import com.bitacoraviaje.data.db.entity.VoiceNoteEntity
 import com.bitacoraviaje.data.db.entity.TrackPointEntity
@@ -178,3 +180,9 @@ fun com.bitacoraviaje.core.model.Enrichment.toEntity() = com.bitacoraviaje.data.
 fun com.bitacoraviaje.data.db.entity.SegmentPlaceEntity.toDomain() = com.bitacoraviaje.core.model.SegmentPlace(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance, dismissed)
 
 fun com.bitacoraviaje.core.model.SegmentPlace.toEntity() = com.bitacoraviaje.data.db.entity.SegmentPlaceEntity(segmentId, placeId, firstSeenUtcMs, dwellMs, relevance, dismissed)
+
+// ---- Backlog D3: weather ----
+
+fun WeatherSampleEntity.toDomain() = WeatherSample(id, segmentId, timeUtcMs, lat, lon, temperatureC, apparentC, precipitationMm, windKmh, cloudPct, weatherCode, source, fetchedUtcMs)
+
+fun WeatherSample.toEntity() = WeatherSampleEntity(id, segmentId, timeUtcMs, lat, lon, temperatureC, apparentC, precipitationMm, windKmh, cloudPct, weatherCode, source, fetchedUtcMs)

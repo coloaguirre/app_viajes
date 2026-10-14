@@ -30,6 +30,7 @@ class TripVideoPlanner @Inject constructor(
     private val media: MediaRepository,
     private val notes: NotesRepository,
     private val places: PlacesRepository,
+    private val weather: com.bitacoraviaje.data.repository.WeatherRepository,
 ) {
     data class Prepared(val segments: List<Segment>, val input: PlanInput)
 
@@ -59,6 +60,7 @@ class TripVideoPlanner @Inject constructor(
                 voiceNotes = voices.map { v -> PlanVoice(v.id, v.startedUtcMs, v.durationMs, v.displayText) },
                 highlightsUtcMs = texts.filter { it.kind == TextNoteKind.HIGHLIGHT }.map { it.timeUtcMs }.sorted(),
                 places = placeRows,
+                weather = com.bitacoraviaje.core.timeline.WeatherDigest.segmentText(weather.samplesOf(s.id)), // backlog D3
             )
         }
         return Prepared(segments, PlanInput(trip.id, trip.title, trip.coverMediaId, planSegments, extraCredits = listOf(MiniVideoPlanner.TILES_CREDIT)))

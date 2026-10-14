@@ -118,6 +118,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setEnrichPlaces(value: Boolean) = viewModelScope.launch { prefs.setEnrichPlaces(value) }
 
+    fun setFetchWeather(value: Boolean) = viewModelScope.launch { prefs.setFetchWeather(value) }
+
     fun setRoundEnrichmentCoords(value: Boolean) = viewModelScope.launch { prefs.setRoundEnrichmentCoords(value) }
 
     fun setUnits(units: Units) = viewModelScope.launch { prefs.setUnits(units) }

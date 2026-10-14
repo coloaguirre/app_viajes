@@ -122,7 +122,7 @@ class Renderer:
                 scene.duration_ms,
             )
         if isinstance(scene, Chapter):
-            return self.still_clip(cards.chapter_card(w, h, scene.title, scene.date), out, scene.duration_ms)
+            return self.still_clip(cards.chapter_card(w, h, scene.title, scene.date, scene.weather), out, scene.duration_ms)
         if isinstance(scene, PlaceCard):
             return self.still_clip(cards.place_card(w, h, scene.title, scene.text, scene.source), out, scene.duration_ms)
         if isinstance(scene, StatsScene):

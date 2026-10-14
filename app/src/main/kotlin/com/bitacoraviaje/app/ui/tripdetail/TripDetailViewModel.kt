@@ -56,6 +56,8 @@ data class SegmentTimeline(
     val pauses: List<com.bitacoraviaje.core.geo.TimeInterval> = emptyList(),
     /** Distance covered up to each point, precomputed off the main thread (same rule as the stage stats). */
     val cumulativeM: DoubleArray = DoubleArray(0),
+    /** Hourly weather samples (backlog D3). */
+    val weather: List<com.bitacoraviaje.core.model.WeatherSample> = emptyList(),
 )
 
 /** What the user selected on the map, by stable keys: resolved against the current segments on every emission (backlog D2). */
@@ -69,6 +71,8 @@ data class MapSelection(
     val speedMps: Double?,
     val altM: Double?,
     val event: TimelineEvent?,
+    /** "☀️ 23 °C" of the nearest sampled hour, when known (backlog D3). */
+    val weather: String? = null,
 )
 
 /** A card of the Places tab (DISENO §14 "Lugares"): the place, how this segment saw it and its texts. */
@@ -115,6 +119,7 @@ class TripDetailViewModel @Inject constructor(
     private val media: MediaRepository,
     private val notes: NotesRepository,
     private val places: com.bitacoraviaje.data.repository.PlacesRepository,
+    private val weather: com.bitacoraviaje.data.repository.WeatherRepository,
     private val prefs: com.bitacoraviaje.app.settings.UserPreferences,
     private val secrets: com.bitacoraviaje.app.settings.Secrets,
     private val rewriter: com.bitacoraviaje.app.enrichment.LlmRewriter,
@@ -191,6 +196,13 @@ class TripDetailViewModel @Inject constructor(
     init {
         // Reconciliation sweep on every open of the trip detail (DISENO §7.3).
         LinkMediaWorker.enqueue(context, tripId)
+        // Backlog D3: segments closed before the feature existed (or offline at the time) get their weather now;
+        // a segment already looked up (even with no usable hour) is not asked again (review I4).
+        viewModelScope.launch {
+            if (!prefs.settings.first().fetchWeather) return@launch
+            tracking.segmentsOf(tripId).filter { it.endedUtcMs != null && weather.fetchedAt(it.id) == null }
+                .forEach { com.bitacoraviaje.app.weather.WeatherWorker.enqueue(context, it.id, endedUtcMs = it.endedUtcMs) }
+        }
     }
 
     private val tripFlow = tracking.observeTrips().map { l -> l.firstOrNull { it.id == tripId } }
@@ -222,10 +234,11 @@ class TripDetailViewModel @Inject constructor(
             flow { emit(tracking.stopsOf(s.id) to tracking.pausesOf(s.id)) },
         ) { pts, med, voice, text, (stops, pauses) -> SegmentData(pts, med, voice, text, stops, pauses) },
         placesFlow.map { l -> l.filter { it.first.segmentId == s.id }.map { it.second to it.first } },
-    ) { d, pl ->
-        val events = buildTimeline(TimelineInput(s, d.pts, d.pauses, d.stops, d.media, d.voice, d.text, places = pl, nowUtcMs = System.currentTimeMillis()))
+        weather.observeSamples(s.id), // backlog D3
+    ) { d, pl, wx ->
+        val events = buildTimeline(TimelineInput(s, d.pts, d.pauses, d.stops, d.media, d.voice, d.text, places = pl, nowUtcMs = System.currentTimeMillis(), weather = wx))
         val intervals = d.pauses.toIntervals(System.currentTimeMillis())
-        SegmentTimeline(s, events, d.pts.map { MapPoint(it.lat, it.lon) }, d.pts, intervals, cumulativeDistanceM(d.pts, intervals, s.transport))
+        SegmentTimeline(s, events, d.pts.map { MapPoint(it.lat, it.lon) }, d.pts, intervals, cumulativeDistanceM(d.pts, intervals, s.transport), wx)
     }.flowOn(kotlinx.coroutines.Dispatchers.Default) // timeline building off the main thread (review M5)
 
     /** Only this trip's enrichment jobs (tagged per segment), not every trip's (review M2). */
@@ -344,7 +357,7 @@ class TripDetailViewModel @Inject constructor(
         val st = segs.firstOrNull { it.segment.id == ref.segmentId } ?: return null
         val event = ref.eventKey?.let { key -> st.events.firstOrNull { eventKey(it) == key } ?: return null }
         val pos = TrackLocator.atTime(st.points, ref.timeUtcMs, st.pauses, st.segment.transport, st.cumulativeM.takeIf { it.size == st.points.size })
-        return MapSelection(st.segment, ref.timeUtcMs, pos?.distanceM, pos?.speedMps, pos?.altM, event)
+        return MapSelection(st.segment, ref.timeUtcMs, pos?.distanceM, pos?.speedMps, pos?.altM, event, com.bitacoraviaje.core.timeline.WeatherDigest.brief(com.bitacoraviaje.core.timeline.WeatherDigest.at(st.weather, ref.timeUtcMs)))
     }
 
     /** DISENO §11.4: only the fetched text and the Wikidata facts go to the model; the result replaces the summary, the original stays. */

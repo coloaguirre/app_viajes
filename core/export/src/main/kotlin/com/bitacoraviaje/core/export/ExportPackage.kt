@@ -116,6 +116,7 @@ class ExportPackage(
             add(MediaCsvWriter())
             add(NotesCsvWriter())
             add(PlacesCsvWriter())
+            add(WeatherCsvWriter())
             add(SrtWriter())
         }
     }
@@ -158,6 +159,7 @@ object LeemeWriter {
             appendLine("- Puntos del recorrido omitidos: ${p.pointsRemoved} (el recorrido se corta ${p.cuts} ${if (p.cuts == 1) "vez" else "veces"})")
             appendLine("- Paradas omitidas: ${p.stopsRemoved} · Lugares omitidos: ${p.placesRemoved}")
             appendLine("- Fotos y videos sin ubicación en este paquete: ${p.mediaBlanked} · Notas sin ubicación: ${p.notesBlanked}")
+            if (p.weatherRemoved > 0) appendLine("- Horas de clima omitidas por caer cerca de una zona: ${p.weatherRemoved}")
             when {
                 p.exifStripped != null -> appendLine("- Copias JPEG verificadas sin GPS en su EXIF: ${p.exifStripped} (los originales del teléfono no se tocan)")
                 p.mediaBlanked > 0 -> appendLine("- Atención: las copias JPEG conservan su propio EXIF (no se eligió quitarles el GPS); las coordenadas de arriba sí fueron omitidas.")
@@ -176,6 +178,7 @@ object LeemeWriter {
         }
         appendLine()
         if (trip.places.isNotEmpty()) appendLine("Lugares con información de internet: ${trip.places.size} (textos en tablas/lugares.csv y en la bitácora, cada uno con su fuente y licencia).")
+        if (trip.allWeather.isNotEmpty()) appendLine("Clima: ${trip.allWeather.size} horas con datos de Open-Meteo (tablas/clima.csv, una fila por hora en su punto medio, HH:30; resumen por mañana, tarde y noche en la bitácora).")
         appendLine()
         appendLine("ATRIBUCIONES")
         trip.attributions.forEach { appendLine("- ${it.name} (${it.license}) ${it.url}") }

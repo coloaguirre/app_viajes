@@ -63,12 +63,14 @@ object Cards {
         return b
     }
 
-    fun chapter(w: Int, h: Int, title: String, date: String?): Bitmap {
+    fun chapter(w: Int, h: Int, title: String, date: String?, weather: String? = null): Bitmap {
         val (b, c) = bitmap(w, h, PAPER)
         c.drawRect(0f, h * 0.44f, w * 0.03f, h * 0.56f, Paint().apply { color = ACCENT })
         val l = layout(title, paint(h * 0.07f, NAVY, bold = true), (w * 0.8).toInt(), 3)
         c.save(); c.translate(w * 0.08f, h * 0.42f); l.draw(c); c.restore()
-        date?.let { c.drawText(it, w * 0.08f, h * 0.42f + l.height + h * 0.05f, paint(h * 0.035f, INK)) }
+        var y = h * 0.42f + l.height + h * 0.05f
+        date?.let { c.drawText(it, w * 0.08f, y, paint(h * 0.035f, INK)); y += h * 0.035f * 1.4f }
+        weather?.let { c.drawText(it, w * 0.08f, y, paint(h * 0.03f, INK)) } // backlog D3
         return b
     }
 

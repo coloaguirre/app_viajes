@@ -84,6 +84,13 @@ class Stop(_Lenient):
     user_label: str | None = None
 
 
+class WeatherSample(_Lenient):
+    id: str
+    time_utc_ms: int
+    temperature_c: float | None = None
+    weather_code: int | None = None
+
+
 class Segment(_Lenient):
     id: str
     type: str = "STAGE"
@@ -101,6 +108,7 @@ class Segment(_Lenient):
     media: list[Media] = Field(default_factory=list)
     voice_notes: list[VoiceNote] = Field(default_factory=list)
     text_notes: list[TextNote] = Field(default_factory=list)
+    weather: list[WeatherSample] = Field(default_factory=list)
 
     @property
     def display_name(self) -> str | None:
@@ -234,6 +242,7 @@ class Chapter(_Strict):
     title: str
     date: str | None = None
     segment: str
+    weather: str | None = None
 
 
 class Photo(_Strict):

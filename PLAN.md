@@ -425,7 +425,8 @@ contrato vigente; entran al plan cuando el usuario los priorice.
       Hecho 2026-10-13 (PR feat/trip-menu): evidencia en `docs/notes/evidencia/backlog/D1-menu-viaje.md`.
 - [x] D2 Mapa interactivo: tocar marcadores y recorrido → foto/nota, km acumulados y hora.  (est: 2)
       Hecho 2026-10-13 (PR feat/map-interactive): evidencia en `docs/notes/evidencia/backlog/D2-mapa-interactivo.md`.
-- [ ] D3 Clima por hora a lo largo del recorrido (Open-Meteo) con resumen mañana/tarde/noche.  (est: 2.5)
+- [x] D3 Clima por hora a lo largo del recorrido (Open-Meteo) con resumen mañana/tarde/noche.  (est: 2.5)
+      Hecho 2026-10-14 (PR feat/weather): evidencia en `docs/notes/evidencia/backlog/D3-clima.md`.
 - [ ] D4 "Nuevo viaje" con componentes (etapa, excursión, trekking) en lugar de tres registros.  (est: 2)
 
 ### Calendario

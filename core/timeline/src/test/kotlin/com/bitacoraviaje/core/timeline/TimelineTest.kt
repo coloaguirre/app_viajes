@@ -121,4 +121,24 @@ class TimelineTest {
         assertTrue(ev.indexOfFirst { it is TimelineEvent.StopArrived } < ev.indexOf(visited[1]), "the place row follows the arrival at the stop")
         assertEquals(pts[20].lat, visited[1].lat)
     }
+
+    @Test
+    fun `weather blocks appear once per block, tag photos and notes with the hour's sample and do not split summaries`() {
+        val pts = walk(2881) // 4 h from 17:00 local
+        val end = pts.last().timeUtcMs
+        val hour = t0 / 3_600_000 * 3_600_000
+        val samples = (0 until 4).map { i -> com.bitacoraviaje.core.model.WeatherSample("w$i", "s", hour + i * 3_600_000L + 1_800_000, -34.6, -58.4, 20.0 + i, 19.0, 0.0, 5.0, 10, if (i < 3) 1 else 61) }
+        val tl = buildTimeline(TimelineInput(seg(end = end), pts, media = listOf(media("m", t0 + 70 * 60_000, null, null)), weather = samples))
+        val blocks = tl.filterIsInstance<TimelineEvent.Weather>()
+        assertEquals(listOf(WeatherDigest.Block.AFTERNOON, WeatherDigest.Block.NIGHT), blocks.map { it.block.block }, "17–20 local is afternoon, 20–21 is night")
+        assertEquals("Mayormente despejado, 20–22 °C", blocks[0].block.text)
+        assertEquals("Lluvia ligera, 23 °C", blocks[1].block.text)
+        assertTrue(blocks.all { it.timeUtcMs >= t0 }, "clamped into the segment")
+        val m = tl.filterIsInstance<TimelineEvent.Moment>().single()
+        assertEquals("w1", m.weather?.id, "the photo at 18:10 gets the 18:30 sample")
+        // Without weather events as anchors the 4 h walk still yields its summaries between real events.
+        val withWx = tl.count { it is TimelineEvent.Summary }
+        val without = buildTimeline(TimelineInput(seg(end = end), pts, media = listOf(media("m", t0 + 70 * 60_000, null, null)))).count { it is TimelineEvent.Summary }
+        assertEquals(without, withWx)
+    }
 }

@@ -21,6 +21,7 @@ class ImportTest {
             appendLine("media " + se.media.joinToString(",") { "${it.kind}:${it.displayName}:${it.takenUtcMs}:${it.takenTimeSource}:${it.linkedLat}:${it.linkedLon}:${it.linkMethod}:${it.linkConfidence}:${it.needsReview}:${it.userCaption}:${it.isFavorite}:${it.isExcluded}:${it.cameraMake}:${it.cameraModel}" })
             appendLine("voice " + se.voiceNotes.joinToString(",") { "${it.startedUtcMs}:${it.durationMs}:${it.lat}:${it.lon}:${it.displayText}:${it.transcriptStatus}:${it.transcriptLang}" })
             appendLine("text " + se.textNotes.joinToString(",") { "${it.kind}:${it.timeUtcMs}:${it.lat}:${it.lon}:${it.text}" })
+            appendLine("weather " + se.weather.joinToString(",") { "${it.timeUtcMs}:${it.lat}:${it.lon}:${it.temperatureC}:${it.apparentC}:${it.precipitationMm}:${it.windKmh}:${it.cloudPct}:${it.weatherCode}:${it.source}" })
             appendLine("places " + t.placesOf(se.segment.id).joinToString(",") { (p, sp) -> "${p.id}:${p.name}:${p.kind}:${p.wikidataId}:${p.source}:${sp.firstSeenUtcMs}:${sp.dwellMs}:${sp.relevance}" })
         }
         appendLine("texts " + t.enrichments.joinToString(",") { "${it.id}:${it.placeId}:${it.lang}:${it.title}:${it.summary}:${it.sourceName}:${it.sourceUrl}:${it.license}:${it.userApproved}:${it.llmRewritten}" })

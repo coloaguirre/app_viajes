@@ -19,6 +19,7 @@ import com.bitacoraviaje.core.model.TextNoteKind
 import com.bitacoraviaje.core.model.TrackPoint
 import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.core.model.VoiceNote
+import com.bitacoraviaje.core.model.WeatherSample
 
 /** One row of the unified timeline (DISENO §9). Times are UTC ms; the UI formats them in the segment's zone. */
 sealed interface TimelineEvent {
@@ -30,16 +31,19 @@ sealed interface TimelineEvent {
     data class SegmentEnd(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val segment: Segment) : TimelineEvent
     data class Pause(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val kind: PauseKind) : TimelineEvent
     data class Resume(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val kind: PauseKind, val pausedMs: Long) : TimelineEvent
-    data class StopArrived(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val stop: Stop) : TimelineEvent
+    data class StopArrived(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val stop: Stop, val weather: WeatherSample? = null) : TimelineEvent
     data class StopLeft(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val stop: Stop, val dwellMs: Long) : TimelineEvent
 
-    /** Photos/videos within 2 min and 100 m collapse into one "moment" with a carousel. */
-    data class Moment(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val media: List<MediaItem>) : TimelineEvent {
+    /** Photos/videos within 2 min and 100 m collapse into one "moment" with a carousel. [weather] is the hour's sample when known (backlog D3). */
+    data class Moment(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val media: List<MediaItem>, val weather: WeatherSample? = null) : TimelineEvent {
         val isSingle: Boolean get() = media.size == 1
         val hasVideo: Boolean get() = media.any { it.kind == MediaKind.VIDEO }
     }
 
-    data class Voice(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val note: VoiceNote) : TimelineEvent
+    data class Voice(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val note: VoiceNote, val weather: WeatherSample? = null) : TimelineEvent
+
+    /** Backlog D3: the weather of a block of the local day (morning / afternoon / night), at the block's first sampled hour. */
+    data class Weather(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val block: WeatherDigest.BlockSummary) : TimelineEvent
     data class Text(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val note: TextNote) : TimelineEvent
     data class Highlight(override val timeUtcMs: Long, override val lat: Double?, override val lon: Double?, val note: TextNote) : TimelineEvent
 
@@ -65,6 +69,8 @@ data class TimelineInput(
     val places: List<Pair<Place, SegmentPlace>> = emptyList(),
     /** For an open segment: where "now" is. */
     val nowUtcMs: Long? = null,
+    /** Hourly weather samples of the segment (backlog D3), time ordered. */
+    val weather: List<WeatherSample> = emptyList(),
 )
 
 data class TimelineConfig(
@@ -91,6 +97,8 @@ fun buildTimeline(input: TimelineInput, config: TimelineConfig = TimelineConfig(
         PositionAt.None -> null to null
     }
 
+    fun wx(t: Long): WeatherSample? = WeatherDigest.at(input.weather, t)
+
     val events = ArrayList<TimelineEvent>()
     at(s.startedUtcMs).let { (la, lo) -> events += TimelineEvent.SegmentStart(s.startedUtcMs, la, lo, s) }
     for (p in input.pauses) {
@@ -98,13 +106,13 @@ fun buildTimeline(input: TimelineInput, config: TimelineConfig = TimelineConfig(
         p.resumedUtcMs?.let { r -> at(r).let { (la, lo) -> events += TimelineEvent.Resume(r, la, lo, p.kind, r - p.pausedUtcMs) } }
     }
     for (st in input.stops) {
-        events += TimelineEvent.StopArrived(st.startUtcMs, st.lat, st.lon, st)
+        events += TimelineEvent.StopArrived(st.startUtcMs, st.lat, st.lon, st, wx(st.startUtcMs))
         events += TimelineEvent.StopLeft(st.endUtcMs, st.lat, st.lon, st, st.endUtcMs - st.startUtcMs)
     }
-    events += groupMoments(input.media.filter { !it.isExcluded }.sortedBy { it.takenUtcMs }, config, ::at)
+    events += groupMoments(input.media.filter { !it.isExcluded }.sortedBy { it.takenUtcMs }, config, ::at).map { it.copy(weather = wx(it.timeUtcMs)) }
     for (v in input.voiceNotes) {
         val (la, lo) = if (v.lat != null && v.lon != null) v.lat to v.lon else at(v.startedUtcMs)
-        events += TimelineEvent.Voice(v.startedUtcMs, la, lo, v)
+        events += TimelineEvent.Voice(v.startedUtcMs, la, lo, v, wx(v.startedUtcMs))
     }
     for (n in input.textNotes) {
         val (la, lo) = if (n.lat != null && n.lon != null) n.lat to n.lon else at(n.timeUtcMs)
@@ -117,6 +125,11 @@ fun buildTimeline(input: TimelineInput, config: TimelineConfig = TimelineConfig(
     for ((place, visit) in input.places) {
         val t = visit.firstSeenUtcMs.coerceIn(s.startedUtcMs, end)
         events += TimelineEvent.PlaceVisited(t, place.lat, place.lon, place, visit)
+    }
+    // Weather blocks of the local day (backlog D3), each at its first sampled hour, inside the segment's span.
+    for (b in WeatherDigest.blocks(input.weather, s.tzId)) {
+        val t = b.startUtcMs.coerceIn(s.startedUtcMs, end)
+        at(t).let { (la, lo) -> events += TimelineEvent.Weather(t, la, lo, b) }
     }
     // Day separators at every local midnight crossed between start and end.
     var midnight = DayBoundary.nextLocalMidnightUtcMs(s.startedUtcMs, s.tzId)
@@ -133,6 +146,7 @@ fun buildTimeline(input: TimelineInput, config: TimelineConfig = TimelineConfig(
 private fun rank(e: TimelineEvent): Int = when (e) {
     is TimelineEvent.SegmentStart -> 0
     is TimelineEvent.DayChange -> 1
+    is TimelineEvent.Weather -> 1
     is TimelineEvent.Resume -> 2
     is TimelineEvent.StopArrived -> 3
     is TimelineEvent.Moment, is TimelineEvent.Voice, is TimelineEvent.Text, is TimelineEvent.Highlight, is TimelineEvent.TransportChange -> 4
@@ -178,6 +192,7 @@ private fun withSummaries(events: List<TimelineEvent>, pts: List<TrackPoint>, pa
     out += prev
     val pauseIntervals = pauses.map { TimeInterval(it.pausedUtcMs, it.resumedUtcMs ?: Long.MAX_VALUE) }
     for (e in events.drop(1)) {
+        if (e is TimelineEvent.Weather) { out += e; continue } // a weather block is a label, not a leg boundary
         val leg = pts.filter { it.timeUtcMs in prev.timeUtcMs..e.timeUtcMs }
         if (leg.size >= 2) {
             val stats = computeSegmentStats(leg, pauseIntervals)

@@ -153,6 +153,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 supportingContent = { Text(stringResource(R.string.settings_round_coords_desc)) },
                 trailingContent = { androidx.compose.material3.Switch(checked = settings.roundEnrichmentCoords, onCheckedChange = viewModel::setRoundEnrichmentCoords, enabled = settings.enrichPlaces, modifier = Modifier.testTag("settings_round_coords")) },
             )
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_fetch_weather)) },
+                supportingContent = { Text(stringResource(R.string.settings_fetch_weather_desc)) },
+                trailingContent = { androidx.compose.material3.Switch(checked = settings.fetchWeather, onCheckedChange = viewModel::setFetchWeather, modifier = Modifier.testTag("settings_fetch_weather")) },
+            )
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_offline))
             Text(stringResource(R.string.settings_offline_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))

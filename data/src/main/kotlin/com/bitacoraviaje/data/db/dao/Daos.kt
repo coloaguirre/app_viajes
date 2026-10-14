@@ -333,6 +333,36 @@ interface EnrichmentDao {
 }
 
 @Dao
+interface WeatherDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(rows: List<com.bitacoraviaje.data.db.entity.WeatherSampleEntity>)
+
+    @Query("SELECT * FROM weather_sample WHERE segment_id = :segmentId ORDER BY time_utc_ms")
+    suspend fun getBySegment(segmentId: String): List<com.bitacoraviaje.data.db.entity.WeatherSampleEntity>
+
+    @Query("SELECT * FROM weather_sample WHERE segment_id = :segmentId ORDER BY time_utc_ms")
+    fun observeBySegment(segmentId: String): Flow<List<com.bitacoraviaje.data.db.entity.WeatherSampleEntity>>
+
+    @Query("SELECT w.* FROM weather_sample w JOIN segment s ON s.id = w.segment_id WHERE s.trip_id = :tripId ORDER BY w.time_utc_ms")
+    suspend fun getByTrip(tripId: String): List<com.bitacoraviaje.data.db.entity.WeatherSampleEntity>
+
+    @Query("SELECT COUNT(*) FROM weather_sample WHERE segment_id = :segmentId")
+    suspend fun countBySegment(segmentId: String): Int
+
+    @Query("DELETE FROM weather_sample WHERE segment_id = :segmentId")
+    suspend fun deleteBySegment(segmentId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun markFetched(row: com.bitacoraviaje.data.db.entity.WeatherFetchEntity)
+
+    @Query("SELECT fetched_utc_ms FROM weather_fetch WHERE segment_id = :segmentId")
+    suspend fun fetchedAt(segmentId: String): Long?
+
+    @Query("DELETE FROM weather_fetch WHERE segment_id = :segmentId")
+    suspend fun clearFetched(segmentId: String)
+}
+
+@Dao
 interface SegmentPlaceDao {
     @Upsert
     suspend fun upsertAll(rows: List<com.bitacoraviaje.data.db.entity.SegmentPlaceEntity>)

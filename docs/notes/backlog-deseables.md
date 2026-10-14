@@ -4,7 +4,7 @@ Pedido del usuario al cerrar la Fase 5: una lista de mejoras para encarar cuando
 pruebas en la calle. Acá va cada una con viabilidad, complejidad estimada (días de agente, misma
 escala que el PLAN), impacto en el esquema y el orden sugerido. Nada de esto está implementado.
 
-## 1. Clima en el registro  — viable · complejidad media (2,5 d) · esquema v10
+## 1. Clima en el registro  — viable · complejidad media (2,5 d) · esquema v10 (al implementarlo quedó en v12: `weather_sample` + marcador `weather_fetch`)
 
 **Qué pidió**: capturar el clima de mañana, tarde y noche y sumarlo al registro, u otro esquema
 horario si hay algo mejor.
@@ -18,7 +18,8 @@ y derivar de ahí los bloques del día. La app ya sabe dónde estuvo el usuario 
   todas las horas, coordenadas redondeadas a 2 decimales como ya se hace con los lugares.
 - Se guardan temperatura, sensación térmica, precipitación, viento, nubosidad y el código de
   tiempo (sol, nublado, lluvia…) en una tabla `weather_sample(segment_id, time_utc_ms, lat, lon,
-  …, source)`; migración de Room a v10 con su test.
+  …, source)`; migración de Room a v10 con su test. (Hecho 2026-10-14: v11 + v12; la caché HTTP de
+  `OsmHttp` no guarda respuestas de Open-Meteo porque el servicio no envía cabeceras de caché.)
 - De las muestras salen los **bloques mañana (6–12) / tarde (12–20) / noche (20–6)** para la
   bitácora y la tarjeta de estadísticas, y además el clima de cada foto y de cada parada (la hora ya
   está). El HTML/Markdown, el CSV y `trip.json` lo exportan; el renderizador de escritorio lo lee

@@ -16,12 +16,14 @@ data class PrivacyReport(
     val placesRemoved: Int,
     val mediaBlanked: Int,
     val notesBlanked: Int,
+    /** Weather hours whose ~1 km cell touches a zone, left out of the package (backlog D3). */
+    val weatherRemoved: Int = 0,
     /** JPEG copies verified without GPS tags by the exporter (null: the option was off). Measured, not predicted. */
     val exifStripped: Int? = null,
     /** Copies inside a zone that still carry their own location metadata (HEIC/MP4/failed rewrite): named, never silent. */
     val mediaWithMetadata: List<String> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = pointsRemoved == 0 && stopsRemoved == 0 && placesRemoved == 0 && mediaBlanked == 0 && notesBlanked == 0
+    val isEmpty: Boolean get() = pointsRemoved == 0 && stopsRemoved == 0 && placesRemoved == 0 && mediaBlanked == 0 && notesBlanked == 0 && weatherRemoved == 0
 }
 
 /**
@@ -32,8 +34,11 @@ data class PrivacyReport(
  * exported copy's EXIF is the app's job). Everything removed is counted in [PrivacyReport].
  */
 object PrivacyFilter {
-    fun inside(lat: Double?, lon: Double?, zones: List<PrivacyZone>): Boolean =
-        lat != null && lon != null && zones.any { haversineM(lat, lon, it.lat, it.lon) <= it.radiusM }
+    fun inside(lat: Double?, lon: Double?, zones: List<PrivacyZone>, marginM: Double = 0.0): Boolean =
+        lat != null && lon != null && zones.any { haversineM(lat, lon, it.lat, it.lon) <= it.radiusM + marginM }
+
+    /** A weather sample sits at the centre of a 0.01° cell: anywhere up to ~790 m from the real position (half a diagonal at the equator). */
+    const val WEATHER_CELL_MARGIN_M = 800.0
 
     fun apply(trip: TripExport, zones: List<PrivacyZone>): Pair<TripExport, PrivacyReport> {
         if (zones.isEmpty()) return trip to PrivacyReport(0, 0, 0, 0, 0, 0, 0)
@@ -42,6 +47,7 @@ object PrivacyFilter {
         var stopsRemoved = 0
         var mediaBlanked = 0
         var notesBlanked = 0
+        var weatherRemoved = 0
         val removedPlaceIds = trip.places.filter { inside(it.lat, it.lon, zones) }.map { it.id }.toSet()
         val segments = trip.segments.map { se ->
             val kept = ArrayList<TrackPoint>()
@@ -77,7 +83,11 @@ object PrivacyFilter {
             }
             val voice = se.voiceNotes.map { v -> if (inside(v.lat, v.lon, zones)) { notesBlanked++; v.copy(lat = null, lon = null) } else v }
             val text = se.textNotes.map { n -> if (inside(n.lat, n.lon, zones)) { notesBlanked++; n.copy(lat = null, lon = null) } else n }
-            se.copy(segment = se.segment.copy(stats = stats), points = kept, pauses = pauses.sortedBy { it.pausedUtcMs }, stops = stops, media = media, voiceNotes = voice, textNotes = text)
+            // Weather samples sit at ~1 km, but one placed inside a zone still names the hour the user was there (backlog D3).
+            // Its cell may touch the zone even when its centre is outside: compare with the cell margin (review I1).
+            val weather = se.weather.filter { !inside(it.lat, it.lon, zones, WEATHER_CELL_MARGIN_M) }
+            weatherRemoved += se.weather.size - weather.size
+            se.copy(segment = se.segment.copy(stats = stats), points = kept, pauses = pauses.sortedBy { it.pausedUtcMs }, stops = stops, media = media, voiceNotes = voice, textNotes = text, weather = weather)
         }
         val enrichments = trip.enrichments.filter { it.placeId !in removedPlaceIds }
         val filtered = trip.copy(
@@ -85,9 +95,9 @@ object PrivacyFilter {
             places = trip.places.filter { it.id !in removedPlaceIds },
             enrichments = enrichments,
             segmentPlaces = trip.segmentPlaces.filter { it.placeId !in removedPlaceIds },
-            // Credits name the article (and so the place): recompute them from what is left (review I1).
-            attributions = TripExport.attributionsFor(enrichments),
+            // Credits name the article (and so the place): recompute them from what is left (review I1), weather included (D3).
+            attributions = TripExport.attributionsFor(enrichments, segments.any { it.weather.isNotEmpty() }),
         )
-        return filtered to PrivacyReport(zones.size, pointsRemoved, cuts, stopsRemoved, removedPlaceIds.size, mediaBlanked, notesBlanked)
+        return filtered to PrivacyReport(zones.size, pointsRemoved, cuts, stopsRemoved, removedPlaceIds.size, mediaBlanked, notesBlanked, weatherRemoved)
     }
 }

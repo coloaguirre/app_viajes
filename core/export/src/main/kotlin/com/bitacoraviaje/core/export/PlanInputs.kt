@@ -32,6 +32,7 @@ object PlanInputs {
                 media = se.media.sortedBy { it.takenUtcMs }.map { m -> PlanMedia(m.id, m.kind == MediaKind.VIDEO, m.takenUtcMs, m.durationMs, m.isFavorite, m.isExcluded, m.userCaption) },
                 voiceNotes = se.voiceNotes.sortedBy { it.startedUtcMs }.map { v -> PlanVoice(v.id, v.startedUtcMs, v.durationMs, v.displayText) },
                 highlightsUtcMs = se.textNotes.filter { it.kind == TextNoteKind.HIGHLIGHT }.map { it.timeUtcMs }.sorted(),
+                weather = com.bitacoraviaje.core.timeline.WeatherDigest.segmentText(se.weather),
                 // Only texts the user approved enter the video (DISENO §11.4); Wikipedia text first, then the Wikidata facts.
                 places = trip.placesOf(s.id).flatMap { (p, _) ->
                     trip.enrichmentsOf(p.id).filter { it.userApproved }.sortedBy { if (it.sourceName == Enrichment.SOURCE_WIKIPEDIA) 0 else 1 }

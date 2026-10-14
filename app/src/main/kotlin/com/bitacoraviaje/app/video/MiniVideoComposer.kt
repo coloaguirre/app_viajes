@@ -114,7 +114,7 @@ class MiniVideoComposer(
                     val cover = media[scene.background_media ?: ""]?.let(::decode)
                     image(card("title_$i", Cards.title(width, height, scene.title, scene.subtitle, cover)), durationMs).also { cover?.recycle() }
                 }
-                is VideoPlan.Chapter -> image(card("chapter_$i", Cards.chapter(width, height, scene.title, scene.date)), durationMs)
+                is VideoPlan.Chapter -> image(card("chapter_$i", Cards.chapter(width, height, scene.title, scene.date, scene.weather)), durationMs)
                 is VideoPlan.PlaceCard -> image(card("place_$i", Cards.place(width, height, scene.title, scene.text, scene.source)), durationMs)
                 is VideoPlan.Stats -> image(card("stats_$i", statsCard(scene, titles[scene.segment ?: ""])), durationMs)
                 is VideoPlan.Credits -> {

@@ -93,3 +93,16 @@ class PlacesCsvWriter(override val path: String = "tablas/lugares.csv") : TripWr
         w.flush()
     }
 }
+
+/** Backlog D3: one row per sampled hour, with the WMO code and its Spanish description. */
+class WeatherCsvWriter(override val path: String = "tablas/clima.csv") : TripWriter {
+    override fun write(trip: TripExport, out: OutputStream) {
+        val (c, w) = out.csv()
+        c.row("id", "segment_id", "time_utc", "time_local", "lat", "lon", "temperatura_c", "sensacion_c", "lluvia_mm", "viento_kmh", "nubosidad_pct", "codigo_wmo", "descripcion", "fuente")
+        trip.segments.forEach { se ->
+            val z = se.segment.tzId
+            se.weather.forEach { s -> c.row(s.id, se.segment.id, Iso.utc(s.timeUtcMs), Iso.local(s.timeUtcMs, z), s.lat, s.lon, s.temperatureC, s.apparentC, s.precipitationMm, s.windKmh, s.cloudPct, s.weatherCode, com.bitacoraviaje.core.model.WeatherCodes.label(s.weatherCode), s.source) }
+        }
+        w.flush()
+    }
+}

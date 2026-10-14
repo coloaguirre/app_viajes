@@ -70,6 +70,7 @@ object TripJson {
         val pauses: List<PauseDto>,
         val stops: List<StopDto>,
         val media: List<MediaDto>,
+        val weather: List<WeatherDto> = emptyList(),
         val voice_notes: List<VoiceNoteDto>,
         val text_notes: List<TextNoteDto>,
     )
@@ -116,6 +117,23 @@ object TripJson {
         val radius_m: Double,
         val place_id: String?,
         val user_label: String?,
+    )
+
+    /** Backlog D3: one hourly weather sample; `time` is local to the segment like every other timestamp here. */
+    @Serializable
+    data class WeatherDto(
+        val id: String,
+        val time: String,
+        val time_utc_ms: Long,
+        val lat: Double,
+        val lon: Double,
+        val temperature_c: Double?,
+        val apparent_c: Double?,
+        val precipitation_mm: Double?,
+        val wind_kmh: Double?,
+        val cloud_pct: Int?,
+        val weather_code: Int?,
+        val source: String,
     )
 
     @Serializable
@@ -233,6 +251,7 @@ object TripJson {
                         )
                     },
                     text_notes = se.textNotes.map { n -> TextNoteDto(n.id, n.kind.name, Iso.local(n.timeUtcMs, z), n.timeUtcMs, n.lat, n.lon, n.text) },
+                    weather = se.weather.map { w -> WeatherDto(w.id, Iso.local(w.timeUtcMs, z), w.timeUtcMs, w.lat, w.lon, w.temperatureC, w.apparentC, w.precipitationMm, w.windKmh, w.cloudPct, w.weatherCode, w.source) },
                 )
             },
             places = t.places.map { p ->
