@@ -38,6 +38,9 @@ sealed interface HomeEvent {
     data object PermissionDenied : HomeEvent
     /** "Seguir registrando" found no active trip: open the new-trip form instead (backlog D4). */
     data object StartNewTrip : HomeEvent
+    /** Continuing failed while a trip is in course: open "Agregar al viaje" for it, never the form that closes it (review I3 of D4). */
+    data class AddToTrip(val tripId: String) : HomeEvent
+    /** Open "Agregar al viaje" for the active trip from the recording banner (excursion / trek with one more tap, review I6). */
     /** A trip left the list; the snackbar offers to undo and, when it goes away, the screen commits the deletion (backlog D1). */
     data class TripDeleted(val tripId: String, val title: String) : HomeEvent
     data object TripInUse : HomeEvent
@@ -156,17 +159,30 @@ class HomeViewModel @Inject constructor(
      * Backlog D4, the big button: back to the open segment, or a new stage of the active trip with one tap;
      * without an active trip the screen opens the new-trip form.
      */
+    private val continuing = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     fun continueRecording() {
+        if (!continuing.compareAndSet(expect = false, update = true)) return // a double tap starts one stage, not two (review I5)
         viewModelScope.launch {
-            if (!controller.hasLocationPermission()) {
-                _events.send(HomeEvent.PermissionDenied)
-                return@launch
+            try {
+                if (!controller.hasLocationPermission()) {
+                    _events.send(HomeEvent.PermissionDenied)
+                    return@launch
+                }
+                val active = repository.getActiveTrip()
+                val id = try {
+                    controller.continueRecording()
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    android.util.Log.w("Bitacora", "continue recording failed: ${e.javaClass.simpleName} ${e.message}")
+                    // A transient failure must not land on the form whose button closes the trip (review I3).
+                    _events.send(if (active != null) HomeEvent.AddToTrip(active.id) else HomeEvent.StartNewTrip)
+                    return@launch
+                }
+                _events.send(if (id != null) HomeEvent.OpenActiveSession(id) else HomeEvent.StartNewTrip)
+            } finally {
+                continuing.value = false
             }
-            val id = runCatching { controller.continueRecording() }.getOrElse { e ->
-                android.util.Log.w("Bitacora", "continue recording failed: ${e.javaClass.simpleName} ${e.message}")
-                null
-            }
-            _events.send(if (id != null) HomeEvent.OpenActiveSession(id) else HomeEvent.StartNewTrip)
         }
     }
 

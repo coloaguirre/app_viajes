@@ -47,8 +47,8 @@ tramo), excursiones o visitas, y trekkings.
 3. Para sumar algo distinto, abrí el viaje y tocá el **+** de arriba (**Agregar al viaje**):
    elegí **Etapa**, **Excursión o visita** o **Trekking**, el medio y el modo, y **Iniciar**.
    Una excursión o un trekking se registran dentro de la etapa en curso, que queda en pausa
-   hasta que terminen; una etapa nueva cierra la anterior. Si el viaje estaba terminado, se
-   reabre.
+   hasta que terminen; una etapa nueva cierra la anterior. Si el viaje estaba terminado o
+   archivado, se reabre (y sale de "Archivados").
 4. El modo: **Completo** (máximo detalle del recorrido, consume más batería) o
    **Económico** (para trekkings largos sin recarga; pierde detalle en zigzags).
 5. La pantalla de sesión muestra el mapa con tu posición, el tiempo, la distancia, la

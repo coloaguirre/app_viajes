@@ -5,7 +5,6 @@
     <string name="home_title">Mis viajes</string>
     <string name="home_empty_title">Todavía no hay viajes</string>
     <string name="home_empty_body">Cuando empieces un viaje, el recorrido, las fotos y tus notas van a aparecer acá.</string>
-    <string name="home_new_recording">Nuevo registro</string>
     <string name="home_new_trip">Nuevo viaje</string>
     <string name="home_continue">Seguir registrando</string>
     <string name="home_active_trip">Viaje en curso: %1$s</string>
@@ -27,6 +26,7 @@
     <string name="newsession_step_component">¿Qué agregás?</string>
     <string name="newsession_closes_trip">El viaje en curso «%1$s» se cierra (y su etapa, si está grabando).</string>
     <string name="newsession_start_trip">Empezar el viaje</string>
+    <string name="newsession_failed">No se pudo iniciar el registro.</string>
     <string name="trip_add">Agregar al viaje</string>
     <string name="newsession_step_type">¿Qué estás haciendo?</string>
     <string name="newsession_step_details">Detalles (opcional)</string>

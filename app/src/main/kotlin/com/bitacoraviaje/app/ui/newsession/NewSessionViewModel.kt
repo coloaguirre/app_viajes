@@ -41,7 +41,6 @@ data class NewSessionUiState(
     val form: NewSessionForm = NewSessionForm(),
     /** An open segment means "Excursión/Trekking" nest under it and "Etapa" closes it first. */
     val openSegment: Segment? = null,
-    val hasActiveTrip: Boolean = false,
     val starting: Boolean = false,
     val mediaAccess: MediaAccess = MediaAccess.NONE,
     val mode: NewSessionMode? = null,
@@ -57,6 +56,9 @@ data class NewSessionUiState(
 sealed interface NewSessionEvent {
     data class Started(val segmentId: String) : NewSessionEvent
     data object PermissionDenied : NewSessionEvent
+    /** Leave this screen: the trip to add to is gone, or an interrupted segment needs Home's recovery dialog (review I7/M2 of D4). */
+    data object GoHome : NewSessionEvent
+    data class Failed(val detail: String) : NewSessionEvent
 }
 
 @HiltViewModel
@@ -73,6 +75,8 @@ class NewSessionViewModel @Inject constructor(
     private val mediaAccess = MutableStateFlow(mediaPermissions.access())
     private val mode = MutableStateFlow<NewSessionMode?>(null)
     private val targetTrip = MutableStateFlow<Trip?>(null)
+    private val _events = Channel<NewSessionEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
 
     init {
         viewModelScope.launch {
@@ -93,16 +97,24 @@ class NewSessionViewModel @Inject constructor(
                 form.value = form.value.copy(type = SegmentType.TRIP_START)
             }
             route.tripId != null -> {
-                targetTrip.value = repository.getTrip(route.tripId)
+                val trip = repository.getTrip(route.tripId)
+                if (trip == null) { _events.send(NewSessionEvent.GoHome); return } // deleted meanwhile: never add to "whatever is active"
+                targetTrip.value = trip
                 mode.value = NewSessionMode.ADD_TO_TRIP
                 form.value = form.value.copy(type = SegmentType.STAGE)
             }
             else -> {
+                if (controller.needsRecovery()) { _events.send(NewSessionEvent.GoHome); return } // Home's dialog decides: resume or close (DISENO §6.9)
                 val active = repository.getActiveTrip()
                 if (active != null && controller.hasLocationPermission()) {
                     starting.value = true
                     try {
                         controller.continueRecording()?.let { _events.send(NewSessionEvent.Started(it)); return }
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        // Never crash the one-tap entry (review I2): fall through to the form, which shows what failed.
+                        android.util.Log.w("Bitacora", "one-tap continue failed: ${e.javaClass.simpleName} ${e.message}")
+                        _events.send(NewSessionEvent.Failed(e.message ?: e.javaClass.simpleName))
                     } finally {
                         starting.value = false
                     }
@@ -123,11 +135,8 @@ class NewSessionViewModel @Inject constructor(
     private class Flags(val starting: Boolean, val media: MediaAccess, val mode: NewSessionMode?, val target: Trip?)
 
     val state: StateFlow<NewSessionUiState> = combine(form, repository.observeOpenSegment(), repository.observeActiveTrip(), flags) { f, open, trip, fl ->
-        NewSessionUiState(f, open, trip != null, fl.starting, fl.media, fl.mode, fl.target, trip)
+        NewSessionUiState(f, open, fl.starting, fl.media, fl.mode, fl.target, trip)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewSessionUiState())
-
-    private val _events = Channel<NewSessionEvent>(Channel.BUFFERED)
-    val events = _events.receiveAsFlow()
 
     fun requiredPermissions() = controller.requiredPermissions()
 
@@ -164,6 +173,10 @@ class NewSessionViewModel @Inject constructor(
                     newTrip = mode.value == NewSessionMode.NEW_TRIP,
                 )
                 _events.send(NewSessionEvent.Started(id))
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.w("Bitacora", "start session failed: ${e.javaClass.simpleName} ${e.message}")
+                _events.send(NewSessionEvent.Failed(e.message ?: e.javaClass.simpleName))
             } finally {
                 starting.value = false
             }

@@ -29,9 +29,20 @@ viaje real al día siguiente (2026-11-20), así que el camino rápido no podía 
   `tripId` apunta al viaje elegido y lo reabre (`status = ACTIVE`, `ended_utc_ms = null`,
   `archived = 0`); si el viaje activo es otro, `finishTripInternal` lo cierra con sus etapas
   abiertas dentro de la misma transacción. El anidado y el cierre de etapas quedan como estaban.
-- `TrackingController.continueRecording()`: etapa abierta → su id (y `resumeOpenSegment` si el
-  servicio no corre); si no, `startSession(STAGE, medio y modo de la última etapa, tripId =
-  activo)`. Al cambiar de viaje también se vacía el buffer del servicio antes de la transacción.
+- `TrackingController.continueRecording()`: etapa abierta → su id; si no, `startSession(STAGE,
+  medio y modo de la **última etapa de primer nivel** (`lastStageOf`, nunca de una excursión
+  anidada: una caminata al final de un día en auto no puede volver "a pie" la etapa del día
+  siguiente, porque el filtro a pie descartaría todos los puntos en movimiento), tripId = activo)`.
+  Al cambiar de viaje también se vacía el buffer del servicio antes de la transacción. Si la etapa
+  abierta quedó sin servicio (proceso muerto), la entrada de un toque manda a Home, cuyo diálogo
+  ofrece Reanudar / Cerrar etapa (DISENO §6.9), en vez de reanudar a ciegas.
+- Todo lo que `startSession` cierra de paso (la etapa abierta y, al cambiar de viaje, el viaje
+  anterior) recibe los mismos trabajos que un cierre explícito: vinculación de fotos, respaldo,
+  nombre de ruta, lugares y clima (`ImplicitlyClosed` devuelto por el repositorio).
+- Home: "Seguir registrando" tiene guarda contra el doble toque; si falla con un viaje en curso abre
+  "Agregar al viaje" para ese viaje (nunca el formulario que lo cierra). La tarjeta "Registro en
+  curso" ofrece **Excursión o trekking** con un toque (abre "Agregar al viaje" del viaje activo).
+- La entrada de un toque nunca crashea: cualquier error cae al formulario con un aviso.
 - `NewSessionViewModel.resolveMode()`: la ruta explícita fija el modo; la pelada intenta
   `continueRecording()` solo si hay permiso de ubicación y viaje activo; si no, abre el formulario
   que corresponda. Mientras decide, la pantalla muestra un spinner (nunca un formulario a medio armar).
@@ -60,6 +71,19 @@ viaje real al día siguiente (2026-11-20), así que el camino rápido no podía 
 5. **Nuevo viaje** desde la tarjeta → formulario con el aviso de cierre y el nombre del viaje
    (`D4-nuevo-viaje.png`); "Prueba D4" → **Empezar el viaje** → sesión activa; Home lista
    "Prueba D4 · Viaje en curso" y "Patagonia · Terminado". Sin crashes en el log.
+
+## Revisión de código
+Primera pasada (2026-11-19, informe en el PR): 1 bloqueante (el medio heredado de una excursión
+anidada), 8 importantes y 8 menores. Corregidos en el segundo commit: medio y modo de la última
+etapa de primer nivel (test); trabajos post-cierre también para cierres implícitos (test de que la
+etapa cerrada conserva puntos y estadísticas); catch en la entrada de un toque y en Iniciar; fallback
+a "Agregar al viaje" en vez de "Nuevo viaje"; guarda de doble toque; excursión desde la tarjeta de
+registro en curso; la entrada de un toque con etapa interrumpida va a Home; `_events` antes del
+`init`; viaje destino borrado → vuelve; manual dice que también desarchiva; recursos sin uso
+eliminados; tests nuevos de Compose (banner con excursión; agregar a otro viaje con excursión
+anidada abierta). Queda registrado y aceptado: el mosaico y el widget arrancan una etapa sin
+confirmación (es el diseño pedido: un toque), y no hay tests de ViewModel ni de controller (la
+lógica de decisión se probó en el repositorio y en el emulador).
 
 ## No incluido / límites
 - El cierre automático de un viaje activo al empezar otro no tiene confirmación propia: el aviso

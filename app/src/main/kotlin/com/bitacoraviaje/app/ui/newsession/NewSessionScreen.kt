@@ -52,6 +52,7 @@ fun NewSessionRoute(onBack: () -> Unit, onStarted: (String) -> Unit, viewModel: 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val denied = stringResource(R.string.home_permission_denied)
+    val failed = stringResource(R.string.newsession_failed)
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.start() }
     val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshMediaAccess() }
     LaunchedEffect(Unit) {
@@ -59,6 +60,8 @@ fun NewSessionRoute(onBack: () -> Unit, onStarted: (String) -> Unit, viewModel: 
             when (e) {
                 is NewSessionEvent.Started -> onStarted(e.segmentId)
                 NewSessionEvent.PermissionDenied -> snackbar.showSnackbar(denied)
+                NewSessionEvent.GoHome -> onBack()
+                is NewSessionEvent.Failed -> snackbar.showSnackbar("$failed ${e.detail}".trim())
             }
         }
     }

@@ -65,6 +65,12 @@ class TrackingRepository @Inject constructor(
 
     suspend fun getActiveTrip(): Trip? = trips.getActive()?.toDomain()
 
+    /** The last stage of the trip (not a nested excursion or trek): what "Seguir registrando" copies transport and mode from (backlog D4). */
+    suspend fun lastStageOf(tripId: String): Segment? = segments.getByTrip(tripId).map { it.toDomain() }.filter { it.parentSegmentId == null }.maxByOrNull { it.startedUtcMs }
+
+    /** Ids of the segments (and the trip) [startSession] closed on the way: the caller runs the same after-close jobs as an explicit finish. */
+    class ImplicitlyClosed(val segmentIds: MutableList<String> = ArrayList(), var tripId: String? = null)
+
     /**
      * Starts a recording session (backlog D4: a trip is a container to which components are added).
      * - [newTrip]: always creates a trip; whatever trip was active is closed first (with its open segment).
@@ -84,6 +90,7 @@ class TrackingRepository @Inject constructor(
         tripTitle: String? = null,
         tripId: String? = null,
         newTrip: Boolean = false,
+        closed: ImplicitlyClosed? = null,
     ): Segment = db.withTransaction {
         val now = clock.nowUtcMs()
         val active = trips.getActive()?.toDomain()
@@ -93,7 +100,10 @@ class TrackingRepository @Inject constructor(
             else -> active
         }
         // Only one trip records at a time: leaving the active one closes it, open segment included.
-        if (active != null && active.id != target?.id) finishTripInternal(active.id, now)
+        if (active != null && active.id != target?.id) {
+            closed?.let { c -> c.tripId = active.id; segments.getOpenByTrip(active.id).forEach { c.segmentIds += it.id } }
+            finishTripInternal(active.id, now)
+        }
         val trip = target?.let { t ->
             if (t.status != TripStatus.ACTIVE || t.archived) {
                 trips.update(t.copy(status = TripStatus.ACTIVE, endedUtcMs = null, archived = false).toEntity())
@@ -124,9 +134,11 @@ class TrackingRepository @Inject constructor(
             } else {
                 // A new stage closes whatever is open, nested child first.
                 if (open.parentSegmentId != null) {
+                    closed?.segmentIds?.add(open.id)
                     finishInternal(open, now, SegmentStatus.FINISHED)
-                    segments.getById(open.parentSegmentId!!)?.toDomain()?.let { finishInternal(it, now, SegmentStatus.FINISHED) }
+                    segments.getById(open.parentSegmentId!!)?.toDomain()?.let { closed?.segmentIds?.add(it.id); finishInternal(it, now, SegmentStatus.FINISHED) }
                 } else {
+                    closed?.segmentIds?.add(open.id)
                     finishInternal(open, now, SegmentStatus.FINISHED)
                 }
             }

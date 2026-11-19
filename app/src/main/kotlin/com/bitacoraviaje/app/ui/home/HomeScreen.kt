@@ -51,7 +51,7 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.model.Trip
 
 @Composable
-fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSession: (String) -> Unit, onOpenTrip: (String) -> Unit = {}, onExportTrip: (String) -> Unit = {}, onCreateVideo: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSession: (String) -> Unit, onAddToTrip: (String) -> Unit = {}, onOpenTrip: (String) -> Unit = {}, onExportTrip: (String) -> Unit = {}, onCreateVideo: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val resources = androidx.compose.ui.platform.LocalResources.current
@@ -61,6 +61,7 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSes
             when (e) {
                 is HomeEvent.OpenActiveSession -> onOpenActiveSession(e.segmentId)
                 HomeEvent.StartNewTrip -> onNewTrip()
+                is HomeEvent.AddToTrip -> onAddToTrip(e.tripId)
                 HomeEvent.PermissionDenied -> launch { snackbar.showSnackbar(denied) }
                 // Each snackbar in its own coroutine: a 10 s "Deshacer" must not hold back the next event (review M5).
                 is HomeEvent.TripDeleted -> launch {
@@ -85,6 +86,7 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSes
         onOpenSettings = onOpenSettings,
         onNewTrip = onNewTrip,
         onContinue = viewModel::continueRecording,
+        onAddToTrip = onAddToTrip,
         onResumeActive = { id -> onOpenActiveSession(id) },
         onRecoverResume = viewModel::resumeOpenSegment,
         onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
@@ -153,6 +155,7 @@ fun HomeScreen(
     onNewTrip: () -> Unit,
     onResumeActive: (String) -> Unit,
     onContinue: () -> Unit = {},
+    onAddToTrip: (String) -> Unit = {},
     onRecoverResume: () -> Unit = {},
     onRecoverClose: () -> Unit = {},
     onOpenTrip: (String) -> Unit = {},
@@ -220,9 +223,13 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("home_active_banner"),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                 ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.home_active_banner), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onResumeActive(open.id) }) { Text(stringResource(R.string.home_active_banner_action)) }
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Text(stringResource(R.string.home_active_banner), style = MaterialTheme.typography.titleMedium)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                            // "Llego en auto, salgo a caminar": an excursion or trek is one tap away from here (review I6 of D4).
+                            if (open.parentSegmentId == null) TextButton(onClick = { onAddToTrip(open.tripId) }, modifier = Modifier.testTag("home_add_excursion")) { Text(stringResource(R.string.home_new_excursion)) }
+                            TextButton(onClick = { onResumeActive(open.id) }, modifier = Modifier.testTag("home_resume")) { Text(stringResource(R.string.home_active_banner_action)) }
+                        }
                     }
                 }
             }

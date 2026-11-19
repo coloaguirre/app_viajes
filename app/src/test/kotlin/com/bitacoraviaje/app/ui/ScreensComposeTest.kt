@@ -115,9 +115,35 @@ class ScreensComposeTest {
         }
         rule.onNodeWithTag("home_continue").assertIsDisplayed().performClick()
         rule.onNodeWithTag("home_new_trip").assertDoesNotExist()
+        rule.onNodeWithTag("home_add_excursion").assertDoesNotExist()
         rule.onNodeWithText("Viaje en curso: Patagonia").assertIsDisplayed()
         rule.onNodeWithTag("home_new_trip_secondary").performClick()
         assertEquals(1 to 1, continues to newTrips)
+    }
+
+    @Test
+    fun `home with a stage recording offers an excursion from the banner`() {
+        var adds = listOf<String>()
+        val open = com.bitacoraviaje.core.model.Segment("s1", "a", null, SegmentType.STAGE, null, null, null, 0L, null, "UTC", "WALK", RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.ACTIVE)
+        rule.setContent {
+            BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = com.bitacoraviaje.app.ui.home.HomeUiState(trips = listOf(tripA), activeTrip = tripA, openSegment = open), snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = {}, onResumeActive = {}, onAddToTrip = { adds = adds + it }) }
+        }
+        rule.onNodeWithTag("home_add_excursion").performClick()
+        assertEquals(listOf("a"), adds)
+        rule.onNodeWithTag("home_active_trip").assertDoesNotExist()
+    }
+
+    @Test
+    fun `adding to another trip while a nested excursion is open shows all three components and the switch warning`() {
+        val tripB = tripA.copy(id = "b", title = "Otro")
+        val nested = com.bitacoraviaje.core.model.Segment("x1", "a", "s1", SegmentType.EXCURSION, null, null, null, 0L, null, "UTC", "WALK", RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.ACTIVE)
+        rule.setContent {
+            BitacoraTheme { NewSessionScreen(state = NewSessionUiState(NewSessionForm(type = SegmentType.STAGE), openSegment = nested, mode = com.bitacoraviaje.app.ui.newsession.NewSessionMode.ADD_TO_TRIP, targetTrip = tripB, activeTrip = tripA), snackbar = SnackbarHostState(), onBack = {}, onUpdate = {}, onStart = {}) }
+        }
+        rule.onNodeWithTag("newsession_type_EXCURSION").assertIsDisplayed()
+        rule.onNodeWithTag("newsession_type_TREKKING").assertIsDisplayed()
+        rule.onNodeWithTag("newsession_closes_trip").assertIsDisplayed()
+        rule.onNodeWithText("La etapa en curso se cierra y empieza una nueva.").assertDoesNotExist()
     }
 
     @Test

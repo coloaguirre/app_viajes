@@ -67,6 +67,7 @@ fun BitacoraNavHost(mapRenderer: MapRenderer, newSessionRequest: Int = 0) {
             HomeRoute(
                 onOpenSettings = { navController.navigate(Route.Settings) },
                 onNewTrip = { navController.navigate(Route.NewSession(newTrip = true)) },
+                onAddToTrip = { id -> navController.navigate(Route.NewSession(tripId = id)) },
                 onOpenActiveSession = { id -> navController.navigate(Route.ActiveSession(id)) },
                 onExportTrip = { id -> navController.navigate(Route.TripDetail(id, openExport = true)) },
                 onCreateVideo = { id -> navController.navigate(Route.VideoCreate(id)) },
