@@ -101,7 +101,9 @@ class NewSessionViewModel @Inject constructor(
                 if (trip == null) { _events.send(NewSessionEvent.GoHome); return } // deleted meanwhile: never add to "whatever is active"
                 targetTrip.value = trip
                 mode.value = NewSessionMode.ADD_TO_TRIP
-                form.value = form.value.copy(type = SegmentType.STAGE)
+                // From the recording banner's "Excursión o trekking" the excursion is preselected: tapping Iniciar nests it
+                // under the open stage instead of closing it (review N1 of D4).
+                form.value = form.value.copy(type = if (route.excursion) SegmentType.EXCURSION else SegmentType.STAGE)
             }
             else -> {
                 if (controller.needsRecovery()) { _events.send(NewSessionEvent.GoHome); return } // Home's dialog decides: resume or close (DISENO §6.9)

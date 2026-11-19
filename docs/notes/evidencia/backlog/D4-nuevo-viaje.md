@@ -78,6 +78,11 @@ viaje real al día siguiente (2026-11-20), así que el camino rápido no podía 
    dirigido a «Prueba D4» y arranca anidada (la etapa queda en pausa y la tarjeta deja de ofrecer
    excursión mientras hay una abierta); un doble toque en "Seguir registrando" no crea segmentos
    de más (base: una etapa en pausa y una excursión activa). Sin crashes.
+7. Segunda pasada de la revisión: "Excursión o trekking" desde la tarjeta abre "Agregar al viaje"
+   con **Excursión o visita ya seleccionada** (`D4-excursion-desde-tarjeta.png`), así "Iniciar"
+   anida en vez de cerrar la etapa; una etapa nueva cierra la excursión anidada y su etapa madre
+   aunque compartan hora de inicio (test); el aviso de fallo no muestra texto técnico; al cambiar
+   de viaje se encola un solo respaldo del viaje cerrado.
 
 ## Revisión de código
 Primera pasada (2026-11-19, informe en el PR): 1 bloqueante (el medio heredado de una excursión

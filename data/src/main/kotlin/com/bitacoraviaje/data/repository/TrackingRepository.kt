@@ -132,14 +132,11 @@ class TrackingRepository @Inject constructor(
                     parentId = open.id
                 }
             } else {
-                // A new stage closes whatever is open, nested child first.
-                if (open.parentSegmentId != null) {
-                    closed?.segmentIds?.add(open.id)
-                    finishInternal(open, now, SegmentStatus.FINISHED)
-                    segments.getById(open.parentSegmentId!!)?.toDomain()?.let { closed?.segmentIds?.add(it.id); finishInternal(it, now, SegmentStatus.FINISHED) }
-                } else {
-                    closed?.segmentIds?.add(open.id)
-                    finishInternal(open, now, SegmentStatus.FINISHED)
+                // A new stage closes whatever is open in that trip, nested children first (the per-trip query
+                // orders them so, and does not depend on which one `getOpen` picked when two share a start time).
+                segments.getOpenByTrip(open.tripId).map { it.toDomain() }.sortedBy { if (it.parentSegmentId != null) 0 else 1 }.forEach {
+                    closed?.segmentIds?.add(it.id)
+                    finishInternal(it, now, SegmentStatus.FINISHED)
                 }
             }
         }

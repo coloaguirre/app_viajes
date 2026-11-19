@@ -60,15 +60,15 @@ class TrackingController @Inject constructor(
         )
         // Whatever the new session closed on the way gets the same after-close jobs as an explicit finish (review I4 of D4):
         // photos linked, backup, route name, places and weather. Never lose a trip's data because it was closed implicitly.
-        closed.segmentIds.distinct().forEach { id -> repository.getSegment(id)?.let { afterClose(it) } }
-        closed.tripId?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, it) }
+        closed.segmentIds.distinct().forEach { id -> repository.getSegment(id)?.let { afterClose(it, withBackup = closed.tripId == null) } }
+        closed.tripId?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, it) } // one link + backup for the whole closed trip
         startService(segment.id, segment.samplingProfile)
         return segment.id
     }
 
-    private fun afterClose(done: com.bitacoraviaje.core.model.Segment) {
+    private fun afterClose(done: com.bitacoraviaje.core.model.Segment, withBackup: Boolean = true) {
         // Link photos first, then the backup (review I9): the trip.json must hold the last linked photos.
-        com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, done.tripId, done.id)
+        if (withBackup) com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, done.tripId, done.id)
         com.bitacoraviaje.app.enrichment.EnrichRouteWorker.enqueue(context, done.id) // PLAN 3.6: name from the map when online
         com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.enqueue(context, done.id) // PLAN 4.1: places and texts when online
         com.bitacoraviaje.app.weather.WeatherWorker.enqueue(context, done.id, endedUtcMs = done.endedUtcMs) // backlog D3: hourly weather when online, once the hour has passed

@@ -29,7 +29,7 @@ sealed interface Route {
      * neither is the one-tap entry (shortcut, tile, widget): continue the open segment, else start a stage of the
      * active trip, else the new-trip form.
      */
-    data class NewSession(val tripId: String? = null, val newTrip: Boolean = false) : Route
+    data class NewSession(val tripId: String? = null, val newTrip: Boolean = false, val excursion: Boolean = false) : Route
 
     @Serializable
     data class ActiveSession(val segmentId: String) : Route
@@ -68,6 +68,7 @@ fun BitacoraNavHost(mapRenderer: MapRenderer, newSessionRequest: Int = 0) {
                 onOpenSettings = { navController.navigate(Route.Settings) },
                 onNewTrip = { navController.navigate(Route.NewSession(newTrip = true)) },
                 onAddToTrip = { id -> navController.navigate(Route.NewSession(tripId = id)) },
+                onAddExcursion = { id -> navController.navigate(Route.NewSession(tripId = id, excursion = true)) },
                 onOpenActiveSession = { id -> navController.navigate(Route.ActiveSession(id)) },
                 onExportTrip = { id -> navController.navigate(Route.TripDetail(id, openExport = true)) },
                 onCreateVideo = { id -> navController.navigate(Route.VideoCreate(id)) },

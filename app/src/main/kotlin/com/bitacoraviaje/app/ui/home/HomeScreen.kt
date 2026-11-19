@@ -51,7 +51,7 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.model.Trip
 
 @Composable
-fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSession: (String) -> Unit, onAddToTrip: (String) -> Unit = {}, onOpenTrip: (String) -> Unit = {}, onExportTrip: (String) -> Unit = {}, onCreateVideo: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSession: (String) -> Unit, onAddToTrip: (String) -> Unit = {}, onAddExcursion: (String) -> Unit = {}, onOpenTrip: (String) -> Unit = {}, onExportTrip: (String) -> Unit = {}, onCreateVideo: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val resources = androidx.compose.ui.platform.LocalResources.current
@@ -86,7 +86,7 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSes
         onOpenSettings = onOpenSettings,
         onNewTrip = onNewTrip,
         onContinue = viewModel::continueRecording,
-        onAddToTrip = onAddToTrip,
+        onAddExcursion = onAddExcursion,
         onResumeActive = { id -> onOpenActiveSession(id) },
         onRecoverResume = viewModel::resumeOpenSegment,
         onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
@@ -155,7 +155,8 @@ fun HomeScreen(
     onNewTrip: () -> Unit,
     onResumeActive: (String) -> Unit,
     onContinue: () -> Unit = {},
-    onAddToTrip: (String) -> Unit = {},
+    /** "Excursión o trekking" from the recording banner: the add form opens with an excursion preselected (review N1 of D4). */
+    onAddExcursion: (String) -> Unit = {},
     onRecoverResume: () -> Unit = {},
     onRecoverClose: () -> Unit = {},
     onOpenTrip: (String) -> Unit = {},
@@ -227,7 +228,7 @@ fun HomeScreen(
                         Text(stringResource(R.string.home_active_banner), style = MaterialTheme.typography.titleMedium)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                             // "Llego en auto, salgo a caminar": an excursion or trek is one tap away from here (review I6 of D4).
-                            if (open.parentSegmentId == null) TextButton(onClick = { onAddToTrip(open.tripId) }, modifier = Modifier.testTag("home_add_excursion")) { Text(stringResource(R.string.home_new_excursion)) }
+                            if (open.parentSegmentId == null) TextButton(onClick = { onAddExcursion(open.tripId) }, modifier = Modifier.testTag("home_add_excursion")) { Text(stringResource(R.string.home_new_excursion)) }
                             TextButton(onClick = { onResumeActive(open.id) }, modifier = Modifier.testTag("home_resume")) { Text(stringResource(R.string.home_active_banner_action)) }
                         }
                     }

@@ -296,10 +296,18 @@ class TrackingRepositoryTest {
     }
 
     @Test
-    fun `an excursion added to the active trip still nests under its open stage`() = runTest {
+    fun `an excursion added to the active trip still nests under its open stage, and a new stage reports both as closed`() = runTest {
         val s = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "V")
         val ex = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC", tripId = s.tripId)
         assertEquals(s.id, ex.parentSegmentId)
         assertEquals(SegmentStatus.PAUSED, repo.getSegment(s.id)?.status)
+        val closed = TrackingRepository.ImplicitlyClosed()
+        // Same start time on purpose: whichever one getOpen picks, both must be closed and reported.
+        val next = repo.startSession(SegmentType.STAGE, Transport.WALK, RecordingMode.FULL, "UTC", tripId = s.tripId, closed = closed)
+        assertEquals(setOf(ex.id, s.id), closed.segmentIds.toSet(), "the nested excursion and its parent stage both get their after-close jobs")
+        assertNull(closed.tripId, "same trip: no trip-level close")
+        assertEquals(SegmentStatus.FINISHED, repo.getSegment(ex.id)?.status)
+        assertEquals(SegmentStatus.FINISHED, repo.getSegment(s.id)?.status)
+        assertEquals(next.id, repo.getOpenSegment()?.id, "only the new stage is open")
     }
 }

@@ -126,7 +126,7 @@ class ScreensComposeTest {
         var adds = listOf<String>()
         val open = com.bitacoraviaje.core.model.Segment("s1", "a", null, SegmentType.STAGE, null, null, null, 0L, null, "UTC", "WALK", RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.ACTIVE)
         rule.setContent {
-            BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = com.bitacoraviaje.app.ui.home.HomeUiState(trips = listOf(tripA), activeTrip = tripA, openSegment = open), snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = {}, onResumeActive = {}, onAddToTrip = { adds = adds + it }) }
+            BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = com.bitacoraviaje.app.ui.home.HomeUiState(trips = listOf(tripA), activeTrip = tripA, openSegment = open), snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = {}, onResumeActive = {}, onAddExcursion = { adds = adds + it }) }
         }
         rule.onNodeWithTag("home_add_excursion").performClick()
         assertEquals(listOf("a"), adds)

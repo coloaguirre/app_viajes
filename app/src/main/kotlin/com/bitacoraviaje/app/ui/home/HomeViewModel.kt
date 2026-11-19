@@ -40,7 +40,6 @@ sealed interface HomeEvent {
     data object StartNewTrip : HomeEvent
     /** Continuing failed while a trip is in course: open "Agregar al viaje" for it, never the form that closes it (review I3 of D4). */
     data class AddToTrip(val tripId: String) : HomeEvent
-    /** Open "Agregar al viaje" for the active trip from the recording banner (excursion / trek with one more tap, review I6). */
     /** A trip left the list; the snackbar offers to undo and, when it goes away, the screen commits the deletion (backlog D1). */
     data class TripDeleted(val tripId: String, val title: String) : HomeEvent
     data object TripInUse : HomeEvent
@@ -155,12 +154,12 @@ class HomeViewModel @Inject constructor(
 
     fun requiredPermissions() = controller.requiredPermissions()
 
+    private val continuing = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     /**
      * Backlog D4, the big button: back to the open segment, or a new stage of the active trip with one tap;
      * without an active trip the screen opens the new-trip form.
      */
-    private val continuing = kotlinx.coroutines.flow.MutableStateFlow(false)
-
     fun continueRecording() {
         if (!continuing.compareAndSet(expect = false, update = true)) return // a double tap starts one stage, not two (review I5)
         viewModelScope.launch {

@@ -61,7 +61,7 @@ fun NewSessionRoute(onBack: () -> Unit, onStarted: (String) -> Unit, viewModel: 
                 is NewSessionEvent.Started -> onStarted(e.segmentId)
                 NewSessionEvent.PermissionDenied -> snackbar.showSnackbar(denied)
                 NewSessionEvent.GoHome -> onBack()
-                is NewSessionEvent.Failed -> snackbar.showSnackbar("$failed ${e.detail}".trim())
+                is NewSessionEvent.Failed -> snackbar.showSnackbar(failed) // the detail is in the log
             }
         }
     }
