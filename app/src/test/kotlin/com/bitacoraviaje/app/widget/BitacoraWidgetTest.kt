@@ -23,6 +23,7 @@ class BitacoraWidgetTest {
     fun `model follows the live state`() {
         val t0 = 1_760_000_000_000L
         assertEquals(WidgetModel(R.string.widget_idle), WidgetModel.of(LiveTrackingState(), false, t0))
+        assertEquals(R.string.widget_continue, WidgetModel.of(LiveTrackingState(), false, t0, hasActiveTrip = true).startRes, "a trip in course: 'Seguir registrando' (backlog D4)")
         val running = LiveTrackingState(segmentId = "s", isRunning = true, startedUtcMs = t0 - 61_000, distanceM = 1234.0)
         assertEquals(WidgetModel(R.string.widget_running, "1 min", "1.2 km", recording = true), WidgetModel.of(running, true, t0))
         assertEquals(R.string.widget_paused, WidgetModel.of(running.copy(isPaused = true, pausedSinceUtcMs = t0), true, t0).statusRes)

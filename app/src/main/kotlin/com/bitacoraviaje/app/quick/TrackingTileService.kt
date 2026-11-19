@@ -46,7 +46,8 @@ class TrackingTileService : TileService() {
             stateHolder.state.collectLatest { live ->
                 // Only when nothing runs: is there an open stage to go back to? (one query per state change)
                 val hasOpen = if (live.isRunning) true else withContext(Dispatchers.IO) { repository.getOpenSegment() != null }
-                model = TrackingTileModel.of(live, hasOpen)
+                val hasActiveTrip = if (hasOpen) true else withContext(Dispatchers.IO) { repository.getActiveTrip() != null }
+                model = TrackingTileModel.of(live, hasOpen, hasActiveTrip)
                 qsTile?.apply {
                     state = if (model.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
                     // Below API 29 there is no subtitle: the label itself says what the tap does.

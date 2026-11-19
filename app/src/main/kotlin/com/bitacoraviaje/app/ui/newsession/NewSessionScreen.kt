@@ -4,6 +4,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -49,6 +52,7 @@ fun NewSessionRoute(onBack: () -> Unit, onStarted: (String) -> Unit, viewModel: 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val denied = stringResource(R.string.home_permission_denied)
+    val failed = stringResource(R.string.newsession_failed)
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.start() }
     val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshMediaAccess() }
     LaunchedEffect(Unit) {
@@ -56,6 +60,8 @@ fun NewSessionRoute(onBack: () -> Unit, onStarted: (String) -> Unit, viewModel: 
             when (e) {
                 is NewSessionEvent.Started -> onStarted(e.segmentId)
                 NewSessionEvent.PermissionDenied -> snackbar.showSnackbar(denied)
+                NewSessionEvent.GoHome -> onBack()
+                is NewSessionEvent.Failed -> snackbar.showSnackbar(failed) // the detail is in the log
             }
         }
     }
@@ -83,7 +89,7 @@ fun NewSessionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.newsession_title)) },
+                title = { Text(stringResource(if (state.mode == NewSessionMode.ADD_TO_TRIP) R.string.newsession_title_add else R.string.newsession_title_new_trip)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) }
                 },
@@ -91,22 +97,31 @@ fun NewSessionScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        if (state.mode == null) {
+            // The one-tap entry is deciding (continue / new stage / this form): a moment, never a half-built form.
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.testTag("newsession_resolving")) }
+            return@Scaffold
+        }
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.newsession_step_type), style = MaterialTheme.typography.titleMedium)
             val nestedOpen = state.openSegment?.parentSegmentId != null
-            val types = when {
-                nestedOpen -> listOf(SegmentType.STAGE) // one nesting level (DISENO §16.2): finish the excursion first
-                state.hasActiveTrip -> listOf(SegmentType.STAGE, SegmentType.EXCURSION, SegmentType.TREKKING)
-                else -> listOf(SegmentType.TRIP_START, SegmentType.EXCURSION, SegmentType.TREKKING)
+            // The trip the open segment belongs to is the active one; adding to another trip closes it (backlog D4).
+            val switching = state.closesOtherTrip
+            if (state.mode == NewSessionMode.ADD_TO_TRIP) {
+                state.targetTrip?.let { Text(stringResource(R.string.newsession_add_to, it.title), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("newsession_target")) }
+                Text(stringResource(R.string.newsession_step_component), style = MaterialTheme.typography.titleMedium)
+                val types = if (nestedOpen && !switching) listOf(SegmentType.STAGE) else listOf(SegmentType.STAGE, SegmentType.EXCURSION, SegmentType.TREKKING) // one nesting level (DISENO §16.2)
+                if (nestedOpen && !switching) Text(stringResource(R.string.newsession_nested_open), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                types.forEach { type -> TypeCard(type, selected = f.type == type, nestedUnder = state.openSegment?.takeIf { !switching && type != SegmentType.STAGE }) { onUpdate { it.copy(type = type) } } }
+                if (state.openSegment != null && !switching && f.type == SegmentType.STAGE) {
+                    Text(stringResource(R.string.newsession_closes_open_stage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
             }
-            if (nestedOpen) Text(stringResource(R.string.newsession_nested_open), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            types.forEach { type -> TypeCard(type, selected = f.type == type, nestedUnder = state.openSegment?.takeIf { type != SegmentType.STAGE && type != SegmentType.TRIP_START }) { onUpdate { it.copy(type = type) } } }
-            if (state.openSegment != null && f.type == SegmentType.STAGE) {
-                Text(stringResource(R.string.newsession_closes_open_stage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            if (switching) {
+                Text(stringResource(R.string.newsession_closes_trip, state.activeTrip?.title ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("newsession_closes_trip"))
             }
 
             Text(stringResource(R.string.newsession_step_details), style = MaterialTheme.typography.titleMedium)
-            if (f.type == SegmentType.TRIP_START) {
+            if (state.mode == NewSessionMode.NEW_TRIP) {
                 OutlinedTextField(
                     value = f.tripTitle,
                     onValueChange = { v -> onUpdate { it.copy(tripTitle = v) } },
@@ -115,14 +130,15 @@ fun NewSessionScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("newsession_trip_title"),
                 )
+            } else {
+                OutlinedTextField(
+                    value = f.title,
+                    onValueChange = { v -> onUpdate { it.copy(title = v) } },
+                    label = { Text(stringResource(R.string.newsession_title_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("newsession_title"),
+                )
             }
-            OutlinedTextField(
-                value = f.title,
-                onValueChange = { v -> onUpdate { it.copy(title = v) } },
-                label = { Text(stringResource(R.string.newsession_title_label)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("newsession_title"),
-            )
             OutlinedTextField(
                 value = f.intentText,
                 onValueChange = { v -> onUpdate { it.copy(intentText = v) } },
@@ -163,7 +179,7 @@ fun NewSessionScreen(
             }
 
             Button(onClick = onStart, enabled = state.canStart, modifier = Modifier.fillMaxWidth().height(64.dp).testTag("newsession_start")) {
-                Text(stringResource(R.string.newsession_start))
+                Text(stringResource(if (state.mode == NewSessionMode.NEW_TRIP) R.string.newsession_start_trip else R.string.newsession_start))
             }
         }
     }

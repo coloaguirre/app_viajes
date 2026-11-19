@@ -45,16 +45,55 @@ class TrackingController @Inject constructor(
         title: String? = null,
         intentText: String? = null,
         tripTitle: String? = null,
+        tripId: String? = null,
+        newTrip: Boolean = false,
     ): String {
         check(hasLocationPermission()) { "location permission required" }
-        // A new stage closes the open one: let the service persist its buffer first (I3).
-        if (type == SegmentType.TRIP_START || type == SegmentType.STAGE) stopServiceAndAwaitFlush()
+        // A new stage (or a new trip, or a switch of trip) closes the open one: let the service persist its buffer first (I3).
+        val switchesTrip = newTrip || (tripId != null && tripId != repository.getActiveTrip()?.id)
+        if (type == SegmentType.TRIP_START || type == SegmentType.STAGE || switchesTrip) stopServiceAndAwaitFlush()
+        val closed = TrackingRepository.ImplicitlyClosed()
         val segment = repository.startSession(
             type, transport, mode, TimeZone.getDefault().id, title, intentText,
             tripTitle = tripTitle?.ifBlank { null } ?: context.getString(com.bitacoraviaje.app.R.string.default_trip_title),
+            tripId = tripId, newTrip = newTrip, closed = closed,
         )
+        // Whatever the new session closed on the way gets the same after-close jobs as an explicit finish (review I4 of D4):
+        // photos linked, backup, route name, places and weather. Never lose a trip's data because it was closed implicitly.
+        closed.segmentIds.distinct().forEach { id -> repository.getSegment(id)?.let { afterClose(it, withBackup = closed.tripId == null) } }
+        closed.tripId?.let { com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, it) } // one link + backup for the whole closed trip
         startService(segment.id, segment.samplingProfile)
         return segment.id
+    }
+
+    private fun afterClose(done: com.bitacoraviaje.core.model.Segment, withBackup: Boolean = true) {
+        // Link photos first, then the backup (review I9): the trip.json must hold the last linked photos.
+        if (withBackup) com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, done.tripId, done.id)
+        com.bitacoraviaje.app.enrichment.EnrichRouteWorker.enqueue(context, done.id) // PLAN 3.6: name from the map when online
+        com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.enqueue(context, done.id) // PLAN 4.1: places and texts when online
+        com.bitacoraviaje.app.weather.WeatherWorker.enqueue(context, done.id, endedUtcMs = done.endedUtcMs) // backlog D3: hourly weather when online, once the hour has passed
+    }
+
+    /** An open segment whose service is gone: Home must offer "Reanudar / Cerrar etapa" (DISENO §6.9) instead of resuming blindly. */
+    suspend fun needsRecovery(): Boolean = repository.getOpenSegment() != null && !isServiceRunning()
+
+    /**
+     * Backlog D4, the one-tap path from Home, the widget and the tile: an open segment is where recording
+     * continues; otherwise a new stage of the active trip starts with the transport and mode of its last
+     * stage. Null when there is no active trip (the caller asks for one). An interrupted segment is not
+     * resumed here: callers check [needsRecovery] first and send the user to Home's dialog.
+     */
+    suspend fun continueRecording(): String? {
+        check(hasLocationPermission()) { "location permission required" }
+        repository.getOpenSegment()?.let { open ->
+            if (!isServiceRunning()) resumeOpenSegment(open)
+            return open.id
+        }
+        val trip = repository.getActiveTrip() ?: return null
+        // From the last *stage*, never from a nested excursion: a walk at the end of a day in the car must not
+        // make the next day's stage "a pie" (its point filter would drop every moving fix; review B1 of D4).
+        val last = repository.lastStageOf(trip.id)
+        return startSession(SegmentType.STAGE, last?.transport ?: com.bitacoraviaje.core.model.Transport.WALK, last?.recordingMode ?: RecordingMode.FULL, tripId = trip.id)
     }
 
     private fun startService(segmentId: String, profile: String) {
@@ -119,13 +158,7 @@ class TrackingController @Inject constructor(
         stopServiceAndAwaitFlush()
         val done = repository.finishSegment(segmentId, SegmentStatus.FINISHED)
         stateHolder.reset()
-        done?.let {
-            // Link photos first, then the backup (review I9): the trip.json must hold the last linked photos.
-            com.bitacoraviaje.app.media.LinkMediaWorker.enqueueThenBackup(context, it.tripId, it.id)
-            com.bitacoraviaje.app.enrichment.EnrichRouteWorker.enqueue(context, it.id) // PLAN 3.6: name from the map when online
-            com.bitacoraviaje.app.enrichment.EnrichPlacesWorker.enqueue(context, it.id) // PLAN 4.1: places and texts when online
-            com.bitacoraviaje.app.weather.WeatherWorker.enqueue(context, it.id, endedUtcMs = it.endedUtcMs) // backlog D3: hourly weather when online, once the hour has passed
-        }
+        done?.let { afterClose(it) }
         val parentId = done?.parentSegmentId ?: return null
         val parent = repository.getSegment(parentId)?.takeIf { it.status == SegmentStatus.PAUSED } ?: return null
         repository.resume(parent.id)

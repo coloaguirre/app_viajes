@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.ui.focus.focusRequester
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ListItem
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -50,7 +51,7 @@ import com.bitacoraviaje.app.R
 import com.bitacoraviaje.core.model.Trip
 
 @Composable
-fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActiveSession: (String) -> Unit, onOpenTrip: (String) -> Unit = {}, onExportTrip: (String) -> Unit = {}, onCreateVideo: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpenSettings: () -> Unit, onNewTrip: () -> Unit, onOpenActiveSession: (String) -> Unit, onAddToTrip: (String) -> Unit = {}, onAddExcursion: (String) -> Unit = {}, onOpenTrip: (String) -> Unit = {}, onExportTrip: (String) -> Unit = {}, onCreateVideo: (String) -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val resources = androidx.compose.ui.platform.LocalResources.current
@@ -59,6 +60,8 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
         viewModel.events.collect { e ->
             when (e) {
                 is HomeEvent.OpenActiveSession -> onOpenActiveSession(e.segmentId)
+                HomeEvent.StartNewTrip -> onNewTrip()
+                is HomeEvent.AddToTrip -> onAddToTrip(e.tripId)
                 HomeEvent.PermissionDenied -> launch { snackbar.showSnackbar(denied) }
                 // Each snackbar in its own coroutine: a 10 s "Deshacer" must not hold back the next event (review M5).
                 is HomeEvent.TripDeleted -> launch {
@@ -81,7 +84,9 @@ fun HomeRoute(onOpenSettings: () -> Unit, onNewSession: () -> Unit, onOpenActive
         state = state,
         snackbar = snackbar,
         onOpenSettings = onOpenSettings,
-        onNewRecording = onNewSession,
+        onNewTrip = onNewTrip,
+        onContinue = viewModel::continueRecording,
+        onAddExcursion = onAddExcursion,
         onResumeActive = { id -> onOpenActiveSession(id) },
         onRecoverResume = viewModel::resumeOpenSegment,
         onRecoverClose = viewModel::closeOpenSegmentAsRecovered,
@@ -147,8 +152,11 @@ fun HomeScreen(
     state: HomeUiState,
     snackbar: SnackbarHostState,
     onOpenSettings: () -> Unit,
-    onNewRecording: () -> Unit,
+    onNewTrip: () -> Unit,
     onResumeActive: (String) -> Unit,
+    onContinue: () -> Unit = {},
+    /** "Excursión o trekking" from the recording banner: the add form opens with an excursion preselected (review N1 of D4). */
+    onAddExcursion: (String) -> Unit = {},
     onRecoverResume: () -> Unit = {},
     onRecoverClose: () -> Unit = {},
     onOpenTrip: (String) -> Unit = {},
@@ -179,26 +187,50 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            run {
+            // Backlog D4: with a trip in course the big button continues it (open segment, or a new stage with one
+            // tap); otherwise it starts a new trip. The fast path in the street is never a form.
+            if (state.activeTrip != null) {
                 ExtendedFloatingActionButton(
-                    onClick = onNewRecording,
+                    onClick = onContinue,
+                    icon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                    text = { Text(stringResource(R.string.home_continue)) },
+                    modifier = Modifier.testTag("home_continue"),
+                )
+            } else {
+                ExtendedFloatingActionButton(
+                    onClick = onNewTrip,
                     icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text(stringResource(if (state.openSegment == null) R.string.home_new_recording else R.string.home_new_excursion)) },
-                    modifier = Modifier.testTag("home_new_recording"),
+                    text = { Text(stringResource(R.string.home_new_trip)) },
+                    modifier = Modifier.testTag("home_new_trip"),
                 )
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            state.activeTrip?.let { trip ->
+                if (state.openSegment == null) {
+                    // Between two days of the same trip: say which trip the next stage goes to, and offer to start another.
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("home_active_trip")) {
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.home_active_trip, trip.title), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            TextButton(onClick = onNewTrip, modifier = Modifier.testTag("home_new_trip_secondary")) { Text(stringResource(R.string.home_new_trip)) }
+                        }
+                    }
+                }
+            }
             state.openSegment?.let { open ->
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("home_active_banner"),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                 ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.home_active_banner), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onResumeActive(open.id) }) { Text(stringResource(R.string.home_active_banner_action)) }
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Text(stringResource(R.string.home_active_banner), style = MaterialTheme.typography.titleMedium)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                            // "Llego en auto, salgo a caminar": an excursion or trek is one tap away from here (review I6 of D4).
+                            if (open.parentSegmentId == null) TextButton(onClick = { onAddExcursion(open.tripId) }, modifier = Modifier.testTag("home_add_excursion")) { Text(stringResource(R.string.home_new_excursion)) }
+                            TextButton(onClick = { onResumeActive(open.id) }, modifier = Modifier.testTag("home_resume")) { Text(stringResource(R.string.home_active_banner_action)) }
+                        }
                     }
                 }
             }

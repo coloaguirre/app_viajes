@@ -59,11 +59,13 @@ data class WidgetModel(
     val recording: Boolean = false,
     /** The service died with a stage open: offer to go back to the app (Home resumes it). */
     val interrupted: Boolean = false,
+    /** Label of the idle button: "Seguir registrando" while a trip is in course, "Nuevo viaje" otherwise (backlog D4). */
+    val startRes: Int = R.string.widget_start,
 ) {
     companion object {
-        fun of(live: LiveTrackingState, hasOpenSegment: Boolean, nowUtcMs: Long): WidgetModel = when {
+        fun of(live: LiveTrackingState, hasOpenSegment: Boolean, nowUtcMs: Long, hasActiveTrip: Boolean = false): WidgetModel = when {
             !live.isRunning && hasOpenSegment -> WidgetModel(R.string.widget_interrupted, interrupted = true)
-            !live.isRunning -> WidgetModel(R.string.widget_idle)
+            !live.isRunning -> WidgetModel(R.string.widget_idle, startRes = if (hasActiveTrip) R.string.widget_continue else R.string.widget_start)
             else -> {
                 val elapsed = TrackingNotificationFactory.formatElapsed(live.elapsedMs(nowUtcMs))
                 val distance = TrackingNotificationFactory.formatKm(live.distanceM)
@@ -96,7 +98,10 @@ class BitacoraWidget : GlanceAppWidget() {
             val hasOpen by androidx.compose.runtime.produceState(initialValue = live.isRunning, live.isRunning) {
                 value = live.isRunning || runCatching { entry.tracking().getOpenSegment() != null }.getOrDefault(false)
             }
-            GlanceTheme { WidgetContent(WidgetModel.of(live, hasOpen, System.currentTimeMillis())) }
+            val hasActiveTrip by androidx.compose.runtime.produceState(initialValue = false, live.isRunning) {
+                value = runCatching { entry.tracking().getActiveTrip() != null }.getOrDefault(false)
+            }
+            GlanceTheme { WidgetContent(WidgetModel.of(live, hasOpen, System.currentTimeMillis(), hasActiveTrip)) }
         }
     }
 }
@@ -125,7 +130,7 @@ fun WidgetContent(model: WidgetModel) {
                 when {
                     model.recording -> WidgetButton(ctx.getString(R.string.widget_marker), actionRunCallback<MarkerAction>(), "widget_marker")
                     model.interrupted -> Unit
-                    else -> WidgetButton(ctx.getString(R.string.widget_start), androidx.glance.appwidget.action.actionStartActivity(Intent(ctx, MainActivity::class.java).setAction(ShortcutActions.NEW_SESSION)), "widget_start")
+                    else -> WidgetButton(ctx.getString(model.startRes), androidx.glance.appwidget.action.actionStartActivity(Intent(ctx, MainActivity::class.java).setAction(ShortcutActions.NEW_SESSION)), "widget_start")
                 }
             }
         }

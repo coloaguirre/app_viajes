@@ -12,11 +12,12 @@ data class TrackingTileModel(val active: Boolean, val labelRes: Int, val action:
     enum class Action { OPEN_NEW_SESSION, OPEN_APP, PAUSE, RESUME }
 
     companion object {
-        fun of(live: LiveTrackingState, hasOpenSegment: Boolean): TrackingTileModel = when {
+        fun of(live: LiveTrackingState, hasOpenSegment: Boolean, hasActiveTrip: Boolean = false): TrackingTileModel = when {
             // The service is gone (killed, rebooted) but a stage is still open: back to the app, whose
             // Home offers to resume it (DISENO §6.9). Never a new session on top of an open one.
             !live.isRunning && hasOpenSegment -> TrackingTileModel(false, R.string.tile_tracking_back, Action.OPEN_APP)
-            !live.isRunning -> TrackingTileModel(false, R.string.tile_tracking_start, Action.OPEN_NEW_SESSION)
+            // Backlog D4: with a trip in course the tile continues it (a new stage with one tap); otherwise a new trip.
+            !live.isRunning -> TrackingTileModel(false, if (hasActiveTrip) R.string.tile_tracking_continue else R.string.tile_tracking_start, Action.OPEN_NEW_SESSION)
             live.isPaused || live.isResting -> TrackingTileModel(false, R.string.tile_tracking_resume, Action.RESUME)
             else -> TrackingTileModel(true, R.string.tile_tracking_pause, Action.PAUSE)
         }

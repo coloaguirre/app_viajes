@@ -427,7 +427,8 @@ contrato vigente; entran al plan cuando el usuario los priorice.
       Hecho 2026-10-13 (PR feat/map-interactive): evidencia en `docs/notes/evidencia/backlog/D2-mapa-interactivo.md`.
 - [x] D3 Clima por hora a lo largo del recorrido (Open-Meteo) con resumen mañana/tarde/noche.  (est: 2.5)
       Hecho 2026-10-14 (PR feat/weather): evidencia en `docs/notes/evidencia/backlog/D3-clima.md`.
-- [ ] D4 "Nuevo viaje" con componentes (etapa, excursión, trekking) en lugar de tres registros.  (est: 2)
+- [x] D4 "Nuevo viaje" con componentes (etapa, excursión, trekking) en lugar de tres registros.  (est: 2)
+      Hecho 2026-11-19 (PR feat/new-trip-flow): evidencia en `docs/notes/evidencia/backlog/D4-nuevo-viaje.md`.
 
 ### Calendario
 Suma de estimaciones activas (Fases 0 a 5): **62,5 días de trabajo de

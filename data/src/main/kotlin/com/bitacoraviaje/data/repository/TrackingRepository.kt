@@ -63,10 +63,22 @@ class TrackingRepository @Inject constructor(
 
     suspend fun segmentsOf(tripId: String): List<Segment> = segments.getByTrip(tripId).map { it.toDomain() }
 
+    suspend fun getActiveTrip(): Trip? = trips.getActive()?.toDomain()
+
+    /** The last stage of the trip (not a nested excursion or trek): what "Seguir registrando" copies transport and mode from (backlog D4). */
+    suspend fun lastStageOf(tripId: String): Segment? = segments.getByTrip(tripId).map { it.toDomain() }.filter { it.parentSegmentId == null }.maxByOrNull { it.startedUtcMs }
+
+    /** Ids of the segments (and the trip) [startSession] closed on the way: the caller runs the same after-close jobs as an explicit finish. */
+    class ImplicitlyClosed(val segmentIds: MutableList<String> = ArrayList(), var tripId: String? = null)
+
     /**
-     * Starts a recording session. Creates the trip when there is no ACTIVE one
-     * (TRIP_START); otherwise appends to the active trip. A nested excursion or trek
-     * pauses the open parent segment with [PauseKind.NESTED].
+     * Starts a recording session (backlog D4: a trip is a container to which components are added).
+     * - [newTrip]: always creates a trip; whatever trip was active is closed first (with its open segment).
+     * - [tripId]: adds the component to that trip, reopening it if it was finished (and un-archiving it);
+     *   a different active trip is closed first.
+     * - neither: the active trip, or a new one when there is none (the pre-D4 behaviour).
+     * A nested excursion or trek pauses the open parent segment with [PauseKind.NESTED]; a stage
+     * closes whatever is open.
      */
     suspend fun startSession(
         type: SegmentType,
@@ -76,9 +88,28 @@ class TrackingRepository @Inject constructor(
         title: String? = null,
         intentText: String? = null,
         tripTitle: String? = null,
+        tripId: String? = null,
+        newTrip: Boolean = false,
+        closed: ImplicitlyClosed? = null,
     ): Segment = db.withTransaction {
         val now = clock.nowUtcMs()
-        val trip = trips.getActive()?.toDomain() ?: Trip(
+        val active = trips.getActive()?.toDomain()
+        val target: Trip? = when {
+            newTrip -> null
+            tripId != null -> requireNotNull(trips.getById(tripId)?.toDomain()) { "trip $tripId does not exist" }
+            else -> active
+        }
+        // Only one trip records at a time: leaving the active one closes it, open segment included.
+        if (active != null && active.id != target?.id) {
+            closed?.let { c -> c.tripId = active.id; segments.getOpenByTrip(active.id).forEach { c.segmentIds += it.id } }
+            finishTripInternal(active.id, now)
+        }
+        val trip = target?.let { t ->
+            if (t.status != TripStatus.ACTIVE || t.archived) {
+                trips.update(t.copy(status = TripStatus.ACTIVE, endedUtcMs = null, archived = false).toEntity())
+            }
+            t
+        } ?: Trip(
             id = UUID.randomUUID().toString(),
             title = requireNotNull(tripTitle) { "tripTitle is required when no trip is active" },
             createdUtcMs = now,
@@ -101,12 +132,11 @@ class TrackingRepository @Inject constructor(
                     parentId = open.id
                 }
             } else {
-                // A new stage closes whatever is open, nested child first.
-                if (open.parentSegmentId != null) {
-                    finishInternal(open, now, SegmentStatus.FINISHED)
-                    segments.getById(open.parentSegmentId!!)?.toDomain()?.let { finishInternal(it, now, SegmentStatus.FINISHED) }
-                } else {
-                    finishInternal(open, now, SegmentStatus.FINISHED)
+                // A new stage closes whatever is open in that trip, nested children first (the per-trip query
+                // orders them so, and does not depend on which one `getOpen` picked when two share a start time).
+                segments.getOpenByTrip(open.tripId).map { it.toDomain() }.sortedBy { if (it.parentSegmentId != null) 0 else 1 }.forEach {
+                    closed?.segmentIds?.add(it.id)
+                    finishInternal(it, now, SegmentStatus.FINISHED)
                 }
             }
         }
@@ -198,8 +228,9 @@ class TrackingRepository @Inject constructor(
     }
 
     /** Ends the trip and any open segment. */
-    suspend fun finishTrip(tripId: String) = db.withTransaction {
-        val now = clock.nowUtcMs()
+    suspend fun finishTrip(tripId: String) = db.withTransaction { finishTripInternal(tripId, clock.nowUtcMs()) }
+
+    private suspend fun finishTripInternal(tripId: String, now: Long) {
         // Children first (ordered newest-first by the query), then the parent stage.
         segments.getOpenByTrip(tripId).forEach { finishInternal(it.toDomain(), now, SegmentStatus.FINISHED) }
         trips.getById(tripId)?.toDomain()?.let { trips.update(it.copy(status = TripStatus.FINISHED, endedUtcMs = now).toEntity()) }

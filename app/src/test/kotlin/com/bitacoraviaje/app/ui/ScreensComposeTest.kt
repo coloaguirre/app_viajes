@@ -53,12 +53,14 @@ class ScreensComposeTest {
     @get:Rule
     val rule = createComposeRule()
 
+    private val tripA = com.bitacoraviaje.core.model.Trip(id = "a", title = "Patagonia", createdUtcMs = 1L, status = com.bitacoraviaje.core.model.TripStatus.ACTIVE)
+
     @Test
-    fun `new session wizard enables Iniciar only after a type and reports the form`() {
+    fun `add-to-trip form enables Iniciar only after a component and reports the form`() {
         var form = NewSessionForm(mode = RecordingMode.FULL)
         var started = 0
         rule.setContent {
-            var state by remember { mutableStateOf(NewSessionUiState(form)) }
+            var state by remember { mutableStateOf(NewSessionUiState(form, mode = com.bitacoraviaje.app.ui.newsession.NewSessionMode.ADD_TO_TRIP, targetTrip = tripA, activeTrip = tripA)) }
             BitacoraTheme {
                 NewSessionScreen(
                     state = state,
@@ -69,6 +71,8 @@ class ScreensComposeTest {
                 )
             }
         }
+        rule.onNodeWithText("Agregar al viaje").assertIsDisplayed()
+        rule.onNodeWithText("Se agrega al viaje «Patagonia».").assertIsDisplayed()
         rule.onNodeWithTag("newsession_start").assertIsNotEnabled()
         rule.onNodeWithTag("newsession_type_TREKKING").performScrollTo().performClick()
         rule.onNodeWithTag("newsession_transport_BIKE").performScrollTo().performClick()
@@ -78,6 +82,79 @@ class ScreensComposeTest {
         assertEquals(Transport.BIKE, form.transport)
         assertEquals(RecordingMode.ECONOMY, form.mode)
         assertEquals(1, started)
+    }
+
+    @Test
+    fun `new-trip form has no component cards, asks the trip name, warns about the trip it closes and resolving shows a spinner`() {
+        var form = NewSessionForm(type = SegmentType.TRIP_START)
+        rule.setContent {
+            var state by remember { mutableStateOf(NewSessionUiState(form, mode = com.bitacoraviaje.app.ui.newsession.NewSessionMode.NEW_TRIP, activeTrip = tripA)) }
+            BitacoraTheme { NewSessionScreen(state = state, snackbar = SnackbarHostState(), onBack = {}, onUpdate = { t -> form = t(form); state = state.copy(form = form) }, onStart = {}) }
+        }
+        rule.onNodeWithText("Nuevo viaje").assertIsDisplayed()
+        rule.onNodeWithTag("newsession_trip_title").assertIsDisplayed()
+        rule.onNodeWithTag("newsession_type_STAGE").assertDoesNotExist()
+        rule.onNodeWithTag("newsession_type_TRIP_START").assertDoesNotExist()
+        rule.onNodeWithTag("newsession_closes_trip").assertIsDisplayed()
+        rule.onNodeWithText("Empezar el viaje").performScrollTo().assertIsEnabled()
+    }
+
+    @Test
+    fun `while the one-tap entry decides only a spinner shows`() {
+        rule.setContent { BitacoraTheme { NewSessionScreen(state = NewSessionUiState(), snackbar = SnackbarHostState(), onBack = {}, onUpdate = {}, onStart = {}) } }
+        rule.onNodeWithTag("newsession_resolving").assertIsDisplayed()
+        rule.onNodeWithTag("newsession_start").assertDoesNotExist()
+    }
+
+    @Test
+    fun `home offers Seguir registrando with a trip in course and Nuevo viaje otherwise`() {
+        var continues = 0
+        var newTrips = 0
+        rule.setContent {
+            BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = com.bitacoraviaje.app.ui.home.HomeUiState(trips = listOf(tripA), activeTrip = tripA), snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = { newTrips++ }, onResumeActive = {}, onContinue = { continues++ }) }
+        }
+        rule.onNodeWithTag("home_continue").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("home_new_trip").assertDoesNotExist()
+        rule.onNodeWithTag("home_add_excursion").assertDoesNotExist()
+        rule.onNodeWithText("Viaje en curso: Patagonia").assertIsDisplayed()
+        rule.onNodeWithTag("home_new_trip_secondary").performClick()
+        assertEquals(1 to 1, continues to newTrips)
+    }
+
+    @Test
+    fun `home with a stage recording offers an excursion from the banner`() {
+        var adds = listOf<String>()
+        val open = com.bitacoraviaje.core.model.Segment("s1", "a", null, SegmentType.STAGE, null, null, null, 0L, null, "UTC", "WALK", RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.ACTIVE)
+        rule.setContent {
+            BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = com.bitacoraviaje.app.ui.home.HomeUiState(trips = listOf(tripA), activeTrip = tripA, openSegment = open), snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = {}, onResumeActive = {}, onAddExcursion = { adds = adds + it }) }
+        }
+        rule.onNodeWithTag("home_add_excursion").performClick()
+        assertEquals(listOf("a"), adds)
+        rule.onNodeWithTag("home_active_trip").assertDoesNotExist()
+    }
+
+    @Test
+    fun `adding to another trip while a nested excursion is open shows all three components and the switch warning`() {
+        val tripB = tripA.copy(id = "b", title = "Otro")
+        val nested = com.bitacoraviaje.core.model.Segment("x1", "a", "s1", SegmentType.EXCURSION, null, null, null, 0L, null, "UTC", "WALK", RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.ACTIVE)
+        rule.setContent {
+            BitacoraTheme { NewSessionScreen(state = NewSessionUiState(NewSessionForm(type = SegmentType.STAGE), openSegment = nested, mode = com.bitacoraviaje.app.ui.newsession.NewSessionMode.ADD_TO_TRIP, targetTrip = tripB, activeTrip = tripA), snackbar = SnackbarHostState(), onBack = {}, onUpdate = {}, onStart = {}) }
+        }
+        rule.onNodeWithTag("newsession_type_EXCURSION").assertIsDisplayed()
+        rule.onNodeWithTag("newsession_type_TREKKING").assertIsDisplayed()
+        rule.onNodeWithTag("newsession_closes_trip").assertIsDisplayed()
+        rule.onNodeWithText("La etapa en curso se cierra y empieza una nueva.").assertDoesNotExist()
+    }
+
+    @Test
+    fun `home without an active trip offers Nuevo viaje as the big button`() {
+        var newTrips = 0
+        rule.setContent {
+            BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = com.bitacoraviaje.app.ui.home.HomeUiState(), snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = { newTrips++ }, onResumeActive = {}) }
+        }
+        rule.onNodeWithTag("home_new_trip").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("home_continue").assertDoesNotExist()
+        assertEquals(1, newTrips)
     }
 
     @Test
@@ -230,7 +307,7 @@ class ScreensComposeTest {
             trips = listOf(trip("a", "Activo", com.bitacoraviaje.core.model.TripStatus.ACTIVE), trip("f", "Terminado", com.bitacoraviaje.core.model.TripStatus.FINISHED)),
             openSegment = com.bitacoraviaje.core.model.Segment("s1", "a", null, com.bitacoraviaje.core.model.SegmentType.STAGE, null, "Etapa", null, 0L, null, "UTC", "WALK", com.bitacoraviaje.core.model.RecordingMode.FULL, false, com.bitacoraviaje.core.model.SegmentStatus.ACTIVE),
         )
-        rule.setContent { BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = state, snackbar = SnackbarHostState(), onOpenSettings = {}, onNewRecording = {}, onResumeActive = {}, onTripAction = { actions += it }) } }
+        rule.setContent { BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = state, snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = {}, onResumeActive = {}, onTripAction = { actions += it }) } }
         rule.onNodeWithTag("trip_menu_a").performClick()
         rule.onNodeWithTag("trip_archive_a").assertIsNotEnabled()
         rule.onNodeWithTag("trip_delete_a").assertIsNotEnabled()
@@ -249,7 +326,7 @@ class ScreensComposeTest {
             trips = listOf(trip("f", "Terminado", com.bitacoraviaje.core.model.TripStatus.FINISHED)),
             archived = listOf(trip("z", "Guardado", com.bitacoraviaje.core.model.TripStatus.FINISHED, archived = true)),
         )
-        rule.setContent { BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = state, snackbar = SnackbarHostState(), onOpenSettings = {}, onNewRecording = {}, onResumeActive = {}, onTripAction = { actions += it }) } }
+        rule.setContent { BitacoraTheme { com.bitacoraviaje.app.ui.home.HomeScreen(state = state, snackbar = SnackbarHostState(), onOpenSettings = {}, onNewTrip = {}, onResumeActive = {}, onTripAction = { actions += it }) } }
         rule.onNodeWithText("Guardado").assertDoesNotExist()
         rule.onNodeWithTag("home_archived_toggle").performClick()
         rule.onNodeWithText("Guardado").assertIsDisplayed()

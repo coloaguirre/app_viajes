@@ -24,7 +24,12 @@ sealed interface Route {
     data object Settings : Route
 
     @Serializable
-    data object NewSession : Route
+    /**
+     * Backlog D4: [newTrip] opens the "Nuevo viaje" form; [tripId] opens "Agregar al viaje" for that trip;
+     * neither is the one-tap entry (shortcut, tile, widget): continue the open segment, else start a stage of the
+     * active trip, else the new-trip form.
+     */
+    data class NewSession(val tripId: String? = null, val newTrip: Boolean = false, val excursion: Boolean = false) : Route
 
     @Serializable
     data class ActiveSession(val segmentId: String) : Route
@@ -55,13 +60,15 @@ fun BitacoraNavHost(mapRenderer: MapRenderer, newSessionRequest: Int = 0) {
     val navController = rememberNavController()
     // A shortcut, tile or widget asked for a new session: navigate once per request (PLAN 5.3).
     androidx.compose.runtime.LaunchedEffect(newSessionRequest) {
-        if (newSessionRequest > 0) navController.navigate(Route.NewSession) { launchSingleTop = true }
+        if (newSessionRequest > 0) navController.navigate(Route.NewSession()) { launchSingleTop = true }
     }
     NavHost(navController = navController, startDestination = Route.Home) {
         composable<Route.Home> {
             HomeRoute(
                 onOpenSettings = { navController.navigate(Route.Settings) },
-                onNewSession = { navController.navigate(Route.NewSession) },
+                onNewTrip = { navController.navigate(Route.NewSession(newTrip = true)) },
+                onAddToTrip = { id -> navController.navigate(Route.NewSession(tripId = id)) },
+                onAddExcursion = { id -> navController.navigate(Route.NewSession(tripId = id, excursion = true)) },
                 onOpenActiveSession = { id -> navController.navigate(Route.ActiveSession(id)) },
                 onExportTrip = { id -> navController.navigate(Route.TripDetail(id, openExport = true)) },
                 onCreateVideo = { id -> navController.navigate(Route.VideoCreate(id)) },
@@ -75,6 +82,7 @@ fun BitacoraNavHost(mapRenderer: MapRenderer, newSessionRequest: Int = 0) {
                 onReview = { id -> navController.navigate(Route.MediaReview(id)) },
                 onVoiceNote = { id -> navController.navigate(Route.VoiceNoteDetail(id)) },
                 onCreateVideo = { id -> navController.navigate(Route.VideoCreate(id)) },
+                onAddToTrip = { id -> navController.navigate(Route.NewSession(tripId = id)) },
             )
         }
         composable<Route.VideoCreate> {

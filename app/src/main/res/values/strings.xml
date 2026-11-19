@@ -5,7 +5,9 @@
     <string name="home_title">Mis viajes</string>
     <string name="home_empty_title">Todavía no hay viajes</string>
     <string name="home_empty_body">Cuando empieces un viaje, el recorrido, las fotos y tus notas van a aparecer acá.</string>
-    <string name="home_new_recording">Nuevo registro</string>
+    <string name="home_new_trip">Nuevo viaje</string>
+    <string name="home_continue">Seguir registrando</string>
+    <string name="home_active_trip">Viaje en curso: %1$s</string>
     <string name="home_active_banner">Registro en curso</string>
     <string name="home_active_banner_action">Volver a la sesión</string>
     <string name="recover_title">Tu registro se interrumpió</string>
@@ -18,6 +20,14 @@
     <string name="map_not_configured">Mapa no configurado: falta MAPTILER_KEY en local.properties.</string>
 
     <string name="newsession_title">Nuevo registro</string>
+    <string name="newsession_title_new_trip">Nuevo viaje</string>
+    <string name="newsession_title_add">Agregar al viaje</string>
+    <string name="newsession_add_to">Se agrega al viaje «%1$s».</string>
+    <string name="newsession_step_component">¿Qué agregás?</string>
+    <string name="newsession_closes_trip">El viaje en curso «%1$s» se cierra (y su etapa, si está grabando).</string>
+    <string name="newsession_start_trip">Empezar el viaje</string>
+    <string name="newsession_failed">No se pudo iniciar el registro.</string>
+    <string name="trip_add">Agregar al viaje</string>
     <string name="newsession_step_type">¿Qué estás haciendo?</string>
     <string name="newsession_step_details">Detalles (opcional)</string>
     <string name="newsession_trip_title_label">Nombre del viaje</string>
@@ -408,6 +418,7 @@
     <string name="tile_voice_note">Nota de voz</string>
     <string name="tile_tracking">Bitácora</string>
     <string name="tile_tracking_start">Iniciar registro</string>
+    <string name="tile_tracking_continue">Seguir registrando</string>
     <string name="tile_tracking_pause">Pausar registro</string>
     <string name="tile_tracking_resume">Reanudar registro</string>
     <string name="tile_tracking_back">Volver a la sesión</string>
@@ -423,12 +434,13 @@
     <string name="widget_resting">Reposo automático · %1$s</string>
     <string name="widget_voice">Nota de voz</string>
     <string name="widget_marker">Marcar</string>
-    <string name="widget_start">Nuevo registro</string>
+    <string name="widget_start">Nuevo viaje</string>
+    <string name="widget_continue">Seguir registrando</string>
     <string name="widget_marker_saved">Marcador guardado</string>
     <string name="shortcut_voice_note">Nota de voz</string>
     <string name="shortcut_voice_note_long">Dictar una nota de voz</string>
-    <string name="shortcut_new_session">Nuevo registro</string>
-    <string name="shortcut_new_session_long">Empezar una etapa o excursión</string>
+    <string name="shortcut_new_session">Registrar</string>
+    <string name="shortcut_new_session_long">Seguir registrando o empezar un viaje</string>
     <string name="camera_rationale_title">Cámara de la bitácora</string>
     <string name="camera_rationale_body">Las fotos y videos que saques desde acá quedan en tu galería (carpeta BitacoraViaje) con la posición exacta del momento, y se vinculan solos a la etapa. Para eso la app necesita usar la cámara.</string>
     <string name="camera_permission_denied">Sin permiso de cámara no se puede sacar fotos desde la app; podés seguir usando la cámara del teléfono.</string>
