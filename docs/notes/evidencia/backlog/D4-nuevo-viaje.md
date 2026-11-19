@@ -71,6 +71,13 @@ viaje real al día siguiente (2026-11-20), así que el camino rápido no podía 
 5. **Nuevo viaje** desde la tarjeta → formulario con el aviso de cierre y el nombre del viaje
    (`D4-nuevo-viaje.png`); "Prueba D4" → **Empezar el viaje** → sesión activa; Home lista
    "Prueba D4 · Viaje en curso" y "Patagonia · Terminado". Sin crashes en el log.
+6. Con la versión corregida tras la revisión: reinstalar con una etapa abierta mostró el diálogo de
+   recuperación de Home (Reanudar / Cerrar etapa), como debe; la tarjeta "Registro en curso" ofrece
+   **Excursión o trekking** y **Volver a la sesión** (`D4-registro-en-curso.png`); "Seguir
+   registrando" vuelve a la misma sesión; la excursión desde la tarjeta abre "Agregar al viaje" ya
+   dirigido a «Prueba D4» y arranca anidada (la etapa queda en pausa y la tarjeta deja de ofrecer
+   excursión mientras hay una abierta); un doble toque en "Seguir registrando" no crea segmentos
+   de más (base: una etapa en pausa y una excursión activa). Sin crashes.
 
 ## Revisión de código
 Primera pasada (2026-11-19, informe en el PR): 1 bloqueante (el medio heredado de una excursión
