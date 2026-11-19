@@ -33,13 +33,26 @@ perder datos de ubicación si así lo elegís (ver "Zonas de privacidad").
 
 ## Registrar un viaje
 
-1. En **Mis viajes**, tocá **Nuevo registro** (o **Excursión o trekking**).
-2. Elegí qué estás haciendo (**Nueva etapa**, **Excursión o visita**, **Trekking**), el medio
-   de transporte y, si querés, un nombre y una intención ("hoy vamos al glaciar").
-3. Elegí el modo: **Completo** (máximo detalle del recorrido, consume más batería) o
+Un viaje es el contenedor; adentro se van agregando **componentes**: etapas (un día o un
+tramo), excursiones o visitas, y trekkings.
+
+1. En **Mis viajes**, tocá **Nuevo viaje**: ponele un nombre y, si querés, una intención
+   ("hoy vamos al glaciar"), elegí el medio de transporte y el modo, y tocá **Empezar el
+   viaje**. Arranca la primera etapa en el acto.
+2. Mientras un viaje está en curso, el botón grande de **Mis viajes** dice **Seguir
+   registrando**: con un toque vuelve a la etapa abierta o, si no hay ninguna (por ejemplo al
+   día siguiente), arranca una etapa nueva con el mismo medio y modo que la última. Sin
+   formularios: es el camino rápido en la calle. La tarjeta "Viaje en curso" tiene al lado un
+   **Nuevo viaje** por si cambiás de viaje (el anterior se cierra).
+3. Para sumar algo distinto, abrí el viaje y tocá el **+** de arriba (**Agregar al viaje**):
+   elegí **Etapa**, **Excursión o visita** o **Trekking**, el medio y el modo, y **Iniciar**.
+   Una excursión o un trekking se registran dentro de la etapa en curso, que queda en pausa
+   hasta que terminen; una etapa nueva cierra la anterior. Si el viaje estaba terminado, se
+   reabre.
+4. El modo: **Completo** (máximo detalle del recorrido, consume más batería) o
    **Económico** (para trekkings largos sin recarga; pierde detalle en zigzags).
-4. Tocá **Iniciar**. La pantalla de sesión muestra el mapa con tu posición, el tiempo, la
-   distancia, la velocidad y los puntos registrados, y los botones grandes:
+5. La pantalla de sesión muestra el mapa con tu posición, el tiempo, la distancia, la
+   velocidad y los puntos registrados, y los botones grandes:
    **Nota de voz**, **Marcar**, **Destacar**, **Foto**, **Pausar** y **Terminar**.
 
 Mientras la etapa está en curso aparece una notificación permanente con la distancia y el
@@ -196,13 +209,14 @@ compartir.
 
 - **Notificación** del registro en curso: Pausar/Reanudar, Nota de voz, Terminar.
 - **Panel de ajustes rápidos** (deslizar desde arriba): mosaicos **Nota de voz** (activo
-  solo con un registro en curso) y **Bitácora** (pausa o reanuda; sin registro abre la app
-  en "Nuevo registro"; si el registro se interrumpió, vuelve a la sesión). Se agregan desde
-  el lápiz de edición del panel.
+  solo con un registro en curso) y **Bitácora** (pausa o reanuda; sin registro dice
+  **Seguir registrando** si hay un viaje en curso y arranca la etapa con un toque, o
+  **Iniciar registro** para empezar un viaje; si el registro se interrumpió, vuelve a la
+  sesión). Se agregan desde el lápiz de edición del panel.
 - **Widget** de pantalla de inicio: estado del registro, **Nota de voz** y **Marcar** (o
-  **Nuevo registro** cuando no hay registro).
-- **Accesos directos** manteniendo apretado el ícono de la app: **Nota de voz** y **Nuevo
-  registro**.
+  **Seguir registrando** / **Nuevo viaje** cuando no hay registro).
+- **Accesos directos** manteniendo apretado el ícono de la app: **Nota de voz** y
+  **Registrar** (sigue el viaje en curso o abre "Nuevo viaje").
 
 ## Cuando algo se ve raro
 

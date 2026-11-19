@@ -1,6 +1,7 @@
 package com.bitacoraviaje.app.ui.newsession
 
 import androidx.lifecycle.ViewModel
+import androidx.navigation.toRoute
 import androidx.lifecycle.viewModelScope
 import com.bitacoraviaje.app.media.MediaAccess
 import com.bitacoraviaje.app.media.MediaPermissions
@@ -8,6 +9,7 @@ import com.bitacoraviaje.app.settings.UserPreferences
 import com.bitacoraviaje.app.tracking.TrackingController
 import com.bitacoraviaje.core.model.RecordingMode
 import com.bitacoraviaje.core.model.Segment
+import com.bitacoraviaje.core.model.Trip
 import com.bitacoraviaje.core.model.SegmentType
 import com.bitacoraviaje.core.model.Transport
 import com.bitacoraviaje.data.repository.TrackingRepository
@@ -32,6 +34,9 @@ data class NewSessionForm(
     val mode: RecordingMode = RecordingMode.FULL,
 )
 
+/** Backlog D4: what the form is for. Null while the one-tap entry decides where to go. */
+enum class NewSessionMode { NEW_TRIP, ADD_TO_TRIP }
+
 data class NewSessionUiState(
     val form: NewSessionForm = NewSessionForm(),
     /** An open segment means "Excursión/Trekking" nest under it and "Etapa" closes it first. */
@@ -39,8 +44,14 @@ data class NewSessionUiState(
     val hasActiveTrip: Boolean = false,
     val starting: Boolean = false,
     val mediaAccess: MediaAccess = MediaAccess.NONE,
+    val mode: NewSessionMode? = null,
+    /** The trip the component is added to (ADD_TO_TRIP). */
+    val targetTrip: Trip? = null,
+    /** The trip recording right now, when it is not [targetTrip]: starting closes it (and its open segment). */
+    val activeTrip: Trip? = null,
 ) {
-    val canStart: Boolean get() = form.type != null && !starting
+    val canStart: Boolean get() = form.type != null && !starting && mode != null
+    val closesOtherTrip: Boolean get() = activeTrip != null && activeTrip.id != targetTrip?.id
 }
 
 sealed interface NewSessionEvent {
@@ -50,24 +61,69 @@ sealed interface NewSessionEvent {
 
 @HiltViewModel
 class NewSessionViewModel @Inject constructor(
+    savedState: androidx.lifecycle.SavedStateHandle,
     private val repository: TrackingRepository,
     private val controller: TrackingController,
     prefs: UserPreferences,
     private val mediaPermissions: MediaPermissions,
 ) : ViewModel() {
+    private val route = savedState.toRoute<com.bitacoraviaje.app.ui.navigation.Route.NewSession>()
     private val form = MutableStateFlow(NewSessionForm())
     private val starting = MutableStateFlow(false)
     private val mediaAccess = MutableStateFlow(mediaPermissions.access())
+    private val mode = MutableStateFlow<NewSessionMode?>(null)
+    private val targetTrip = MutableStateFlow<Trip?>(null)
 
     init {
         viewModelScope.launch {
             val settings = prefs.settings.first()
             form.value = form.value.copy(mode = settings.recordingMode)
+            resolveMode()
         }
     }
 
-    val state: StateFlow<NewSessionUiState> = combine(form, repository.observeOpenSegment(), repository.observeActiveTrip(), starting, mediaAccess) { f, open, trip, st, ma ->
-        NewSessionUiState(f, open, trip != null, st, ma)
+    /**
+     * Backlog D4. Explicit routes set the mode. The bare route is the one-tap entry (shortcut, tile, widget):
+     * continue the open segment, else start a stage of the active trip right away, else offer a new trip.
+     */
+    private suspend fun resolveMode() {
+        when {
+            route.newTrip -> {
+                mode.value = NewSessionMode.NEW_TRIP
+                form.value = form.value.copy(type = SegmentType.TRIP_START)
+            }
+            route.tripId != null -> {
+                targetTrip.value = repository.getTrip(route.tripId)
+                mode.value = NewSessionMode.ADD_TO_TRIP
+                form.value = form.value.copy(type = SegmentType.STAGE)
+            }
+            else -> {
+                val active = repository.getActiveTrip()
+                if (active != null && controller.hasLocationPermission()) {
+                    starting.value = true
+                    try {
+                        controller.continueRecording()?.let { _events.send(NewSessionEvent.Started(it)); return }
+                    } finally {
+                        starting.value = false
+                    }
+                }
+                if (active != null) {
+                    targetTrip.value = active
+                    mode.value = NewSessionMode.ADD_TO_TRIP
+                    form.value = form.value.copy(type = SegmentType.STAGE)
+                } else {
+                    mode.value = NewSessionMode.NEW_TRIP
+                    form.value = form.value.copy(type = SegmentType.TRIP_START)
+                }
+            }
+        }
+    }
+
+    private val flags = combine(starting, mediaAccess, mode, targetTrip) { st, ma, m, t -> Flags(st, ma, m, t) }
+    private class Flags(val starting: Boolean, val media: MediaAccess, val mode: NewSessionMode?, val target: Trip?)
+
+    val state: StateFlow<NewSessionUiState> = combine(form, repository.observeOpenSegment(), repository.observeActiveTrip(), flags) { f, open, trip, fl ->
+        NewSessionUiState(f, open, trip != null, fl.starting, fl.media, fl.mode, fl.target, trip)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewSessionUiState())
 
     private val _events = Channel<NewSessionEvent>(Channel.BUFFERED)
@@ -104,6 +160,8 @@ class NewSessionViewModel @Inject constructor(
                     title = f.title.ifBlank { null },
                     intentText = f.intentText.ifBlank { null },
                     tripTitle = f.tripTitle,
+                    tripId = targetTrip.value?.id,
+                    newTrip = mode.value == NewSessionMode.NEW_TRIP,
                 )
                 _events.send(NewSessionEvent.Started(id))
             } finally {

@@ -110,6 +110,14 @@ class DetailScreensComposeTest {
     }
 
     @Test
+    fun `trip detail offers to add a component to the trip`() {
+        var adds = 0
+        rule.setContent { BitacoraTheme { TripDetailScreen(state = TripDetailUiState(trip = trip), onBack = {}, onTab = {}, onEvent = {}, onReview = {}, onAddToTrip = { adds++ }) } }
+        rule.onNodeWithTag("trip_add").performClick()
+        assertEquals(1, adds)
+    }
+
+    @Test
     fun `export dialog starts with the chosen options and destination and shows the result`() {
         val started = mutableListOf<Pair<com.bitacoraviaje.app.export.ExportOptions, com.bitacoraviaje.app.export.ExportDestination>>()
         var resets = 0

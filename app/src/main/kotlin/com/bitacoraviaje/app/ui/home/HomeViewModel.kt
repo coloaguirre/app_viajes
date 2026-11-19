@@ -29,11 +29,15 @@ data class HomeUiState(
     val openSegment: Segment? = null,
     /** Open segment in the database but no service running: process was killed or phone rebooted. */
     val needsRecovery: Boolean = false,
+    /** The trip that receives the next stage (backlog D4): Home offers "Seguir registrando" while it exists. */
+    val activeTrip: Trip? = null,
 )
 
 sealed interface HomeEvent {
     data class OpenActiveSession(val segmentId: String) : HomeEvent
     data object PermissionDenied : HomeEvent
+    /** "Seguir registrando" found no active trip: open the new-trip form instead (backlog D4). */
+    data object StartNewTrip : HomeEvent
     /** A trip left the list; the snackbar offers to undo and, when it goes away, the screen commits the deletion (backlog D1). */
     data class TripDeleted(val tripId: String, val title: String) : HomeEvent
     data object TripInUse : HomeEvent
@@ -74,7 +78,8 @@ class HomeViewModel @Inject constructor(
 
     val state: StateFlow<HomeUiState> = combine(repository.observeTrips(), repository.observeOpenSegment(), stateHolder.state, pendingDelete) { trips, open, live, hidden ->
         val visible = trips.filter { it.id !in hidden }
-        HomeUiState(visible.filter { !it.archived }, visible.filter { it.archived }, open, needsRecovery = open != null && !live.isRunning)
+        val active = visible.firstOrNull { it.status == com.bitacoraviaje.core.model.TripStatus.ACTIVE && !it.archived }
+        HomeUiState(visible.filter { !it.archived }, visible.filter { it.archived }, open, needsRecovery = open != null && !live.isRunning, activeTrip = active)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     fun renameTrip(tripId: String, title: String) {
@@ -146,6 +151,24 @@ class HomeViewModel @Inject constructor(
 
 
     fun requiredPermissions() = controller.requiredPermissions()
+
+    /**
+     * Backlog D4, the big button: back to the open segment, or a new stage of the active trip with one tap;
+     * without an active trip the screen opens the new-trip form.
+     */
+    fun continueRecording() {
+        viewModelScope.launch {
+            if (!controller.hasLocationPermission()) {
+                _events.send(HomeEvent.PermissionDenied)
+                return@launch
+            }
+            val id = runCatching { controller.continueRecording() }.getOrElse { e ->
+                android.util.Log.w("Bitacora", "continue recording failed: ${e.javaClass.simpleName} ${e.message}")
+                null
+            }
+            _events.send(if (id != null) HomeEvent.OpenActiveSession(id) else HomeEvent.StartNewTrip)
+        }
+    }
 
     /** Recovery dialog: keep recording the open segment. */
     fun resumeOpenSegment() {

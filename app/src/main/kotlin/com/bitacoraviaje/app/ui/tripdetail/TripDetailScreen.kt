@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
@@ -68,7 +69,7 @@ import java.util.Locale
 private val APP_LOCALE: Locale = Locale.forLanguageTag("es-AR")
 
 @Composable
-fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (String) -> Unit, onVoiceNote: (String) -> Unit, onCreateVideo: (String) -> Unit = {}, viewModel: TripDetailViewModel = hiltViewModel()) {
+fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (String) -> Unit, onVoiceNote: (String) -> Unit, onCreateVideo: (String) -> Unit = {}, onAddToTrip: (String) -> Unit = {}, viewModel: TripDetailViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
     var showOffline by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
@@ -93,6 +94,7 @@ fun TripDetailRoute(mapRenderer: MapRenderer, onBack: () -> Unit, onReview: (Str
         onReview = { onReview(viewModel.tripId) },
         onExport = { showExport = true },
         onCreateVideo = { onCreateVideo(viewModel.tripId) },
+        onAddToTrip = { onAddToTrip(viewModel.tripId) },
         onPlaceAction = viewModel::onPlaceAction,
         map = { s, m, tap -> mapRenderer.TrackMap(s, m, onTap = tap) },
         onMapTap = viewModel::onMapTap,
@@ -150,6 +152,7 @@ fun TripDetailScreen(
     onReview: () -> Unit,
     onExport: () -> Unit = {},
     onCreateVideo: () -> Unit = {},
+    onAddToTrip: () -> Unit = {},
     onPlaceAction: (PlaceAction) -> Unit = {},
     offline: OfflineUiState = OfflineUiState(),
     onOffline: () -> Unit = {},
@@ -164,6 +167,8 @@ fun TripDetailScreen(
                 title = { Text(state.trip?.title ?: "") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
                 actions = {
+                    // Backlog D4: a trip is a container; a stage, excursion or trek is added from here.
+                    IconButton(onClick = onAddToTrip, modifier = Modifier.testTag("trip_add")) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.trip_add)) }
                     IconButton(onClick = onCreateVideo, modifier = Modifier.testTag("trip_video")) { Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.video_title)) }
                     IconButton(onClick = onExport, modifier = Modifier.testTag("trip_export")) { Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.export_title)) }
                 },

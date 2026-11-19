@@ -17,6 +17,7 @@ class QuickActionsTest {
     @Test
     fun `tracking tile starts when idle, pauses when running and resumes when paused or resting`() {
         assertEquals(TrackingTileModel(false, R.string.tile_tracking_start, TrackingTileModel.Action.OPEN_NEW_SESSION), TrackingTileModel.of(LiveTrackingState(), hasOpenSegment = false))
+        assertEquals(R.string.tile_tracking_continue, TrackingTileModel.of(LiveTrackingState(), hasOpenSegment = false, hasActiveTrip = true).labelRes, "a trip in course: the tile continues it (backlog D4)")
         // The service died (phone killed it) but a stage is open: back to the app, never a new session on top (review I2).
         assertEquals(TrackingTileModel(false, R.string.tile_tracking_back, TrackingTileModel.Action.OPEN_APP), TrackingTileModel.of(LiveTrackingState(isRunning = false), hasOpenSegment = true))
         val running = LiveTrackingState(segmentId = "s", isRunning = true, startedUtcMs = 1)

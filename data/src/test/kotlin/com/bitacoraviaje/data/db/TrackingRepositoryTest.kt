@@ -239,4 +239,43 @@ class TrackingRepositoryTest {
         assertEquals(0, db.trackPointDao().countBySegment(s.id))
         assertTrue(repo.observeTrips().first().isEmpty())
     }
+
+    // Backlog D4: a trip is a container; components are added to it.
+
+    @Test
+    fun `a new trip closes the active one with its open segment`() = runTest {
+        val a = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "A")
+        val b = repo.startSession(SegmentType.TRIP_START, Transport.CAR, RecordingMode.FULL, "UTC", tripTitle = "B", newTrip = true)
+        assertTrue(a.tripId != b.tripId)
+        assertEquals(TripStatus.FINISHED, repo.getTrip(a.tripId)?.status)
+        assertEquals(SegmentStatus.FINISHED, repo.getSegment(a.id)?.status)
+        assertEquals(b.id, repo.getOpenSegment()?.id)
+        assertEquals(b.tripId, repo.getActiveTrip()?.id)
+    }
+
+    @Test
+    fun `adding a stage to a finished trip reopens it and closes whatever other trip was active`() = runTest {
+        val old = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Viejo")
+        repo.finishTrip(old.tripId)
+        repo.setTripArchived(old.tripId, true)
+        val other = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "Otro")
+        val added = repo.startSession(SegmentType.STAGE, Transport.BIKE, RecordingMode.ECONOMY, "UTC", title = "Día 2", tripId = old.tripId)
+        assertEquals(old.tripId, added.tripId)
+        val reopened = assertNotNull(repo.getTrip(old.tripId))
+        assertEquals(TripStatus.ACTIVE, reopened.status)
+        assertNull(reopened.endedUtcMs)
+        assertEquals(false, reopened.archived, "adding to an archived trip brings it back")
+        assertEquals(TripStatus.FINISHED, repo.getTrip(other.tripId)?.status, "the other active trip is closed")
+        assertEquals(SegmentStatus.FINISHED, repo.getSegment(other.id)?.status)
+        assertEquals(added.id, repo.getOpenSegment()?.id)
+        assertEquals(2, repo.segmentsOf(old.tripId).size)
+    }
+
+    @Test
+    fun `an excursion added to the active trip still nests under its open stage`() = runTest {
+        val s = repo.startSession(SegmentType.TRIP_START, Transport.WALK, RecordingMode.FULL, "UTC", tripTitle = "V")
+        val ex = repo.startSession(SegmentType.EXCURSION, Transport.WALK, RecordingMode.FULL, "UTC", tripId = s.tripId)
+        assertEquals(s.id, ex.parentSegmentId)
+        assertEquals(SegmentStatus.PAUSED, repo.getSegment(s.id)?.status)
+    }
 }

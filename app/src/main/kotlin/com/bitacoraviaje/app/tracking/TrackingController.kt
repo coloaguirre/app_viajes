@@ -45,16 +45,36 @@ class TrackingController @Inject constructor(
         title: String? = null,
         intentText: String? = null,
         tripTitle: String? = null,
+        tripId: String? = null,
+        newTrip: Boolean = false,
     ): String {
         check(hasLocationPermission()) { "location permission required" }
-        // A new stage closes the open one: let the service persist its buffer first (I3).
-        if (type == SegmentType.TRIP_START || type == SegmentType.STAGE) stopServiceAndAwaitFlush()
+        // A new stage (or a new trip, or a switch of trip) closes the open one: let the service persist its buffer first (I3).
+        val switchesTrip = newTrip || (tripId != null && tripId != repository.getActiveTrip()?.id)
+        if (type == SegmentType.TRIP_START || type == SegmentType.STAGE || switchesTrip) stopServiceAndAwaitFlush()
         val segment = repository.startSession(
             type, transport, mode, TimeZone.getDefault().id, title, intentText,
             tripTitle = tripTitle?.ifBlank { null } ?: context.getString(com.bitacoraviaje.app.R.string.default_trip_title),
+            tripId = tripId, newTrip = newTrip,
         )
         startService(segment.id, segment.samplingProfile)
         return segment.id
+    }
+
+    /**
+     * Backlog D4, the one-tap path from Home, the widget and the tile: an open segment is where recording
+     * continues (the service is restarted if it died); otherwise a new stage of the active trip starts with
+     * the transport and mode of its last segment. Null when there is no active trip (the caller asks for one).
+     */
+    suspend fun continueRecording(): String? {
+        check(hasLocationPermission()) { "location permission required" }
+        repository.getOpenSegment()?.let { open ->
+            if (!isServiceRunning()) resumeOpenSegment(open)
+            return open.id
+        }
+        val trip = repository.getActiveTrip() ?: return null
+        val last = repository.segmentsOf(trip.id).maxByOrNull { it.startedUtcMs }
+        return startSession(SegmentType.STAGE, last?.transport ?: com.bitacoraviaje.core.model.Transport.WALK, last?.recordingMode ?: RecordingMode.FULL, tripId = trip.id)
     }
 
     private fun startService(segmentId: String, profile: String) {
