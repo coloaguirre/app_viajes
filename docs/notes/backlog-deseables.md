@@ -92,6 +92,14 @@ registros distintos, y además el viaje continuo (adenda 1) crea etapas solas a 
 etapa, accesos rápidos) y toca los tests de Compose de todas esas pantallas; conviene hacerlo
 después de las pruebas de campo de las Fases 1–3 para no cambiar lo que se está midiendo.
 
+## 5. Video por tramo de un viaje largo  — viable · complejidad baja (1 d) · sin esquema
+Pedido 2026-11-20. Un viaje de 20 días se registra como un solo viaje con etapas; el video de resumen
+es por viaje y hoy no se puede acotar a un destino. Alcance: en la pantalla de crear video, un selector
+de etapas (rango o selección múltiple) que el planificador recibe como filtro de segmentos; los capítulos,
+créditos y el clima se calculan igual sobre el subconjunto. El espejo Python del planificador recibe el
+mismo filtro y las fixtures de conformidad se extienden con un caso filtrado. Sin cambios de esquema ni
+de exportación.
+
 ## Orden sugerido
 1. Menú de tres puntos (1 d): barato y destraba el uso diario (archivar lo viejo).
 2. Mapa interactivo (2 d): mejora directa de la bitácora sin tocar el modelo.

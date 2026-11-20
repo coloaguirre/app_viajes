@@ -429,6 +429,10 @@ contrato vigente; entran al plan cuando el usuario los priorice.
       Hecho 2026-10-14 (PR feat/weather): evidencia en `docs/notes/evidencia/backlog/D3-clima.md`.
 - [x] D4 "Nuevo viaje" con componentes (etapa, excursión, trekking) en lugar de tres registros.  (est: 2)
       Hecho 2026-11-19 (PR feat/new-trip-flow): evidencia en `docs/notes/evidencia/backlog/D4-nuevo-viaje.md`.
+- [ ] D5 Video por tramo: generar el video de un rango de etapas (un destino o región) de un viaje largo,
+      sin partir el viaje. Pedido el 2026-11-20 al decidir registrar un viaje de 20 días como un solo viaje
+      con etapas. Alcance previsto: selector de etapas en la pantalla de crear video; el planificador filtra
+      segmentos (Kotlin y espejo Python); exportación y bitácora no cambian.  (est: 1)
 
 ### Calendario
 Suma de estimaciones activas (Fases 0 a 5): **62,5 días de trabajo de
