@@ -42,12 +42,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 
 /**
  * Foreground service of type `location` (DISENO §6.1). Started only from the visible
@@ -84,8 +82,8 @@ class TrackingService : LifecycleService() {
     private var clockGuard = ClockGuard()
     private var loggedCorrections = 0
     private var policy: TripContinuityPolicy? = null
-    private val buffer = ArrayList<TrackPoint>()
-    private var lastFlushMs = 0L
+    /** Fixes waiting for the next batch insert; its flush is exclusive (see [PointBuffer]). */
+    private val buffer = PointBuffer<TrackPoint> { repository.insertPoints(it) }
     private var lastNotifyMs = 0L
     private var tickerJob: Job? = null
     private var mediaJob: Job? = null
@@ -215,7 +213,7 @@ class TrackingService : LifecycleService() {
                 val live = stateHolder.state.value
                 // A manual pause freezes the policy: no rest entry, no GPS re-request (I5).
                 if (!live.isPaused) policy?.onTick(now)?.forEach { apply(it) }
-                if (buffer.isNotEmpty() && now - lastFlushMs > FLUSH_INTERVAL_MS) flush() // I1: silence flushes too
+                if (buffer.isNotEmpty() && now - buffer.lastFlushMs > FLUSH_INTERVAL_MS) flush() // I1: silence flushes too
                 checkBattery()
                 notifications.notify(stateHolder.state.value, now)
             }
@@ -304,8 +302,8 @@ class TrackingService : LifecycleService() {
         }
         val verdict = filter.offer(raw)
         // Reinstated jump candidates were stored as rejected; re-store them as accepted copies.
-        verdict.reinstated.forEach { buffer += it.copy(isFilteredOut = false) }
-        buffer += raw.copy(isFilteredOut = !verdict.accepted)
+        verdict.reinstated.forEach { buffer.add(it.copy(isFilteredOut = false)) }
+        buffer.add(raw.copy(isFilteredOut = !verdict.accepted))
         stateHolder.update { s ->
             if (verdict.accepted) {
                 s.copy(distanceM = s.distanceM + verdict.addedDistanceM, acceptedPoints = s.acceptedPoints + 1, lastPoint = raw, currentSpeedMps = raw.speedMps?.toDouble())
@@ -315,7 +313,7 @@ class TrackingService : LifecycleService() {
         }
         if (verdict.accepted) policy?.onPoint(raw)?.forEach { apply(it) }
         val now = System.currentTimeMillis()
-        if (buffer.size >= FLUSH_POINTS || now - lastFlushMs > FLUSH_INTERVAL_MS) flush()
+        if (buffer.size >= FLUSH_POINTS || now - buffer.lastFlushMs > FLUSH_INTERVAL_MS) flush()
         if (now - lastNotifyMs > NOTIFY_INTERVAL_MS) {
             lastNotifyMs = now
             notifications.notify(stateHolder.state.value, now)
@@ -323,17 +321,10 @@ class TrackingService : LifecycleService() {
     }
 
     /**
-     * Runs on [pipeline]. The buffer is cleared only after the insert succeeded, and the
-     * insert cannot be cancelled by scope teardown (I2): a failed or interrupted write
-     * keeps the points for the next attempt.
+     * Runs on [pipeline]. Exclusive: a flush that finds another one in flight waits for it
+     * and then sees an empty buffer (the overlap used to crash the process, see [PointBuffer]).
      */
-    private suspend fun flush() {
-        if (buffer.isEmpty()) return
-        val batch = buffer.toList()
-        withContext(NonCancellable) { repository.insertPoints(batch) }
-        buffer.subList(0, batch.size).clear()
-        lastFlushMs = System.currentTimeMillis()
-    }
+    private suspend fun flush() = buffer.flush()
 
     /**
      * Below 15 % and not charging, sample like SAVER until the phone is charged again
