@@ -151,7 +151,10 @@ Observaciones de la verificación (ítem 0.1):
   recupera). Una etapa en reposo automático se recupera como pausa manual (D7).
 - Backlog de la revisión de Fase 1 (no bloqueante): pantalla previa de
   explicación antes de pedir permisos (§15.1); extraer el pipeline de puntos
-  a una clase pura `TrackRecorder` testeable con reloj inyectado; interacción
+  a una clase pura `TrackRecorder` testeable con reloj inyectado; mutex a nivel pipeline que
+  serialice lote/tick/comando como unidades: hoy un lote que se intercala con otro posterior
+  mientras espera el flush puede ver su cola rechazada como tiempo duplicado (hoy sólo el flush es exclusivo, `PointBuffer`,
+  que vive en `app/tracking` porque ningún módulo `core` depende de coroutines; revisión F1); interacción
   pausa manual + excursión anidada; fuente única de altitud (MSL vs
   elipsoidal) por etapa; `ForegroundServiceStartNotAllowedException` a
   vigilar en el Pixel durante 1.7.

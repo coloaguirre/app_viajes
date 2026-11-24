@@ -8,13 +8,14 @@ import kotlinx.coroutines.withContext
 /**
  * Pending items waiting to be written in one batch by [sink].
  *
- * [flush] suspends inside the sink, and the single-thread pipeline keeps running other
- * coroutines meanwhile (the ticker, a pause, more fixes): two flushes used to interleave,
- * both copied the same head of the list and the second `subList(0, n).clear()` threw
- * `IndexOutOfBoundsException` and killed the recording process (seen 7 times on the
- * 2026-11-20 trip). A mutex makes the flush exclusive; a late caller finds the list
- * already drained and returns. Items are cleared only after the sink succeeded, and the
- * write cannot be cancelled by scope teardown (I2): a failed write keeps the items.
+ * Not thread-safe: every call must come from one single-threaded dispatcher (the service
+ * pipeline). Only [flush] is serialized, with a mutex, because it suspends inside the sink
+ * and the dispatcher keeps running other coroutines meanwhile: two flushes used to copy the
+ * same head of the list and the second `subList(0, n).clear()` threw and killed the
+ * recording process (evidence in `docs/notes/evidencia/backlog/F1-flush-race.md`). A late
+ * caller now finds the list already drained and returns. Items are cleared only after the
+ * sink succeeded, and the write cannot be cancelled by scope teardown (I2): a failed write
+ * keeps the items for the next attempt.
  */
 class PointBuffer<T>(private val sink: suspend (List<T>) -> Unit) {
     private val items = ArrayList<T>()
@@ -35,7 +36,7 @@ class PointBuffer<T>(private val sink: suspend (List<T>) -> Unit) {
         if (items.isEmpty()) return@withLock
         val batch = items.toList()
         withContext(NonCancellable) { sink(batch) }
-        // Only the pipeline appends, so the head of the list is still exactly [batch].
+        // Only this flush removes items and callers only append: the head is still exactly [batch].
         items.subList(0, batch.size).clear()
         lastFlushMs = nowMs
     }

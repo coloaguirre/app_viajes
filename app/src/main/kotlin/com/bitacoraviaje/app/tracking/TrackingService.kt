@@ -52,10 +52,15 @@ import kotlinx.coroutines.runBlocking
  * app; survives screen off; publishes live state through [TrackingStateHolder].
  *
  * Concurrency: every mutation of the recording pipeline (clock guard → filter →
- * continuity policy → buffer) runs on [pipeline], a single-thread dispatcher, so
- * location batches, the ticker and commands never race on the non-thread-safe
- * pure objects. Points are buffered and flushed every [FLUSH_POINTS] fixes or
- * [FLUSH_INTERVAL_MS], whichever comes first (the ticker covers silent periods).
+ * continuity policy → buffer) runs on [pipeline], a single-thread dispatcher. That rules
+ * out data races on the non-thread-safe pure objects, NOT interleaving: at every `suspend`
+ * (a database write, a mutex) another pipeline coroutine runs, so a location batch, a tick
+ * or a command is not atomic as a whole. [PointBuffer] serializes the flush, which is the
+ * one step that mutates shared state across a suspension (review F1). The other handlers do
+ * not crash on interleaving, but a batch interleaved with a later one may get its tail
+ * rejected as duplicate time; a pipeline-level mutex is the recorded follow-up. Points are
+ * buffered and flushed every [FLUSH_POINTS] fixes or [FLUSH_INTERVAL_MS], whichever comes
+ * first (the ticker covers silent periods).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @AndroidEntryPoint
