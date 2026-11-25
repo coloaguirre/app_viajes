@@ -433,6 +433,22 @@ contrato vigente; entran al plan cuando el usuario los priorice.
       sin partir el viaje. Pedido el 2026-11-20 al decidir registrar un viaje de 20 días como un solo viaje
       con etapas. Alcance previsto: selector de etapas en la pantalla de crear video; el planificador filtra
       segmentos (Kotlin y espejo Python); exportación y bitácora no cambian.  (est: 1)
+- [x] F1 Corrección urgente (2026-11-24, en viaje): el proceso se cerraba al solapar dos guardados de
+      puntos (`IndexOutOfBoundsException` en `flush`, 7 cierres en 4 días); `PointBuffer` con flush
+      exclusivo y pruebas. Instalado en el Pixel el 2026-11-24 20:41. Evidencia:
+      `docs/notes/evidencia/backlog/F1-flush-race.md`.  (est: 0.5)
+- [ ] D6 Inicio con sesión abierta: un solo acceso ("Ver grabación en curso"), ocultar "Seguir
+      registrando" mientras hay etapa abierta y mostrar la nota de voz desde el inicio. Pedido el
+      2026-11-24: "tres accesos a más o menos lo mismo".  (est: 0.5)
+- [ ] D7 Recuperación de una etapa en reposo automático como reposo (hoy se restaura como pausa manual y
+      exige dos toques), y relanzar el servicio desde la pantalla de sesión si la etapa está abierta sin
+      servicio (deuda de D4).  (est: 0.5)
+- [ ] D8 Reprocesar una etapa con otro transporte: volver a pasar el filtro sobre los puntos guardados
+      (los descartados se conservan con `is_filtered_out`). Primer uso: la excursión del 2026-11-24
+      grabada "a pie" durante 560 km en auto (1353 de 1467 puntos descartados).  (est: 1)
+- [ ] D9 Vigía del servicio: comprobación periódica (WorkManager) que relance el servicio si hay etapa
+      abierta sin servicio y lo avise. Motivo: el 22 y 23/11 no se grabó nada porque el servicio murió
+      sin traza y nadie lo relanzó.  (est: 1)
 
 ### Calendario
 Suma de estimaciones activas (Fases 0 a 5): **62,5 días de trabajo de

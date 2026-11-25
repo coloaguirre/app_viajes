@@ -3,8 +3,8 @@
 > Este archivo lo mantiene Claude Code. Actualizarlo al terminar cada tarea relevante.
 
 ## Estado actual
-- Fase: **5 implementada completa: 5.1 (PR #11), 5.5 (PR #12), 5.2 (PR #13) y 5.3 (PR #14) mergeados; 5.4 mapas sin red implementado en `feat/fase-5-offline` (2026-10-13). 5.6 Google Fotos queda como deseable a futuro.** Quedan en manos del usuario las mediciones de campo que cierran formalmente las fases: 1.7 (batería), 2.8 (salida con fotos y notas), 3.4 (motor de transcripción con ≥10 notas), 3.7 (abrir la exportación en la PC y My Maps), 4.6 y 5.1 (tiempos de video en el Pixel). Pendiente con el usuario: retro de Fases 2–4. Backlog deseable: D1 (menú por viaje) y D2 (mapa interactivo) hechos el 2026-10-13, D3 (clima) el 2026-10-14 y D4 ("Nuevo viaje" con componentes) el 2026-11-19: el backlog deseable D1–D4 está completo; queda D5 (video por tramo, pedido 2026-11-20, sin fecha). Decisión del usuario (2026-11-19): sin retro; las pruebas de campo se hacen en vivo en viajes reales (el primero, 2026-11-20).
-- Última actualización: 2026-11-20 (D5 video por tramo anotado como pendiente; D4 instalado en el Pixel el 2026-11-19)
+- Fase: **5 implementada completa: 5.1 (PR #11), 5.5 (PR #12), 5.2 (PR #13) y 5.3 (PR #14) mergeados; 5.4 mapas sin red implementado en `feat/fase-5-offline` (2026-10-13). 5.6 Google Fotos queda como deseable a futuro.** Quedan en manos del usuario las mediciones de campo que cierran formalmente las fases: 1.7 (batería), 2.8 (salida con fotos y notas), 3.4 (motor de transcripción con ≥10 notas), 3.7 (abrir la exportación en la PC y My Maps), 4.6 y 5.1 (tiempos de video en el Pixel). Pendiente con el usuario: retro de Fases 2–4. Backlog deseable: D1 (menú por viaje) y D2 (mapa interactivo) hechos el 2026-10-13, D3 (clima) el 2026-10-14 y D4 ("Nuevo viaje" con componentes) el 2026-11-19: el backlog deseable D1–D4 está completo; queda D5 (video por tramo, pedido 2026-11-20, sin fecha). **2026-11-24, en viaje: corrección urgente F1** (cierre del proceso al solapar dos guardados de puntos, 7 cierres en 4 días) instalada en el Pixel; deja pendientes D6–D9 (inicio con un solo acceso, recuperación del reposo, reprocesar etapa con otro transporte, vigía del servicio). Ver `docs/notes/evidencia/backlog/F1-flush-race.md`. Decisión del usuario (2026-11-19): sin retro; las pruebas de campo se hacen en vivo en viajes reales (el primero, 2026-11-20).
+- Última actualización: 2026-11-24 (F1 corrección del cierre en `flush` instalada en el Pixel durante el viaje; D6–D9 anotados)
 
 ## Fases
 | Fase | Estado | Evidencia de aceptación |
@@ -145,9 +145,16 @@ Observaciones de la verificación (ítem 0.1):
   un comando con sudo del usuario.
 
 ## Problemas conocidos
+- Viaje 2026-11-20 (datos reales, leídos el 2026-11-24): el 22 y 23/11 no hay registro (el servicio
+  murió el 22/11 00:05 sin traza y no se relanzó hasta el 24/11); la excursión del 24/11 quedó "a pie"
+  durante 560 km en auto y el filtro descartó el 92 % de los puntos (se conservan en la base; D8 los
+  recupera). Una etapa en reposo automático se recupera como pausa manual (D7).
 - Backlog de la revisión de Fase 1 (no bloqueante): pantalla previa de
   explicación antes de pedir permisos (§15.1); extraer el pipeline de puntos
-  a una clase pura `TrackRecorder` testeable con reloj inyectado; interacción
+  a una clase pura `TrackRecorder` testeable con reloj inyectado; mutex a nivel pipeline que
+  serialice lote/tick/comando como unidades: hoy un lote que se intercala con otro posterior
+  mientras espera el flush puede ver su cola rechazada como tiempo duplicado (hoy sólo el flush es exclusivo, `PointBuffer`,
+  que vive en `app/tracking` porque ningún módulo `core` depende de coroutines; revisión F1); interacción
   pausa manual + excursión anidada; fuente única de altitud (MSL vs
   elipsoidal) por etapa; `ForegroundServiceStartNotAllowedException` a
   vigilar en el Pixel durante 1.7.
